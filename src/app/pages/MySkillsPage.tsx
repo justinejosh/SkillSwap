@@ -398,17 +398,6 @@ export default function MySkillsPage() {
                           </div>
                         </div>
                         <div className="flex gap-2 ml-4">
-                          {!skill.verified && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => navigate("/skill-verification")}
-                              className="border-purple-200 text-purple-600 hover:bg-purple-50"
-                            >
-                              <CheckCircle className="mr-1 size-3" />
-                              Verify
-                            </Button>
-                          )}
                           <Button
                             size="sm"
                             variant="outline"
@@ -570,14 +559,6 @@ export default function MySkillsPage() {
                   className="bg-white text-blue-600 border-white hover:bg-blue-50"
                 >
                   Browse Marketplace
-                </Button>
-                <Button
-                  onClick={() => navigate("/skill-verification")}
-                  variant="outline"
-                  className="bg-white text-blue-600 border-white hover:bg-blue-50"
-                >
-                  <CheckCircle className="mr-2 size-4" />
-                  Verify Skills
                 </Button>
               </div>
             </div>

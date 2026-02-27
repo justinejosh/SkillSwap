@@ -176,14 +176,6 @@ export default function DashboardPage() {
                 <Button
                   variant="ghost"
                   className="w-full justify-start text-blue-900 hover:bg-blue-50"
-                  onClick={() => navigate("/resources")}
-                >
-                  <BookOpen className="mr-2 size-5" />
-                  Resources
-                </Button>
-                <Button
-                  variant="ghost"
-                  className="w-full justify-start text-blue-900 hover:bg-blue-50"
                   onClick={() => navigate("/security")}
                 >
                   <Shield className="mr-2 size-5" />
@@ -217,30 +209,6 @@ export default function DashboardPage() {
                 >
                   <BarChart3 className="mr-2 size-5" />
                   My Analytics
-                </Button>
-                <Button
-                  variant="ghost"
-                  className="w-full justify-start text-blue-900 hover:bg-blue-50"
-                  onClick={() => navigate("/skill-verification")}
-                >
-                  <CheckCircle className="mr-2 size-5" />
-                  Skill Verification
-                </Button>
-                <Button
-                  variant="ghost"
-                  className="w-full justify-start text-blue-900 hover:bg-blue-50"
-                  onClick={() => navigate("/dispute-resolution")}
-                >
-                  <Scale className="mr-2 size-5" />
-                  Dispute Resolution
-                </Button>
-                <Button
-                  variant="ghost"
-                  className="w-full justify-start text-blue-900 hover:bg-blue-50"
-                  onClick={() => navigate("/activity-timeline")}
-                >
-                  <Clock className="mr-2 size-5" />
-                  Activity Timeline
                 </Button>
               </CardContent>
             </Card>

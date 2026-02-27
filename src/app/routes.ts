@@ -19,7 +19,6 @@ import CommunityForumPage from "@/app/pages/CommunityForumPage";
 import ResourceLibraryPage from "@/app/pages/ResourceLibraryPage";
 import NotificationCenterPage from "@/app/pages/NotificationCenterPage";
 import AnalyticsDashboardPage from "@/app/pages/AnalyticsDashboardPage";
-import SkillVerificationPage from "@/app/pages/SkillVerificationPage";
 import DisputeResolutionPage from "@/app/pages/DisputeResolutionPage";
 import ActivityTimelinePage from "@/app/pages/ActivityTimelinePage";
 import MySkillsPage from "@/app/pages/MySkillsPage";
@@ -108,10 +107,6 @@ export const router = createBrowserRouter([
   {
     path: "/analytics",
     Component: AnalyticsDashboardPage,
-  },
-  {
-    path: "/skill-verification",
-    Component: SkillVerificationPage,
   },
   {
     path: "/dispute-resolution",
