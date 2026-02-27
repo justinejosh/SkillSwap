@@ -16,10 +16,8 @@ import LeaderboardPage from "@/app/pages/LeaderboardPage";
 import AchievementsPage from "@/app/pages/AchievementsPage";
 import SkillRequestBoardPage from "@/app/pages/SkillRequestBoardPage";
 import CommunityForumPage from "@/app/pages/CommunityForumPage";
-import ResourceLibraryPage from "@/app/pages/ResourceLibraryPage";
 import NotificationCenterPage from "@/app/pages/NotificationCenterPage";
 import AnalyticsDashboardPage from "@/app/pages/AnalyticsDashboardPage";
-import DisputeResolutionPage from "@/app/pages/DisputeResolutionPage";
 import ActivityTimelinePage from "@/app/pages/ActivityTimelinePage";
 import MySkillsPage from "@/app/pages/MySkillsPage";
 
@@ -97,20 +95,12 @@ export const router = createBrowserRouter([
     Component: CommunityForumPage,
   },
   {
-    path: "/resources",
-    Component: ResourceLibraryPage,
-  },
-  {
     path: "/notifications",
     Component: NotificationCenterPage,
   },
   {
     path: "/analytics",
     Component: AnalyticsDashboardPage,
-  },
-  {
-    path: "/dispute-resolution",
-    Component: DisputeResolutionPage,
   },
   {
     path: "/activity-timeline",
