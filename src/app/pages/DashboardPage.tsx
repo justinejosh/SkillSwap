@@ -44,7 +44,7 @@ export default function DashboardPage() {
       <header className="bg-white border-b border-blue-100 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-8">
-            <h1 className="text-2xl font-bold text-blue-900">SkillSwap</h1>
+            <h1 className="text-2xl font-bold text-blue-900">Knoxite</h1>
             <div className="relative flex-1 max-w-md">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-blue-400 size-5" />
               <Input
