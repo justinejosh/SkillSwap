@@ -10,12 +10,46 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  
+  // New states for handling backend communication
+  const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Login attempt with:", { email, password });
-    // Navigate to dashboard after successful login
-    navigate("/dashboard");
+    setError(""); // Clear previous errors
+    setIsLoading(true);
+
+    try {
+      // 1. Send the email and password to our Node.js server
+      const response = await fetch("http://localhost:5000/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email, password }),
+      });
+
+      // 2. Parse the JSON response from the server
+      const data = await response.json();
+
+      // 3. Check if the server rejected the login (e.g., wrong password)
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to login. Please try again.");
+      }
+
+      // 4. Success! Save the security token and user data to the browser
+      localStorage.setItem("knoxite_token", data.token);
+      localStorage.setItem("knoxite_user", JSON.stringify(data.user));
+
+      // 5. Navigate to the dashboard
+      navigate("/dashboard");
+    } catch (err: any) {
+      // Display the error message in the UI
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const reviews = [
@@ -53,6 +87,14 @@ export default function LoginPage() {
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-4">
+                
+                {/* --- NEW ERROR MESSAGE DISPLAY --- */}
+                {error && (
+                  <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md text-center">
+                    {error}
+                  </div>
+                )}
+
                 <div className="space-y-2">
                   <Label htmlFor="email" className="text-blue-900">Email</Label>
                   <Input
@@ -73,7 +115,7 @@ export default function LoginPage() {
                       className="text-sm text-blue-600 hover:text-blue-700 hover:underline"
                       onClick={(e) => {
                         e.preventDefault();
-                        alert("Password reset feature");
+                        alert("Password reset feature coming soon!");
                       }}
                     >
                       Forgot password?
@@ -89,9 +131,16 @@ export default function LoginPage() {
                     className="border-blue-200 focus:border-blue-400 focus:ring-blue-400"
                   />
                 </div>
-                <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white">
-                  Sign in
+                
+                {/* --- UPDATED BUTTON --- */}
+                <Button 
+                  type="submit" 
+                  disabled={isLoading}
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white disabled:bg-blue-400"
+                >
+                  {isLoading ? "Signing in..." : "Sign in"}
                 </Button>
+
               </form>
               <div className="mt-4 text-center text-sm text-blue-700">
                 Don't have an account?{" "}

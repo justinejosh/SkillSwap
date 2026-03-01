@@ -1,0 +1,21 @@
+### 1. Test the Health Route
+GET http://localhost:5000/api/health
+
+### 2. Register a New User
+POST http://localhost:5000/api/auth/register
+Content-Type: application/json
+
+{
+  "name": "Test User",
+  "email": "test@knoxite.com",
+  "password": "securepassword123"
+}
+
+### 3. Login with that User
+POST http://localhost:5000/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "test@knoxite.com",
+  "password": "securepassword123"
+}

@@ -1,0 +1,106 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// -------------------------------------------------
+// 1. USER MODEL
+// -------------------------------------------------
+model User {
+  id             String   @id @default(uuid())
+  name           String
+  email          String   @unique
+  passwordHash   String   
+  bio            String?  @db.Text
+  avatarUrl      String?
+  location       String?
+  createdAt      DateTime @default(now())
+
+  offeredSkills  Skill[]  @relation("OfferedSkills")
+  wantedSkills   Skill[]  @relation("WantedSkills")
+
+  requestsSent     SwapRequest[] @relation("Requester")
+  requestsReceived SwapRequest[] @relation("Receiver")
+
+  reviewsGiven    Review[] @relation("Reviewer")
+  reviewsReceived Review[] @relation("Reviewee")
+
+  messagesSent     Message[] @relation("Sender")
+  messagesReceived Message[] @relation("Receiver")
+}
+
+// -------------------------------------------------
+// 2. SKILL MODEL
+// -------------------------------------------------
+model Skill {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  category    String   
+
+  offeredBy   User[]   @relation("OfferedSkills")
+  wantedBy    User[]   @relation("WantedSkills")
+
+  swapsOffered SwapRequest[] @relation("SwapOfferedSkill")
+  swapsWanted  SwapRequest[] @relation("SwapWantedSkill")
+}
+
+// -------------------------------------------------
+// 3. SWAP REQUEST MODEL
+// -------------------------------------------------
+model SwapRequest {
+  id              String   @id @default(uuid())
+  status          String   @default("PENDING") 
+  scheduledDate   DateTime?
+  meetingLink     String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  requesterId     String
+  receiverId      String
+  offeredSkillId  String
+  wantedSkillId   String
+
+  requester       User     @relation("Requester", fields: [requesterId], references: [id])
+  receiver        User     @relation("Receiver", fields: [receiverId], references: [id])
+  offeredSkill    Skill    @relation("SwapOfferedSkill", fields: [offeredSkillId], references: [id])
+  wantedSkill     Skill    @relation("SwapWantedSkill", fields: [wantedSkillId], references: [id])
+
+  reviews         Review[]
+}
+
+// -------------------------------------------------
+// 4. REVIEW MODEL
+// -------------------------------------------------
+model Review {
+  id              String   @id @default(uuid())
+  rating          Int      
+  comment         String?  @db.Text
+  createdAt       DateTime @default(now())
+
+  swapRequestId   String
+  reviewerId      String
+  revieweeId      String
+
+  swapRequest     SwapRequest @relation(fields: [swapRequestId], references: [id])
+  reviewer        User        @relation("Reviewer", fields: [reviewerId], references: [id])
+  reviewee        User        @relation("Reviewee", fields: [revieweeId], references: [id])
+}
+
+// -------------------------------------------------
+// 5. MESSAGE MODEL
+// -------------------------------------------------
+model Message {
+  id          String   @id @default(uuid())
+  content     String   @db.Text
+  createdAt   DateTime @default(now())
+
+  senderId    String
+  receiverId  String
+
+  sender      User     @relation("Sender", fields: [senderId], references: [id])
+  receiver    User     @relation("Receiver", fields: [receiverId], references: [id])
+}

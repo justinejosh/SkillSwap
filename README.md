@@ -8,4 +8,12 @@
   Run `npm i` to install the dependencies.
 
   Run `npm run dev` to start the development server.
+
+  Run  knoxite-backend 
   
+  C:\Users\ashto\OneDrive\Documents\SOFE\SkillSwap\knoxite-backend> 
+  'npm install express cors dotenv bcrypt jsonwebtoken'
+  'npm install -D typescript @types/node @types/express @types/cors @types/bcrypt @types/jsonwebtoken ts-node nodemon prisma'
+  npx tsc --init
+  npx prisma init
+  npm install prisma@6 @prisma/client@6
