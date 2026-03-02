@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
@@ -6,198 +6,243 @@ import { Label } from "@/app/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/app/components/ui/avatar";
 import { Badge } from "@/app/components/ui/badge";
-import { ArrowLeft, Star, Shield, LogOut } from "lucide-react";
+import { ArrowLeft, Star, Shield, LogOut, Loader2, Save } from "lucide-react";
+
+// 1. IMPORT YOUR CONFIG
+import { API_BASE_URL } from "@/config";
 
 export default function ProfilePage() {
   const navigate = useNavigate();
-  const [name, setName] = useState("John Doe");
-  const [email, setEmail] = useState("john.doe@example.com");
-  const [bio, setBio] = useState("Passionate about learning and sharing skills!");
+  
+  const [profile, setProfile] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
 
-  const offeredSkills = ["Web Development", "Graphic Design", "Photography"];
-  const wantedSkills = ["Piano", "Spanish", "Cooking"];
+  // Form states
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [bio, setBio] = useState("");
 
-  const handleSave = (e: React.FormEvent) => {
+  useEffect(() => {
+    fetchUserProfile();
+  }, []);
+
+  const fetchUserProfile = async () => {
+    try {
+      const token = localStorage.getItem("knoxite_token");
+      if (!token) {
+        navigate("/");
+        return;
+      }
+
+      const response = await fetch(`${API_BASE_URL}/profile`, {
+        headers: { 
+          "Authorization": `Bearer ${token}`,
+          "bypass-tunnel-reminder": "true" 
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setProfile(data);
+        setName(data.name);
+        setEmail(data.email);
+        setBio(data.bio || "");
+      }
+    } catch (error) {
+      console.error("Error fetching profile:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    alert("Profile updated successfully!");
+    setIsSaving(true);
+    try {
+      const token = localStorage.getItem("knoxite_token");
+      const response = await fetch(`${API_BASE_URL}/profile`, {
+        method: "PUT", // Or PATCH depending on your backend
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+          "bypass-tunnel-reminder": "true"
+        },
+        body: JSON.stringify({ name, bio })
+      });
+
+      if (response.ok) {
+        alert("Profile updated successfully!");
+        fetchUserProfile(); // Refresh data
+      }
+    } catch (error) {
+      console.error("Save failed", error);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleSignOut = () => {
-    // Clear any stored user data (in a real app, this would clear tokens, etc.)
     if (confirm("Are you sure you want to sign out?")) {
-      localStorage.clear();
-      sessionStorage.clear();
+      localStorage.removeItem("knoxite_token");
+      localStorage.removeItem("knoxite_user");
       navigate("/");
     }
   };
 
+  if (isLoading) {
+    return (
+      <div className="flex flex-col justify-center items-center min-h-screen bg-blue-50">
+        <Loader2 className="animate-spin size-8 text-blue-600 mb-2" />
+        <p className="text-blue-900 font-medium">Loading Profile...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-100">
-      {/* Header */}
-      <header className="bg-white border-b border-blue-100 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate("/dashboard")}
-            className="text-blue-600 hover:text-blue-700"
+      <header className="bg-white border-b border-blue-100 shadow-sm sticky top-0 z-10">
+        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => navigate("/dashboard")}
+              className="text-blue-600 h-10 w-10"
+            >
+              <ArrowLeft className="size-6" />
+            </Button>
+            <h1 className="text-xl font-bold text-blue-900">My Profile</h1>
+          </div>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={handleSignOut} 
+            className="text-red-500 hover:bg-red-50 text-xs font-bold"
           >
-            <ArrowLeft className="size-6" />
+            <LogOut className="size-4 mr-1" /> EXIT
           </Button>
-          <h1 className="text-2xl font-bold text-blue-900">My Profile</h1>
         </div>
       </header>
 
-      <div className="max-w-4xl mx-auto p-4 space-y-6">
-        {/* Profile Card */}
-        <Card className="bg-white/90 backdrop-blur border-blue-100">
-          <CardHeader>
-            <div className="flex items-center gap-4">
-              <Avatar className="size-20">
-                <AvatarImage src="https://api.dicebear.com/7.x/avataaars/svg?seed=JohnDoe" />
-                <AvatarFallback className="bg-blue-200 text-blue-900 text-2xl">JD</AvatarFallback>
+      <div className="max-w-4xl mx-auto p-4 space-y-4">
+        {/* User Identity Card */}
+        <Card className="bg-white/90 backdrop-blur border-blue-100 shadow-sm">
+          <CardContent className="pt-6">
+            <div className="flex flex-col items-center text-center mb-6">
+              <Avatar className="size-24 border-4 border-white shadow-md mb-3">
+                <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${name.replace(/\s+/g, '')}`} />
+                <AvatarFallback className="bg-blue-600 text-white text-3xl">
+                  {name.charAt(0).toUpperCase()}
+                </AvatarFallback>
               </Avatar>
-              <div>
-                <CardTitle className="text-blue-900">{name}</CardTitle>
-                <CardDescription className="text-blue-600">{email}</CardDescription>
-                <div className="flex items-center gap-2 mt-2">
-                  <Star className="size-4 fill-yellow-400 text-yellow-400" />
-                  <span className="text-sm text-blue-600">4.8 rating</span>
-                  <span className="text-sm text-blue-400">• 12 swaps completed</span>
+              <h2 className="text-2xl font-bold text-blue-900">{profile?.name}</h2>
+              <p className="text-blue-500 text-sm">{profile?.email}</p>
+              
+              <div className="flex gap-4 mt-4">
+                <div className="text-center">
+                  <p className="text-xs text-blue-400 uppercase font-bold tracking-widest">Rating</p>
+                  <div className="flex items-center justify-center gap-1 text-blue-900 font-bold">
+                    <Star className="size-3 fill-yellow-400 text-yellow-400" /> 4.8
+                  </div>
+                </div>
+                <div className="w-px h-8 bg-blue-100" />
+                <div className="text-center">
+                  <p className="text-xs text-blue-400 uppercase font-bold tracking-widest">Swaps</p>
+                  <p className="text-blue-900 font-bold">12</p>
                 </div>
               </div>
             </div>
-          </CardHeader>
-          <CardContent>
+
             <form onSubmit={handleSave} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="name" className="text-blue-900">Full Name</Label>
+              <div className="space-y-1.5">
+                <Label htmlFor="name" className="text-xs font-bold text-blue-400 uppercase ml-1">Display Name</Label>
                 <Input
                   id="name"
-                  type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="border-blue-200 focus:border-blue-400"
+                  className="bg-blue-50/30 border-blue-100 focus:ring-blue-500 h-11"
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="email" className="text-blue-900">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="border-blue-200 focus:border-blue-400"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="bio" className="text-blue-900">Bio</Label>
-                <Input
+              
+              <div className="space-y-1.5">
+                <Label htmlFor="bio" className="text-xs font-bold text-blue-400 uppercase ml-1">About Me</Label>
+                <textarea
                   id="bio"
-                  type="text"
+                  rows={3}
                   value={bio}
                   onChange={(e) => setBio(e.target.value)}
-                  className="border-blue-200 focus:border-blue-400"
+                  placeholder="Tell the community what you're looking for..."
+                  className="w-full rounded-md border border-blue-100 bg-blue-50/30 p-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
                 />
               </div>
-              <Button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white">
-                Save Changes
-              </Button>
+
               <Button 
-                type="button"
-                variant="outline"
-                onClick={() => navigate("/security")}
-                className="ml-2 border-blue-200 text-blue-600 hover:bg-blue-50"
+                type="submit" 
+                disabled={isSaving}
+                className="w-full bg-blue-600 hover:bg-blue-700 h-12 shadow-md shadow-blue-200"
               >
-                <Shield className="mr-2 size-4" />
-                Security Settings
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleSignOut}
-                className="ml-2 border-blue-200 text-blue-600 hover:bg-blue-50"
-              >
-                <LogOut className="mr-2 size-4" />
-                Sign Out
+                {isSaving ? <Loader2 className="animate-spin mr-2" /> : <Save className="mr-2 size-4" />}
+                Update Profile Info
               </Button>
             </form>
           </CardContent>
         </Card>
 
-        {/* Skills Section */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Offered Skills */}
-          <Card className="bg-white/90 backdrop-blur border-blue-100">
-            <CardHeader>
-              <CardTitle className="text-blue-900">Skills I Offer</CardTitle>
-              <CardDescription className="text-blue-600">
-                What I can teach others
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-wrap gap-2">
-                {offeredSkills.map((skill, index) => (
-                  <Badge key={index} className="bg-blue-100 text-blue-900 hover:bg-blue-200">
-                    {skill}
-                  </Badge>
-                ))}
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => navigate("/my-skills")}
-                  className="border-blue-300 text-blue-600"
-                >
-                  + Add Skill
-                </Button>
-              </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => navigate("/my-skills")}
-                className="w-full mt-3 text-blue-600 hover:bg-blue-50"
-              >
-                Manage all skills →
-              </Button>
-            </CardContent>
-          </Card>
-
-          {/* Wanted Skills */}
-          <Card className="bg-white/90 backdrop-blur border-blue-100">
-            <CardHeader>
-              <CardTitle className="text-blue-900">Skills I Want</CardTitle>
-              <CardDescription className="text-blue-600">
-                What I want to learn
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-wrap gap-2">
-                {wantedSkills.map((skill, index) => (
-                  <Badge key={index} className="bg-green-100 text-green-900 hover:bg-green-200">
-                    {skill}
-                  </Badge>
-                ))}
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => navigate("/my-skills")}
-                  className="border-blue-300 text-blue-600"
-                >
-                  + Add Skill
-                </Button>
-              </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => navigate("/my-skills")}
-                className="w-full mt-3 text-blue-600 hover:bg-blue-50"
-              >
-                Manage all skills →
-              </Button>
-            </CardContent>
-          </Card>
+        {/* Skills Quick-View Section */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <SkillSummaryCard 
+            title="Skills I Offer" 
+            skills={profile?.offeredSkills} 
+            color="blue" 
+            onManage={() => navigate("/my-skills")} 
+          />
+          <SkillSummaryCard 
+            title="Skills I Want" 
+            skills={profile?.wantedSkills} 
+            color="emerald" 
+            onManage={() => navigate("/my-skills")} 
+          />
         </div>
       </div>
     </div>
+  );
+}
+
+// Sub-component for the skill previews
+function SkillSummaryCard({ title, skills, color, onManage }: any) {
+  const isBlue = color === "blue";
+  return (
+    <Card className="bg-white border-blue-100 shadow-sm">
+      <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between space-y-0">
+        <CardTitle className="text-sm font-bold text-blue-900">{title}</CardTitle>
+        <Badge variant="outline" className="text-[10px] font-bold">{skills?.length || 0}</Badge>
+      </CardHeader>
+      <CardContent className="p-4 pt-0">
+        <div className="flex flex-wrap gap-1.5 mb-4">
+          {skills?.length === 0 ? (
+            <p className="text-xs text-blue-300 italic">No skills listed yet.</p>
+          ) : (
+            skills?.slice(0, 5).map((skill: any) => (
+              <Badge 
+                key={skill.id} 
+                className={`${isBlue ? 'bg-blue-50 text-blue-600' : 'bg-emerald-50 text-emerald-600'} border-none text-[10px] py-0 capitalize`}
+              >
+                {skill.name}
+              </Badge>
+            ))
+          )}
+          {skills?.length > 5 && <span className="text-[10px] text-blue-400">+{skills.length - 5} more</span>}
+        </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onManage}
+          className="w-full h-8 text-xs text-blue-600 hover:bg-blue-50 border border-blue-50"
+        >
+          Manage Skills
+        </Button>
+      </CardContent>
+    </Card>
   );
 }

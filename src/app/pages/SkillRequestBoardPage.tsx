@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { Button } from "@/app/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app/components/ui/card";
@@ -8,148 +8,142 @@ import { Badge } from "@/app/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/app/components/ui/avatar";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/app/components/ui/dialog";
 import { Label } from "@/app/components/ui/label";
-import { ArrowLeft, MessageSquare, Plus, Search, Clock } from "lucide-react";
+import { ArrowLeft, MessageSquare, Plus, Search, Clock, Loader2, Filter } from "lucide-react";
+
+// 1. IMPORT YOUR CONFIG
+import { API_BASE_URL } from "@/config";
 
 export default function SkillRequestBoardPage() {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
-  const [newRequest, setNewRequest] = useState({ looking: "", offering: "", description: "" });
+  const [requests, setRequests] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isPosting, setIsPosting] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [newRequest, setNewRequest] = useState({ looking: "", offering: "", description: "" });
+  const [currentUserId, setCurrentUserId] = useState<number | null>(null);
 
-  const requests = [
-    {
-      id: 1,
-      author: "Alice Johnson",
-      looking: "Java Programming",
-      offering: "Cooking & Baking",
-      description: "Looking for someone to teach me Java basics. I can teach you how to cook delicious Italian dishes!",
-      comments: 5,
-      timeAgo: "2 hours ago",
-    },
-    {
-      id: 2,
-      author: "Bob Williams",
-      looking: "Spanish Language",
-      offering: "Guitar Lessons",
-      description: "Want to learn conversational Spanish. I'm an experienced guitar teacher willing to trade lessons.",
-      comments: 8,
-      timeAgo: "5 hours ago",
-    },
-    {
-      id: 3,
-      author: "Carol Davis",
-      looking: "Photography",
-      offering: "Graphic Design",
-      description: "Seeking photography mentor for portrait and landscape. Can help with Adobe Photoshop and Illustrator.",
-      comments: 3,
-      timeAgo: "1 day ago",
-    },
-    {
-      id: 4,
-      author: "David Martinez",
-      looking: "Piano",
-      offering: "Web Development",
-      description: "Complete beginner looking for piano lessons. I can teach HTML, CSS, JavaScript, and React.",
-      comments: 12,
-      timeAgo: "1 day ago",
-    },
-    {
-      id: 5,
-      author: "Emma Wilson",
-      looking: "Public Speaking",
-      offering: "Digital Marketing",
-      description: "Want to improve presentation skills. I have 5 years experience in SEO and social media marketing.",
-      comments: 6,
-      timeAgo: "2 days ago",
-    },
-  ];
+  useEffect(() => {
+    const userString = localStorage.getItem("knoxite_user");
+    if (userString) {
+      setCurrentUserId(JSON.parse(userString).id);
+    }
+    fetchRequests();
+  }, []);
 
-  const handlePostRequest = () => {
+  const fetchRequests = async () => {
+    try {
+      setIsLoading(true);
+      const token = localStorage.getItem("knoxite_token");
+      
+      // 2. USE API_BASE_URL AND BYPASS TUNNEL
+      const response = await fetch(`${API_BASE_URL}/board`, {
+        headers: { 
+          "Authorization": `Bearer ${token}`,
+          "bypass-tunnel-reminder": "true"
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setRequests(data);
+      }
+    } catch (error) {
+      console.error("Fetch error:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handlePostRequest = async () => {
     if (!newRequest.looking || !newRequest.offering) {
-      alert("Please fill in what you're looking for and what you're offering");
+      alert("Please fill in the required fields.");
       return;
     }
-    alert("Request posted successfully!");
-    setNewRequest({ looking: "", offering: "", description: "" });
-    setIsDialogOpen(false);
+
+    setIsPosting(true);
+    try {
+      const token = localStorage.getItem("knoxite_token");
+      const response = await fetch(`${API_BASE_URL}/board`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+          "bypass-tunnel-reminder": "true"
+        },
+        body: JSON.stringify(newRequest)
+      });
+
+      if (response.ok) {
+        setNewRequest({ looking: "", offering: "", description: "" });
+        setIsDialogOpen(false);
+        fetchRequests(); 
+      }
+    } catch (error) {
+      alert("Failed to post request.");
+    } finally {
+      setIsPosting(false);
+    }
   };
 
   const filteredRequests = requests.filter((request) =>
     request.looking.toLowerCase().includes(searchQuery.toLowerCase()) ||
     request.offering.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    request.author.toLowerCase().includes(searchQuery.toLowerCase())
+    request.author.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-100">
-      {/* Header */}
-      <header className="bg-white border-b border-blue-100 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => navigate("/dashboard")}
-              className="text-blue-600 hover:text-blue-700"
-            >
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-100 pb-20">
+      <header className="bg-white border-b border-blue-100 shadow-sm sticky top-0 z-20">
+        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")} className="text-blue-600 h-10 w-10">
               <ArrowLeft className="size-6" />
             </Button>
-            <div className="flex items-center gap-2">
-              <MessageSquare className="size-6 text-blue-600" />
-              <h1 className="text-2xl font-bold text-blue-900">Skill Request Board</h1>
-            </div>
+            <h1 className="text-lg font-bold text-blue-900 leading-none">Request Board</h1>
           </div>
           
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="bg-blue-600 hover:bg-blue-700 text-white">
-                <Plus className="mr-2 size-4" />
-                Post Request
+              <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white rounded-full px-4">
+                <Plus className="mr-1 size-4" /> Post
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-md">
+            <DialogContent className="w-[95%] rounded-2xl max-w-md">
               <DialogHeader>
-                <DialogTitle className="text-blue-900">Post Skill Request</DialogTitle>
-                <DialogDescription className="text-blue-600">
-                  Let others know what skill you're looking for and what you can offer in return
-                </DialogDescription>
+                <DialogTitle className="text-blue-900">Broadcasting Request</DialogTitle>
+                <DialogDescription>What skill are you hunting for today?</DialogDescription>
               </DialogHeader>
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="looking" className="text-blue-900">Looking For</Label>
-                  <Input
-                    id="looking"
-                    placeholder="e.g., Piano Lessons"
-                    value={newRequest.looking}
-                    onChange={(e) => setNewRequest({ ...newRequest, looking: e.target.value })}
-                    className="border-blue-200 focus:border-blue-400"
+              <div className="space-y-4 pt-2">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-bold text-blue-400 uppercase">Looking For</Label>
+                  <Input 
+                    value={newRequest.looking} 
+                    onChange={(e) => setNewRequest({...newRequest, looking: e.target.value})}
+                    placeholder="e.g. Guitar Lessons" 
+                    className="bg-blue-50/50 border-blue-100"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="offering" className="text-blue-900">Can Teach</Label>
-                  <Input
-                    id="offering"
-                    placeholder="e.g., Web Development"
-                    value={newRequest.offering}
-                    onChange={(e) => setNewRequest({ ...newRequest, offering: e.target.value })}
-                    className="border-blue-200 focus:border-blue-400"
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-bold text-blue-400 uppercase">In Exchange For</Label>
+                  <Input 
+                    value={newRequest.offering} 
+                    onChange={(e) => setNewRequest({...newRequest, offering: e.target.value})}
+                    placeholder="e.g. Web Design" 
+                    className="bg-blue-50/50 border-blue-100"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="description" className="text-blue-900">Description (Optional)</Label>
-                  <Textarea
-                    id="description"
-                    placeholder="Add more details about your request..."
-                    value={newRequest.description}
-                    onChange={(e) => setNewRequest({ ...newRequest, description: e.target.value })}
-                    className="border-blue-200 focus:border-blue-400 min-h-24"
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-bold text-blue-400 uppercase">Description</Label>
+                  <Textarea 
+                    value={newRequest.description} 
+                    onChange={(e) => setNewRequest({...newRequest, description: e.target.value})}
+                    placeholder="Tell us more about what you need..." 
+                    className="bg-blue-50/50 border-blue-100 min-h-[100px]"
                   />
                 </div>
-                <Button 
-                  onClick={handlePostRequest}
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-                >
-                  Post Request
+                <Button onClick={handlePostRequest} className="w-full bg-blue-600 h-12 text-base font-bold" disabled={isPosting}>
+                  {isPosting ? <Loader2 className="animate-spin" /> : "Publish to Board"}
                 </Button>
               </div>
             </DialogContent>
@@ -157,77 +151,88 @@ export default function SkillRequestBoardPage() {
         </div>
       </header>
 
-      <div className="max-w-5xl mx-auto p-4 space-y-6">
-        {/* Search */}
-        <Card className="bg-white/90 backdrop-blur border-blue-100">
-          <CardContent className="p-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-blue-400 size-5" />
-              <Input
-                type="search"
-                placeholder="Search requests by skill or person..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 border-blue-200 focus:border-blue-400"
-              />
-            </div>
-          </CardContent>
-        </Card>
+      <div className="max-w-3xl mx-auto p-4 space-y-4">
+        {/* Search Bar */}
+        <div className="relative group">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-300 group-focus-within:text-blue-600 size-5 transition-colors" />
+          <Input
+            placeholder="Search skills or users..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10 h-12 bg-white/80 border-blue-100 shadow-sm rounded-xl focus:ring-blue-500"
+          />
+        </div>
 
-        {/* Requests List */}
-        <div className="space-y-4">
-          {filteredRequests.map((request) => (
-            <Card key={request.id} className="bg-white/90 backdrop-blur border-blue-100 hover:shadow-md transition-shadow">
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3">
-                    <Avatar>
-                      <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${request.author}`} />
-                      <AvatarFallback className="bg-blue-200 text-blue-900">
-                        {request.author.split(" ").map((n) => n[0]).join("")}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <h3 className="font-medium text-blue-900">{request.author}</h3>
-                      <p className="text-xs text-blue-500 flex items-center gap-1">
-                        <Clock className="size-3" />
-                        {request.timeAgo}
-                      </p>
+        {/* Board Content */}
+        <div className="space-y-3">
+          {isLoading ? (
+            <div className="flex flex-col items-center justify-center py-20">
+              <Loader2 className="animate-spin text-blue-600 size-10 mb-2" />
+              <p className="text-blue-400 text-sm font-medium">Scanning the board...</p>
+            </div>
+          ) : filteredRequests.length === 0 ? (
+            <div className="text-center py-20 bg-white/50 border-2 border-dashed border-blue-100 rounded-3xl">
+              <MessageSquare className="size-12 mx-auto mb-4 text-blue-100" />
+              <p className="text-blue-400 font-medium">No requests match your search.</p>
+            </div>
+          ) : (
+            filteredRequests.map((request) => (
+              <Card key={request.id} className="bg-white/90 border-blue-50 shadow-sm hover:shadow-md transition-all active:scale-[0.99] overflow-hidden rounded-2xl">
+                <CardHeader className="p-4 pb-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <Avatar className="size-10 border border-blue-100">
+                        <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${request.author.name}`} />
+                        <AvatarFallback className="bg-blue-100 text-blue-700">{request.author.name[0]}</AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <h3 className="font-bold text-blue-900 text-sm">{request.author.name}</h3>
+                        <p className="text-[10px] text-blue-400 flex items-center gap-1 font-medium">
+                          <Clock className="size-3" />
+                          {new Date(request.createdAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                    </div>
+                    {request.authorId === currentUserId && (
+                       <Badge className="bg-blue-600 text-[10px] uppercase font-bold">My Post</Badge>
+                    )}
+                  </div>
+                </CardHeader>
+                <CardContent className="p-4 pt-2 space-y-3">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="bg-red-50 p-2 rounded-lg border border-red-100/50">
+                       <p className="text-[9px] uppercase font-black text-red-400 mb-0.5">Looking For</p>
+                       <p className="text-xs font-bold text-red-700 truncate">{request.looking}</p>
+                    </div>
+                    <div className="bg-green-50 p-2 rounded-lg border border-green-100/50">
+                       <p className="text-[9px] uppercase font-black text-green-400 mb-0.5">Can Teach</p>
+                       <p className="text-xs font-bold text-green-700 truncate">{request.offering}</p>
                     </div>
                   </div>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex flex-wrap gap-2">
-                  <Badge className="bg-red-100 text-red-800">
-                    Looking: {request.looking}
-                  </Badge>
-                  <Badge className="bg-green-100 text-green-800">
-                    Offering: {request.offering}
-                  </Badge>
-                </div>
-                
-                <p className="text-blue-700">{request.description}</p>
-                
-                <div className="flex items-center justify-between pt-3 border-t border-blue-100">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                  >
-                    <MessageSquare className="mr-2 size-4" />
-                    {request.comments} Comments
-                  </Button>
-                  <Button
-                    size="sm"
-                    className="bg-blue-600 hover:bg-blue-700 text-white"
-                  >
-                    Offer Help
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                  
+                  <p className="text-blue-800 text-xs leading-relaxed line-clamp-3 bg-blue-50/30 p-2 rounded-md">
+                    {request.description}
+                  </p>
+                  
+                  <div className="flex items-center gap-2 pt-1">
+                    <Button 
+                      className="flex-1 bg-blue-600 hover:bg-blue-700 h-9 text-xs font-bold shadow-md shadow-blue-100"
+                      onClick={() => navigate("/marketplace")}
+                    >
+                      Offer Help
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="icon" 
+                      className="h-9 w-9 border-blue-100 text-blue-400"
+                    >
+                      <MessageSquare className="size-4" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          )}
         </div>
       </div>
     </div>

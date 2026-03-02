@@ -17,3 +17,7 @@
   npx tsc --init
   npx prisma init
   npm install prisma@6 @prisma/client@6
+
+
+Prisma studio to access database
+  npx prisma studio

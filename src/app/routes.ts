@@ -5,6 +5,7 @@ import DashboardPage from "@/app/pages/DashboardPage";
 import ProfilePage from "@/app/pages/ProfilePage";
 import ChatPage from "@/app/pages/ChatPage";
 import SwapAgreementPage from "@/app/pages/SwapAgreementPage";
+import AgreementSuccessPage from "@/app/pages/AgreementSuccessPage"; // Added this
 import ReputationPage from "@/app/pages/ReputationPage";
 import AdminDashboardPage from "@/app/pages/AdminDashboardPage";
 import MarketplacePage from "@/app/pages/MarketplacePage";
@@ -47,8 +48,14 @@ export const router = createBrowserRouter([
     Component: ChatPage,
   },
   {
-    path: "/swap-agreement",
+    // Added :swapId so the page knows which specific swap to load
+    path: "/swap-agreement/:swapId",
     Component: SwapAgreementPage,
+  },
+  {
+    // Added the success confirmation route
+    path: "/agreement-success",
+    Component: AgreementSuccessPage,
   },
   {
     path: "/reputation",
@@ -95,7 +102,7 @@ export const router = createBrowserRouter([
     Component: CommunityForumPage,
   },
   {
-    path: "/notifications",
+    path: "/requests",
     Component: NotificationCenterPage,
   },
   {

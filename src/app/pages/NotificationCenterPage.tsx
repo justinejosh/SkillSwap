@@ -1,255 +1,257 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { Button } from "@/app/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app/components/ui/card";
 import { Badge } from "@/app/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/app/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/app/components/ui/tabs";
-import { ArrowLeft, Bell, CheckCheck, Trash2, MessageCircle, Calendar, Trophy, AlertTriangle, Users, Star, Gift } from "lucide-react";
+import { 
+  ArrowLeft, 
+  Bell, 
+  CheckCheck, 
+  Users, 
+  Check, 
+  X, 
+  Loader2,
+  MessageCircle,
+  Clock
+} from "lucide-react";
+
+// 1. IMPORT YOUR CONFIG
+import { API_BASE_URL } from "@/config";
 
 export default function NotificationCenterPage() {
   const navigate = useNavigate();
-  const [notifications, setNotifications] = useState([
-    {
-      id: 1,
-      type: "message",
-      title: "New message from Alice Johnson",
-      description: "Hi! I'd love to swap Python lessons for your guitar skills.",
-      time: "2 minutes ago",
-      read: false,
-      icon: MessageCircle,
-      color: "blue"
-    },
-    {
-      id: 2,
-      type: "swap",
-      title: "Swap request accepted",
-      description: "Bob Williams accepted your swap request for cooking lessons.",
-      time: "1 hour ago",
-      read: false,
-      icon: Users,
-      color: "green"
-    },
-    {
-      id: 3,
-      type: "calendar",
-      title: "Upcoming session reminder",
-      description: "Your Spanish lesson with Maria starts in 3 hours.",
-      time: "3 hours ago",
-      read: true,
-      icon: Calendar,
-      color: "purple"
-    },
-    {
-      id: 4,
-      type: "achievement",
-      title: "New achievement unlocked!",
-      description: "You've earned the 'Quick Learner' badge for completing 5 swaps.",
-      time: "5 hours ago",
-      read: true,
-      icon: Trophy,
-      color: "yellow"
-    },
-    {
-      id: 5,
-      type: "rating",
-      title: "New rating received",
-      description: "David Chen gave you 5 stars for your photography lessons!",
-      time: "1 day ago",
-      read: true,
-      icon: Star,
-      color: "orange"
-    },
-    {
-      id: 6,
-      type: "system",
-      title: "Profile verification reminder",
-      description: "Verify your skills to increase your match rate by 40%.",
-      time: "2 days ago",
-      read: true,
-      icon: AlertTriangle,
-      color: "red"
-    },
-    {
-      id: 7,
-      type: "reward",
-      title: "Bonus credits earned",
-      description: "You've earned 50 bonus points for active participation this week!",
-      time: "3 days ago",
-      read: true,
-      icon: Gift,
-      color: "pink"
-    },
-  ]);
+  const [swaps, setSwaps] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [currentUserId, setCurrentUserId] = useState<number | null>(null);
 
-  const markAsRead = (id: number) => {
-    setNotifications(notifications.map(n => 
-      n.id === id ? { ...n, read: true } : n
-    ));
+  useEffect(() => {
+    const userString = localStorage.getItem("knoxite_user");
+    if (userString) {
+      setCurrentUserId(JSON.parse(userString).id);
+    }
+    fetchSwaps();
+  }, []);
+
+  const fetchSwaps = async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem("knoxite_token");
+      
+      // 2. USE API_BASE_URL AND BYPASS TUNNEL
+      const res = await fetch(`${API_BASE_URL}/swaps`, {
+        headers: { 
+          "Authorization": `Bearer ${token}`,
+          "bypass-tunnel-reminder": "true" 
+        }
+      });
+      
+      if (res.ok) {
+        const data = await res.json();
+        setSwaps(data);
+      }
+    } catch (err) {
+      console.error("Failed to fetch notifications", err);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const markAllAsRead = () => {
-    setNotifications(notifications.map(n => ({ ...n, read: true })));
+  const handleSwapAction = async (swapId: string, status: "ACCEPTED" | "REJECTED") => {
+    try {
+      const token = localStorage.getItem("knoxite_token");
+      
+      const res = await fetch(`${API_BASE_URL}/swaps/${swapId}/status`, {
+        method: "PATCH",
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+          "bypass-tunnel-reminder": "true" 
+        },
+        body: JSON.stringify({ newStatus: status })
+      });
+
+      if (res.ok) {
+        fetchSwaps(); 
+      } else {
+        const errorData = await res.json();
+        alert(errorData.error || "Failed to update status");
+      }
+    } catch (err) {
+      console.error("Action failed", err);
+    }
   };
 
-  const deleteNotification = (id: number) => {
-    setNotifications(notifications.filter(n => n.id !== id));
-  };
-
-  const unreadCount = notifications.filter(n => !n.read).length;
-
-  const filterNotifications = (type?: string) => {
-    if (!type || type === "all") return notifications;
-    return notifications.filter(n => n.type === type);
-  };
-
-  const getColorClasses = (color: string) => {
-    const colors: { [key: string]: string } = {
-      blue: "bg-blue-100 text-blue-600",
-      green: "bg-green-100 text-green-600",
-      purple: "bg-purple-100 text-purple-600",
-      yellow: "bg-yellow-100 text-yellow-600",
-      orange: "bg-orange-100 text-orange-600",
-      red: "bg-red-100 text-red-600",
-      pink: "bg-pink-100 text-pink-600",
-    };
-    return colors[color] || colors.blue;
-  };
+  const incomingPending = swaps.filter(s => s.receiverId === currentUserId && s.status === "PENDING");
+  const outgoingRequests = swaps.filter(s => s.requesterId === currentUserId);
+  const historicalSwaps = swaps.filter(s => s.status !== "PENDING");
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-100">
-      {/* Header */}
-      <header className="bg-white border-b border-blue-100 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
+      <header className="bg-white border-b border-blue-100 shadow-sm sticky top-0 z-20">
+        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
             <Button
               variant="ghost"
               size="icon"
               onClick={() => navigate("/dashboard")}
-              className="text-blue-600 hover:text-blue-700"
+              className="text-blue-600 h-10 w-10"
             >
               <ArrowLeft className="size-6" />
             </Button>
-            <div className="flex items-center gap-3">
-              <Bell className="size-6 text-blue-600" />
-              <h1 className="text-2xl font-bold text-blue-900">Notification Center</h1>
-              {unreadCount > 0 && (
-                <Badge className="bg-red-500 text-white">
-                  {unreadCount} new
-                </Badge>
+            <div>
+              <h1 className="text-lg font-bold text-blue-900 leading-tight">Notifications</h1>
+              {incomingPending.length > 0 && (
+                <p className="text-[10px] text-red-500 font-bold uppercase tracking-tighter">
+                  {incomingPending.length} pending requests
+                </p>
               )}
             </div>
           </div>
-          <Button
-            onClick={markAllAsRead}
-            variant="outline"
-            className="border-blue-200 text-blue-600 hover:bg-blue-50"
-            disabled={unreadCount === 0}
-          >
-            <CheckCheck className="mr-2 size-4" />
-            Mark all as read
-          </Button>
+          <Bell className="size-5 text-blue-300" />
         </div>
       </header>
 
-      <div className="max-w-5xl mx-auto p-4">
-        <Card className="bg-white/90 backdrop-blur border-blue-100">
-          <CardHeader>
-            <CardTitle className="text-blue-900">All Notifications</CardTitle>
-            <CardDescription className="text-blue-600">
-              Stay updated with your skill swap activities
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Tabs defaultValue="all" className="space-y-4">
-              <TabsList className="grid grid-cols-5 w-full bg-blue-50">
-                <TabsTrigger value="all" className="data-[state=active]:bg-white data-[state=active]:text-blue-600">
-                  All
-                </TabsTrigger>
-                <TabsTrigger value="message" className="data-[state=active]:bg-white data-[state=active]:text-blue-600">
-                  Messages
-                </TabsTrigger>
-                <TabsTrigger value="swap" className="data-[state=active]:bg-white data-[state=active]:text-blue-600">
-                  Swaps
-                </TabsTrigger>
-                <TabsTrigger value="calendar" className="data-[state=active]:bg-white data-[state=active]:text-blue-600">
-                  Schedule
-                </TabsTrigger>
-                <TabsTrigger value="achievement" className="data-[state=active]:bg-white data-[state=active]:text-blue-600">
-                  Achievements
-                </TabsTrigger>
-              </TabsList>
+      <div className="max-w-4xl mx-auto p-4 md:p-6">
+        <Tabs defaultValue="incoming" className="space-y-4">
+          <TabsList className="grid grid-cols-3 w-full bg-blue-50/50 p-1 rounded-xl border border-blue-100">
+            <TabsTrigger value="incoming" className="rounded-lg text-xs md:text-sm">Incoming</TabsTrigger>
+            <TabsTrigger value="outgoing" className="rounded-lg text-xs md:text-sm">Sent</TabsTrigger>
+            <TabsTrigger value="history" className="rounded-lg text-xs md:text-sm">History</TabsTrigger>
+          </TabsList>
 
-              {["all", "message", "swap", "calendar", "achievement"].map(tabValue => (
-                <TabsContent key={tabValue} value={tabValue} className="space-y-3">
-                  {filterNotifications(tabValue === "all" ? undefined : tabValue).length === 0 ? (
-                    <div className="text-center py-12 text-blue-400">
-                      <Bell className="size-12 mx-auto mb-3 opacity-50" />
-                      <p>No notifications in this category</p>
-                    </div>
-                  ) : (
-                    filterNotifications(tabValue === "all" ? undefined : tabValue).map((notification) => {
-                      const Icon = notification.icon;
-                      return (
-                        <div
-                          key={notification.id}
-                          className={`flex items-start gap-4 p-4 rounded-lg border transition-all ${
-                            notification.read
-                              ? "bg-white border-blue-100"
-                              : "bg-blue-50 border-blue-200"
-                          }`}
-                        >
-                          <div className={`p-3 rounded-full ${getColorClasses(notification.color)}`}>
-                            <Icon className="size-5" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="flex-1">
-                                <h3 className="font-semibold text-blue-900">
-                                  {notification.title}
-                                  {!notification.read && (
-                                    <span className="ml-2 inline-block size-2 bg-blue-500 rounded-full" />
-                                  )}
-                                </h3>
-                                <p className="text-sm text-blue-600 mt-1">
-                                  {notification.description}
-                                </p>
-                                <p className="text-xs text-blue-400 mt-2">
-                                  {notification.time}
-                                </p>
-                              </div>
-                              <div className="flex items-center gap-1">
-                                {!notification.read && (
-                                  <Button
-                                    size="icon"
-                                    variant="ghost"
-                                    onClick={() => markAsRead(notification.id)}
-                                    className="size-8 text-blue-600 hover:bg-blue-100"
-                                  >
-                                    <CheckCheck className="size-4" />
-                                  </Button>
-                                )}
-                                <Button
-                                  size="icon"
-                                  variant="ghost"
-                                  onClick={() => deleteNotification(notification.id)}
-                                  className="size-8 text-red-600 hover:bg-red-50"
-                                >
-                                  <Trash2 className="size-4" />
-                                </Button>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
-                </TabsContent>
-              ))}
-            </Tabs>
-          </CardContent>
-        </Card>
+          <TabsContent value="incoming" className="space-y-3">
+            {loading ? (
+              <div className="flex justify-center py-10"><Loader2 className="animate-spin text-blue-600" /></div>
+            ) : incomingPending.length === 0 ? (
+              <EmptyState message="No new requests for you." />
+            ) : (
+              incomingPending.map((swap) => (
+                <SwapRequestItem 
+                  key={swap.id} 
+                  swap={swap} 
+                  isReceiver={true} 
+                  onAction={handleSwapAction} 
+                  onNavigate={navigate}
+                />
+              ))
+            )}
+          </TabsContent>
+
+          <TabsContent value="outgoing" className="space-y-3">
+            {outgoingRequests.length === 0 ? (
+              <EmptyState message="You haven't sent any invitations." />
+            ) : (
+              outgoingRequests.map((swap) => (
+                <SwapRequestItem 
+                  key={swap.id} 
+                  swap={swap} 
+                  isReceiver={false} 
+                  onNavigate={navigate}
+                />
+              ))
+            )}
+          </TabsContent>
+
+          <TabsContent value="history" className="space-y-3">
+            {historicalSwaps.length === 0 ? (
+              <EmptyState message="Your activity history is empty." />
+            ) : (
+              historicalSwaps.map((swap) => (
+                <SwapRequestItem 
+                  key={swap.id} 
+                  swap={swap} 
+                  isReceiver={swap.receiverId === currentUserId} 
+                  onNavigate={navigate}
+                />
+              ))
+            )}
+          </TabsContent>
+        </Tabs>
       </div>
+    </div>
+  );
+}
+
+function SwapRequestItem({ swap, isReceiver, onAction, onNavigate }: any) {
+  const isPending = swap.status === "PENDING";
+  const partner = isReceiver ? swap.requester : swap.receiver;
+
+  return (
+    <Card className={`overflow-hidden border-blue-100 shadow-sm transition-all ${isPending && isReceiver ? "ring-1 ring-blue-400" : ""}`}>
+      <CardContent className="p-4">
+        <div className="flex items-start gap-3">
+          <div className={`p-2 rounded-full shrink-0 ${isPending ? "bg-blue-100 text-blue-600" : "bg-gray-100 text-gray-400"}`}>
+            <Users className="size-5" />
+          </div>
+          
+          <div className="min-w-0 flex-1">
+            <div className="flex justify-between items-start mb-1">
+              <h3 className="font-bold text-blue-900 text-sm truncate pr-2">
+                {partner.name}
+              </h3>
+              <Badge variant="outline" className={`text-[9px] h-4 px-1 ${
+                swap.status === 'ACCEPTED' ? "border-green-200 text-green-600 bg-green-50" : 
+                swap.status === 'REJECTED' ? "border-red-200 text-red-600 bg-red-50" : "text-blue-600"
+              }`}>
+                {swap.status}
+              </Badge>
+            </div>
+
+            <p className="text-xs text-blue-800 leading-snug mb-3">
+              {isReceiver 
+                ? `Wants to trade their ${swap.wantedSkill.name} for your ${swap.offeredSkill.name}.`
+                : `Waiting for them to trade their ${swap.wantedSkill.name} for your ${swap.offeredSkill.name}.`}
+            </p>
+
+            <div className="flex items-center gap-3 mb-3">
+              <span className="flex items-center gap-1 text-[10px] text-blue-400">
+                <Clock className="size-3" /> {new Date(swap.createdAt).toLocaleDateString()}
+              </span>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex gap-2">
+              {isPending && isReceiver && onAction ? (
+                <>
+                  <Button 
+                    size="sm" 
+                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white h-8 text-xs"
+                    onClick={() => onAction(swap.id, "ACCEPTED")}
+                  >
+                    <Check className="size-3 mr-1" /> Accept
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    variant="ghost" 
+                    className="flex-1 text-red-500 hover:bg-red-50 h-8 text-xs"
+                    onClick={() => onAction(swap.id, "REJECTED")}
+                  >
+                    <X className="size-3 mr-1" /> Decline
+                  </Button>
+                </>
+              ) : swap.status === "ACCEPTED" ? (
+                <Button 
+                  size="sm" 
+                  className="w-full bg-blue-50 text-blue-600 hover:bg-blue-100 border-blue-200 h-8 text-xs font-semibold"
+                  onClick={() => onNavigate("/chat")}
+                >
+                  <MessageCircle className="size-3 mr-1" /> Send Message
+                </Button>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function EmptyState({ message }: { message: string }) {
+  return (
+    <div className="text-center py-16 bg-white/50 border-2 border-dashed border-blue-50 rounded-2xl">
+      <Bell className="size-10 mx-auto mb-2 text-blue-100" />
+      <p className="text-xs text-blue-400 font-medium">{message}</p>
     </div>
   );
 }
