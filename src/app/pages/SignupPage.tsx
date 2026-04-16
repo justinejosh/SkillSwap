@@ -180,7 +180,7 @@ export default function SignupPage() {
         </Card>
         
         <p className="mt-8 text-center text-[10px] text-blue-400 uppercase tracking-widest font-medium">
-          Secure Skill Exchange • Knoxite v1.0
+          Secure Skill Exchange â€¢ Knoxite v1.0
         </p>
       </div>
     </div>

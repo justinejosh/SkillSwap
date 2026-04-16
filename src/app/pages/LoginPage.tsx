@@ -116,7 +116,7 @@ export default function LoginPage() {
                   <Input
                     id="password"
                     type="password"
-                    placeholder="••••••••"
+                    placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
@@ -162,7 +162,7 @@ export default function LoginPage() {
                   </div>
                   <p className="text-xs text-blue-800 italic">"{review.comment}"</p>
                   <div className="text-[10px] text-blue-600">
-                    <span className="font-bold">{review.name}</span> • {review.role}
+                    <span className="font-bold">{review.name}</span> â€¢ {review.role}
                   </div>
                 </div>
               ))}
