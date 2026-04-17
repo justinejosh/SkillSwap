@@ -5,10 +5,10 @@ import DashboardPage from "@/app/pages/DashboardPage";
 import ProfilePage from "@/app/pages/ProfilePage";
 import ChatPage from "@/app/pages/ChatPage";
 import SwapAgreementPage from "@/app/pages/SwapAgreementPage";
-import AgreementSuccessPage from "@/app/pages/AgreementSuccessPage"; // Added this
+import AgreementSuccessPage from "@/app/pages/AgreementSuccessPage";
 import ReputationPage from "@/app/pages/ReputationPage";
 import AdminDashboardPage from "@/app/pages/AdminDashboardPage";
-import MarketplacePage from "@/app/pages/MarketplacePage";
+import KnoxHubPage from "@/app/pages/KnoxHubPage";
 import CalendarPage from "@/app/pages/CalendarPage";
 import PrivacyPolicyPage from "@/app/pages/PrivacyPolicyPage";
 import SecurityPage from "@/app/pages/SecurityPage";
@@ -66,8 +66,8 @@ export const router = createBrowserRouter([
     Component: AdminDashboardPage,
   },
   {
-    path: "/marketplace",
-    Component: MarketplacePage,
+    path: "/knox-hub",
+    Component: KnoxHubPage,
   },
   {
     path: "/calendar",
@@ -98,7 +98,7 @@ export const router = createBrowserRouter([
     Component: SkillRequestBoardPage,
   },
   {
-    path: "/community",
+    path: "/community-forum",
     Component: CommunityForumPage,
   },
   {

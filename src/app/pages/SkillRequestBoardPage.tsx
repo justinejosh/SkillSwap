@@ -217,7 +217,7 @@ export default function SkillRequestBoardPage() {
                   <div className="flex items-center gap-2 pt-1">
                     <Button 
                       className="flex-1 bg-blue-600 hover:bg-blue-700 h-9 text-xs font-bold shadow-md shadow-blue-100"
-                      onClick={() => navigate("/marketplace")}
+                      onClick={() => navigate("/knox-hub")}
                     >
                       Offer Help
                     </Button>

@@ -12,7 +12,7 @@ import { ArrowLeft, UserPlus, Star, AlertCircle, Zap, CheckCircle2, Loader2 } fr
 // 1. IMPORT YOUR CONFIG
 import { API_BASE_URL } from "@/config";
 
-export default function MarketplacePage() {
+export default function KnoxHubPage() {
   const navigate = useNavigate();
   const [matches, setMatches] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -118,10 +118,10 @@ export default function MarketplacePage() {
           </Button>
           <div className="min-w-0">
             <h1 className="text-xl md:text-2xl font-bold text-blue-900 flex items-center gap-2">
-              <Zap className="size-5 md:size-6 text-yellow-500 shrink-0" /> 
-              <span className="truncate">Top Matches</span>
+              {/* dito lagayan ng icon pre kung trip natin, sa line na to mismo  */}
+              <span className="truncate">KnoxHub</span>
             </h1>
-            <p className="text-[10px] md:text-sm text-blue-600 truncate">Ranked by reciprocal skills</p>
+            <p className="text-[10px] md:text-sm text-blue-600 truncate">Learn the hottest skills in the market</p>
           </div>
         </div>
       </header>

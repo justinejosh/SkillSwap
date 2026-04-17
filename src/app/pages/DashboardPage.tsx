@@ -5,7 +5,7 @@ import { Button } from "@/app/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app/components/ui/card";
 import { Badge } from "@/app/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/app/components/ui/avatar";
-import { Search, Users, BookOpen, Bell, User, MessageCircle, Calendar, Trophy, ShoppingBag, Shield, MessageSquare, Loader2 } from "lucide-react";
+import { Search, Users, BookOpen, Bell, User, MessageCircle, Calendar, Trophy, LayoutGrid, Shield, MessageSquare, Loader2 } from "lucide-react";
 import { API_BASE_URL } from "@/config";
 
 export default function DashboardPage() {
@@ -106,8 +106,8 @@ export default function DashboardPage() {
               </CardHeader>
               <CardContent className="p-2 grid grid-cols-2 md:grid-cols-1 gap-1">
                 {/* Always Visible Buttons */}
-                <Button variant="ghost" className="justify-start text-blue-900 hover:bg-blue-50 text-xs md:text-sm" onClick={() => navigate("/marketplace")}>
-                  <ShoppingBag className="mr-2 md:mr-3 size-4 md:size-5 text-blue-500 shrink-0" /> Marketplace
+                <Button variant="ghost" className="justify-start text-blue-900 hover:bg-blue-50 text-xs md:text-sm" onClick={() => navigate("/knox-hub")}>
+                  <LayoutGrid className="mr-2 md:mr-3 size-4 md:size-5 text-blue-500 shrink-0" /> KnoxHub
                 </Button>
                 <Button variant="ghost" className="justify-start text-blue-900 hover:bg-blue-50 text-xs md:text-sm" onClick={() => navigate("/my-skills")}>
                   <BookOpen className="mr-2 md:mr-3 size-4 md:size-5 text-blue-500 shrink-0" /> My Skills
@@ -172,7 +172,7 @@ export default function DashboardPage() {
                           </div>
                         </div>
                       </div>
-                      <Button onClick={() => navigate("/marketplace")} size="sm" className="bg-blue-600 hover:bg-blue-700 ml-2 h-8 text-xs">
+                      <Button onClick={() => navigate("/knox-hub")} size="sm" className="bg-blue-600 hover:bg-blue-700 ml-2 h-8 text-xs">
                         Connect
                       </Button>
                     </div>

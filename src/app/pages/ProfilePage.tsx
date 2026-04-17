@@ -6,9 +6,7 @@ import { Label } from "@/app/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/app/components/ui/avatar";
 import { Badge } from "@/app/components/ui/badge";
-import { ArrowLeft, Star, Shield, LogOut, Loader2, Save } from "lucide-react";
-
-// 1. IMPORT YOUR CONFIG
+import { ArrowLeft, Star, LogOut, Loader2, Save, Repeat } from "lucide-react";
 import { API_BASE_URL } from "@/config";
 
 export default function ProfilePage() {
@@ -30,10 +28,7 @@ export default function ProfilePage() {
   const fetchUserProfile = async () => {
     try {
       const token = localStorage.getItem("knoxite_token");
-      if (!token) {
-        navigate("/");
-        return;
-      }
+      if (!token) { navigate("/"); return; }
 
       const response = await fetch(`${API_BASE_URL}/profile`, {
         headers: { 
@@ -62,7 +57,7 @@ export default function ProfilePage() {
     try {
       const token = localStorage.getItem("knoxite_token");
       const response = await fetch(`${API_BASE_URL}/profile`, {
-        method: "PUT", // Or PATCH depending on your backend
+        method: "PUT",
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${token}`,
@@ -73,7 +68,7 @@ export default function ProfilePage() {
 
       if (response.ok) {
         alert("Profile updated successfully!");
-        fetchUserProfile(); // Refresh data
+        fetchUserProfile(); 
       }
     } catch (error) {
       console.error("Save failed", error);
@@ -93,8 +88,8 @@ export default function ProfilePage() {
   if (isLoading) {
     return (
       <div className="flex flex-col justify-center items-center min-h-screen bg-blue-50">
-        <Loader2 className="animate-spin size-8 text-blue-600 mb-2" />
-        <p className="text-blue-900 font-medium">Loading Profile...</p>
+        <Loader2 className="animate-spin size-10 text-blue-600 mb-4" />
+        <span className="text-blue-900 font-bold">Loading Knoxite Profile...</span>
       </div>
     );
   }
@@ -107,7 +102,7 @@ export default function ProfilePage() {
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => navigate("/dashboard")}
+              onClick={() => navigate(-1)} // FIXED: Smart back button
               className="text-blue-600 h-10 w-10"
             >
               <ArrowLeft className="size-6" />
@@ -125,64 +120,69 @@ export default function ProfilePage() {
         </div>
       </header>
 
-      <div className="max-w-4xl mx-auto p-4 space-y-4">
+      <div className="max-w-4xl mx-auto p-4 space-y-6">
         {/* User Identity Card */}
-        <Card className="bg-white/90 backdrop-blur border-blue-100 shadow-sm">
-          <CardContent className="pt-6">
-            <div className="flex flex-col items-center text-center mb-6">
-              <Avatar className="size-24 border-4 border-white shadow-md mb-3">
+        <Card className="bg-white/90 backdrop-blur border-blue-100 shadow-sm overflow-hidden">
+          <CardContent className="pt-8">
+            <div className="flex flex-col items-center text-center mb-8">
+              <Avatar className="size-28 border-4 border-white shadow-xl mb-4">
                 <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${name.replace(/\s+/g, '')}`} />
-                <AvatarFallback className="bg-blue-600 text-white text-3xl">
+                <AvatarFallback className="bg-blue-600 text-white text-3xl font-bold">
                   {name.charAt(0).toUpperCase()}
                 </AvatarFallback>
               </Avatar>
-              <h2 className="text-2xl font-bold text-blue-900">{profile?.name}</h2>
-              <p className="text-blue-500 text-sm">{profile?.email}</p>
               
-              <div className="flex gap-4 mt-4">
+              <span className="text-2xl font-bold text-blue-900 block leading-tight">{profile?.name}</span>
+              <span className="text-blue-500 text-sm font-medium mt-1">{profile?.email}</span>
+              
+              {/* FIXED: DYNAMIC RATING & SWAPS */}
+              <div className="flex justify-center gap-12 mt-6 py-4 border-y border-blue-50 w-full max-w-sm">
                 <div className="text-center">
-                  <p className="text-xs text-blue-400 uppercase font-bold tracking-widest">Rating</p>
-                  <div className="flex items-center justify-center gap-1 text-blue-900 font-bold">
-                    <Star className="size-3 fill-yellow-400 text-yellow-400" /> 4.8
+                  <span className="text-[10px] text-blue-400 uppercase font-bold tracking-widest block mb-1">Rating</span>
+                  <div className="flex items-center justify-center gap-1">
+                    <Star className="size-4 fill-yellow-400 text-yellow-400" /> 
+                    <span className="text-xl font-bold text-blue-900">{profile?.rating > 0 ? profile.rating : "0.0"}</span>
                   </div>
                 </div>
-                <div className="w-px h-8 bg-blue-100" />
-                <div className="text-center">
-                  <p className="text-xs text-blue-400 uppercase font-bold tracking-widest">Swaps</p>
-                  <p className="text-blue-900 font-bold">12</p>
+                <div className="text-center border-l border-blue-100 pl-12">
+                  <span className="text-[10px] text-blue-400 uppercase font-bold tracking-widest block mb-1">Swaps</span>
+                  <div className="flex items-center justify-center gap-1">
+                    <Repeat className="size-4 text-blue-500" />
+                    <span className="text-xl font-bold text-blue-900">{profile?.swapsCount || 0}</span>
+                  </div>
                 </div>
               </div>
             </div>
 
-            <form onSubmit={handleSave} className="space-y-4">
-              <div className="space-y-1.5">
-                <Label htmlFor="name" className="text-xs font-bold text-blue-400 uppercase ml-1">Display Name</Label>
+            <form onSubmit={handleSave} className="space-y-5">
+              <div className="space-y-2">
+                <Label htmlFor="name" className="text-[11px] font-bold text-blue-400 uppercase tracking-wider ml-1">Display Name</Label>
                 <Input
                   id="name"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="bg-blue-50/30 border-blue-100 focus:ring-blue-500 h-11"
+                  className="bg-blue-50/20 border-blue-100 focus:ring-blue-500 h-12 text-blue-900 font-medium"
                 />
               </div>
               
-              <div className="space-y-1.5">
-                <Label htmlFor="bio" className="text-xs font-bold text-blue-400 uppercase ml-1">About Me</Label>
+              <div className="space-y-2">
+                <Label htmlFor="bio" className="text-[11px] font-bold text-blue-400 uppercase tracking-wider ml-1">About Me</Label>
                 <textarea
                   id="bio"
-                  rows={3}
+                  rows={4}
                   value={bio}
                   onChange={(e) => setBio(e.target.value)}
                   placeholder="Tell the community what you're looking for..."
-                  className="w-full rounded-md border border-blue-100 bg-blue-50/30 p-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                  className="w-full rounded-xl border border-blue-100 bg-blue-50/20 p-4 text-sm font-medium text-blue-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all min-h-[120px]"
                 />
               </div>
 
               <Button 
                 type="submit" 
                 disabled={isSaving}
-                className="w-full bg-blue-600 hover:bg-blue-700 h-12 shadow-md shadow-blue-200"
+                className="w-full bg-blue-600 hover:bg-blue-700 h-12 shadow-lg shadow-blue-100 font-bold"
               >
-                {isSaving ? <Loader2 className="animate-spin mr-2" /> : <Save className="mr-2 size-4" />}
+                {isSaving ? <Loader2 className="animate-spin mr-2" /> : <Save className="mr-2 size-5" />}
                 Update Profile Info
               </Button>
             </form>
@@ -209,36 +209,35 @@ export default function ProfilePage() {
   );
 }
 
-// Sub-component for the skill previews
 function SkillSummaryCard({ title, skills, color, onManage }: any) {
   const isBlue = color === "blue";
   return (
-    <Card className="bg-white border-blue-100 shadow-sm">
-      <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between space-y-0">
-        <CardTitle className="text-sm font-bold text-blue-900">{title}</CardTitle>
-        <Badge variant="outline" className="text-[10px] font-bold">{skills?.length || 0}</Badge>
+    <Card className="bg-white/90 backdrop-blur border-blue-100 shadow-sm">
+      <CardHeader className="p-5 pb-2 flex flex-row items-center justify-between space-y-0">
+        <span className="text-sm font-bold text-blue-900">{title}</span>
+        <Badge variant="outline" className="text-[10px] font-bold border-blue-100 text-blue-600">{skills?.length || 0}</Badge>
       </CardHeader>
-      <CardContent className="p-4 pt-0">
-        <div className="flex flex-wrap gap-1.5 mb-4">
+      <CardContent className="p-5 pt-2">
+        <div className="flex flex-wrap gap-2 mb-6">
           {skills?.length === 0 ? (
-            <p className="text-xs text-blue-300 italic">No skills listed yet.</p>
+            <span className="text-xs text-blue-300 italic">No skills listed yet.</span>
           ) : (
             skills?.slice(0, 5).map((skill: any) => (
               <Badge 
                 key={skill.id} 
-                className={`${isBlue ? 'bg-blue-50 text-blue-600' : 'bg-emerald-50 text-emerald-600'} border-none text-[10px] py-0 capitalize`}
+                className={`${isBlue ? 'bg-blue-50 text-blue-600' : 'bg-emerald-50 text-emerald-600'} border-none text-[10px] py-1 px-2 font-bold capitalize`}
               >
                 {skill.name}
               </Badge>
             ))
           )}
-          {skills?.length > 5 && <span className="text-[10px] text-blue-400">+{skills.length - 5} more</span>}
+          {skills?.length > 5 && <span className="text-[10px] text-blue-400 font-bold">+{skills.length - 5} more</span>}
         </div>
         <Button
-          variant="ghost"
+          variant="outline"
           size="sm"
           onClick={onManage}
-          className="w-full h-8 text-xs text-blue-600 hover:bg-blue-50 border border-blue-50"
+          className="w-full h-10 text-xs font-bold text-blue-600 hover:bg-blue-50 border-blue-100"
         >
           Manage Skills
         </Button>

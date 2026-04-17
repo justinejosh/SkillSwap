@@ -114,7 +114,7 @@ export default function LeaderboardPage() {
             <ArrowLeft className="size-6" />
           </Button>
           <div className="flex items-center gap-2">
-            <Trophy className="size-6 text-yellow-600" />
+            {/* Pwede dito maglagay ng icon pre, sa line na to  */}
             <h1 className="text-xl md:text-2xl font-bold text-blue-900">Leaderboard</h1>
           </div>
         </div>
