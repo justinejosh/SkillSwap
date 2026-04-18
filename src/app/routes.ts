@@ -1,3 +1,4 @@
+import PreviewPage from "@/app/pages/PreviewPage";
 import { createBrowserRouter } from "react-router";
 import LoginPage from "@/app/pages/LoginPage";
 import SignupPage from "@/app/pages/SignupPage";
@@ -25,6 +26,10 @@ import MySkillsPage from "@/app/pages/MySkillsPage";
 export const router = createBrowserRouter([
   {
     path: "/",
+    Component: PreviewPage,
+  },
+  {
+    path: "/login",
     Component: LoginPage,
   },
   {
@@ -48,12 +53,10 @@ export const router = createBrowserRouter([
     Component: ChatPage,
   },
   {
-    // Added :swapId so the page knows which specific swap to load
     path: "/swap-agreement/:swapId",
     Component: SwapAgreementPage,
   },
   {
-    // Added the success confirmation route
     path: "/agreement-success",
     Component: AgreementSuccessPage,
   },

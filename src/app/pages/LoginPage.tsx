@@ -119,9 +119,22 @@ export default function LoginPage() {
               >
                 Sign up
               </button>
+
+              <p className="text-xs">
+              <button
+                onClick={() => navigate("/")}
+                className="text-blue-600 font-bold hover:underline" //hover:text-blue-200 transition-colors//
+              >
+                 Back to Home
+              </button>
+
+              </p>
             </div>
           </CardContent>
         </Card>
+         <p className="mt-8 text-center text-[10px] text-blue-400 uppercase tracking-widest font-medium">
+            Knoxite v1.0
+        </p>
       </div>
     </div>
   );

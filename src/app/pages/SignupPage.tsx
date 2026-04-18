@@ -169,18 +169,28 @@ export default function SignupPage() {
               <p className="text-sm text-blue-400">
                 Already part of the tribe?{" "}
                 <button
-                  onClick={() => navigate("/")}
+                  onClick={() => navigate("/login")}
                   className="text-blue-600 font-bold hover:underline"
                 >
                   Sign in
                 </button>
+              </p>
+
+              <p className="text-xs">
+              <button
+                onClick={() => navigate("/")}
+                className="text-blue-600 font-bold hover:underline" //hover:text-blue-200 transition-colors//
+              >
+                 Back to Home
+              </button>
+
               </p>
             </div>
           </CardContent>
         </Card>
         
         <p className="mt-8 text-center text-[10px] text-blue-400 uppercase tracking-widest font-medium">
-          Secure Skill Exchange â€¢ Knoxite v1.0
+            Knoxite v1.0
         </p>
       </div>
     </div>
