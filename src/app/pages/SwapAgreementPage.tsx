@@ -3,85 +3,114 @@ import { useNavigate, useParams } from "react-router";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
 import { Label } from "@/app/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/app/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/app/components/ui/avatar";
 import { Checkbox } from "@/app/components/ui/checkbox";
 import { ArrowLeft, ArrowRight, CheckCircle2, Loader2 } from "lucide-react";
-
-// 1. IMPORT CONFIG
 import { API_BASE_URL } from "@/config";
 
 export default function SwapAgreementPage() {
   const navigate = useNavigate();
-  const { swapId } = useParams(); // Get the swap ID from the URL
+  const { swapId } = useParams(); 
   const [step, setStep] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
-  const [partner, setPartner] = useState<any>(null);
+  const [debugError, setDebugError] = useState<string | null>(null);
+  
+  const [participants, setParticipants] = useState<any>({
+    me: { name: "You", headline: "Streetwear Enthusiast" },
+    partner: { name: "Partner", headline: "Knoxite Member" }
+  });
   
   const [agreement, setAgreement] = useState({
-    skillA: "",
-    skillB: "",
+    skillA: "", 
+    skillB: "", 
     duration: "1",
     sessions: "4",
     agreedToTerms: false,
   });
 
   useEffect(() => {
-    fetchSwapDetails();
+    if (swapId) fetchSwapDetails();
   }, [swapId]);
 
   const fetchSwapDetails = async () => {
-  const token = localStorage.getItem("token"); // OR "knoxite_token" - use whichever you used in Login
-  
-  try {
-    const response = await fetch(`${API_BASE_URL}/api/swaps/${swapId}`, {
-      method: "GET",
-      headers: {
-        "Authorization": `Bearer ${token}`,
-        "Content-Type": "application/json"
-      }
-    });
+    setIsLoading(true);
+    setDebugError(null);
+    const token = localStorage.getItem("knoxite_token") || localStorage.getItem("token");
+    
+    try {
+      const response = await fetch(`${API_BASE_URL}/swaps/${swapId}`, {
+        method: "GET",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json"
+        }
+      });
 
-    const data = await response.json();
-    if (response.ok) {
-      // Update your state with the real data
-      setPartner(data.partner);
+      if (!response.ok) {
+        const errorData = await response.json();
+        setDebugError(`Server Error: ${errorData.message || response.statusText}`);
+        return;
+      }
+
+      const data = await response.json();
+
+      setParticipants({
+        me: data.me || { name: "You", headline: "Streetwear Enthusiast" },
+        partner: data.partner || { name: "Partner", headline: "Knoxite Member" }
+      });
+
       setAgreement(prev => ({
         ...prev,
-        skillA: data.offeredSkill,
-        skillB: data.wantedSkill
+        skillA: typeof data.offeredSkill === 'object' ? data.offeredSkill.name : data.offeredSkill || "Skill A",
+        skillB: typeof data.wantedSkill === 'object' ? data.wantedSkill.name : data.wantedSkill || "Skill B"
       }));
+
+    } catch (err: any) {
+      setDebugError(`Network Error: ${err.message}`);
+    } finally {
+      setIsLoading(false);
     }
-  } catch (err) {
-    console.error("Fetch error:", err);
-  }
-};
+  };
 
   const handleSubmit = async () => {
-  if (!agreement.agreedToTerms) return;
-
-  try {
-    const token = localStorage.getItem("knoxite_token");
-    const response = await fetch(`${API_BASE_URL}/swaps/${swapId}/agreement`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${token}`,
-        "bypass-tunnel-reminder": "true"
-      },
-      body: JSON.stringify(agreement)
-    });
-
-    if (response.ok) {
-      // GO TO SUCCESS PAGE INSTEAD
-      navigate("/agreement-success"); 
+    if (!agreement.agreedToTerms) {
+      alert("Please agree to the Knoxite Oath first.");
+      return;
     }
-  } catch (error) {
-    alert("Error saving agreement.");
-  }
-};
 
-  if (isLoading) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin text-blue-600" /></div>;
+    try {
+      const token = localStorage.getItem("knoxite_token") || localStorage.getItem("token");
+      console.log("Submitting agreement for swap:", swapId);
+
+      const response = await fetch(`${API_BASE_URL}/swaps/${swapId}/agreement`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        // Sending the final logistics to the backend
+        body: JSON.stringify({
+          duration: agreement.duration,
+          sessions: agreement.sessions,
+          agreedToTerms: true
+        })
+      });
+
+      if (response.ok) {
+        console.log("Agreement signed successfully!");
+        navigate("/dashboard");
+      } else {
+        const errorData = await response.json();
+        alert(`Failed to sign: ${errorData.message || "Unknown error"}`);
+      }
+    } catch (error: any) {
+      console.error("Submit Error:", error);
+      alert(`Network Error: ${error.message}. Check your server connection.`);
+    }
+  };
+
+  if (isLoading) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin text-blue-600 size-10" /></div>;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-100 pb-10">
@@ -95,16 +124,23 @@ export default function SwapAgreementPage() {
       </header>
 
       <div className="max-w-xl mx-auto p-4 space-y-6">
-        {/* Mobile-Friendly Stepper */}
-        <div className="flex items-center justify-between px-6">
+        {debugError && (
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded text-xs">
+            <strong>Fetch Error:</strong> {debugError}
+            <p className="mt-1">Make sure the ID in the URL matches Prisma Studio.</p>
+          </div>
+        )}
+
+        {/* Stepper */}
+        <div className="flex items-center justify-between px-6 relative">
           {[1, 2, 3].map((s) => (
-            <div key={s} className={`size-8 rounded-full flex items-center justify-center text-xs font-bold ${
+            <div key={s} className={`size-8 rounded-full flex items-center justify-center text-xs font-bold z-10 ${
               s <= step ? "bg-blue-600 text-white" : "bg-blue-100 text-blue-400"
             }`}>
               {s < step ? <CheckCircle2 className="size-5" /> : s}
             </div>
           ))}
-          <div className="absolute left-1/2 -translate-x-1/2 w-48 h-0.5 bg-blue-100 -z-10 hidden sm:block" />
+          <div className="absolute left-1/2 -translate-x-1/2 w-48 h-0.5 bg-blue-100 top-1/2 -translate-y-1/2" />
         </div>
 
         {/* Step 1: Participants */}
@@ -116,21 +152,27 @@ export default function SwapAgreementPage() {
             <CardContent className="pt-6 space-y-6">
               <div className="flex items-center gap-4 bg-white p-3 rounded-xl border border-blue-50">
                 <Avatar className="size-12"><AvatarFallback>ME</AvatarFallback></Avatar>
-                <div><p className="font-bold text-blue-900">You</p><p className="text-xs text-blue-500">Instructor & Student</p></div>
+                <div>
+                  <p className="font-bold text-blue-900">{participants.me.name}</p>
+                  <p className="text-xs text-blue-500">{participants.me.headline}</p>
+                </div>
               </div>
               <div className="flex justify-center"><ArrowRight className="text-blue-200" /></div>
               <div className="flex items-center gap-4 bg-white p-3 rounded-xl border border-blue-50">
                 <Avatar className="size-12">
-                   <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${partner?.name}`} />
-                   <AvatarFallback>{partner?.name?.[0]}</AvatarFallback>
+                   <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${participants.partner.name}`} />
+                   <AvatarFallback>{participants.partner.name?.[0]}</AvatarFallback>
                 </Avatar>
-                <div><p className="font-bold text-blue-900">{partner?.name || "Partner"}</p><p className="text-xs text-blue-500">Instructor & Student</p></div>
+                <div>
+                  <p className="font-bold text-blue-900">{participants.partner.name}</p>
+                  <p className="text-xs text-blue-500">{participants.partner.headline}</p>
+                </div>
               </div>
             </CardContent>
           </Card>
         )}
 
-        {/* Step 2: Skills & Details */}
+        {/* Step 2: Swap Logistics */}
         {step === 2 && (
           <Card className="border-blue-100 shadow-sm rounded-2xl">
             <CardHeader><CardTitle className="text-blue-900 text-base">Swap Logistics</CardTitle></CardHeader>
@@ -155,7 +197,7 @@ export default function SwapAgreementPage() {
                   <Input type="number" value={agreement.sessions} onChange={(e) => setAgreement({...agreement, sessions: e.target.value})} className="h-11" />
                 </div>
               </div>
-              <div className="bg-blue-900 text-white p-4 rounded-xl mt-4">
+              <div className="bg-blue-900 text-white p-4 rounded-xl mt-4 text-center">
                 <p className="text-[10px] uppercase font-bold opacity-70">Mutual Time Investment</p>
                 <p className="text-2xl font-black">{Number(agreement.sessions) * Number(agreement.duration)} Hours Total</p>
               </div>
@@ -174,8 +216,14 @@ export default function SwapAgreementPage() {
                 <p><strong>3. Respect:</strong> I will maintain a professional and safe learning environment.</p>
               </div>
               <div className="flex items-center space-x-3 pt-2">
-                <Checkbox id="terms" checked={agreement.agreedToTerms} onCheckedChange={(c) => setAgreement({...agreement, agreedToTerms: !!c})} />
-                <Label htmlFor="terms" className="text-xs text-blue-900 leading-tight">I commit to this skill exchange and agree to the community guidelines.</Label>
+                <Checkbox 
+                  id="terms" 
+                  checked={agreement.agreedToTerms} 
+                  onCheckedChange={(c) => setAgreement({...agreement, agreedToTerms: !!c})} 
+                />
+                <Label htmlFor="terms" className="text-xs text-blue-900 leading-tight cursor-pointer">
+                  I commit to this skill exchange and agree to the community guidelines.
+                </Label>
               </div>
             </CardContent>
           </Card>

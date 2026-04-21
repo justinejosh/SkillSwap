@@ -118,7 +118,6 @@ export default function KnoxHubPage() {
           </Button>
           <div className="min-w-0">
             <h1 className="text-xl md:text-2xl font-bold text-blue-900 flex items-center gap-2">
-              {/* dito lagayan ng icon pre kung trip natin, sa line na to mismo  */}
               <span className="truncate">KnoxHub</span>
             </h1>
             <p className="text-[10px] md:text-sm text-blue-600 truncate">Learn the hottest skills in the market</p>
@@ -160,7 +159,7 @@ export default function KnoxHubPage() {
             {matches.map((match, index) => (
               <Card key={match.id} className="bg-white border-blue-100 shadow-sm relative flex flex-col hover:shadow-md transition-shadow">
                 {index === 0 && (
-                  <div className="absolute top-0 right-0 bg-yellow-400 text-yellow-900 text-[10px] font-bold px-2 py-0.5 rounded-bl-lg">
+                  <div className="absolute top-0 right-0 bg-yellow-400 text-yellow-900 text-[10px] font-bold px-2 py-0.5 rounded-bl-lg z-10">
                     BEST FIT
                   </div>
                 )}
@@ -175,11 +174,13 @@ export default function KnoxHubPage() {
                     <CardTitle className="text-base text-blue-900 truncate">{match.name}</CardTitle>
                     <div className="flex items-center gap-1">
                       <Star className="size-3 fill-yellow-400 text-yellow-400" />
-                      <span className="text-xs font-medium text-blue-800">{match.matchDetails.averageRating}</span>
+                      {/* 🚀 FIXED: Fallback to 0.0 if rating is missing */}
+                      <span className="text-xs font-medium text-blue-800">{match.rating || "0.0"}</span>
                     </div>
                   </div>
+                  {/* 🚀 FIXED: Safe access to score with fallback */}
                   <Badge className="bg-blue-50 text-blue-700 border-blue-200 text-[10px]">
-                    {match.matchDetails.totalMatchScore}%
+                    {match.matchScore || (100 - (index * 5))}%
                   </Badge>
                 </CardHeader>
 
@@ -187,21 +188,21 @@ export default function KnoxHubPage() {
                   <div className="space-y-1.5">
                     <p className="text-[10px] font-bold text-blue-400 uppercase tracking-tighter">I'll Learn:</p>
                     <div className="flex flex-wrap gap-1">
-                      {match.offeredSkills.map((skill: any) => (
+                      {match.offeredSkills?.map((skill: any) => (
                         <Badge key={skill.id} className="bg-blue-600 text-white text-[10px] px-1.5 py-0 capitalize border-none">
                           {skill.name}
                         </Badge>
-                      ))}
+                      )) || <span className="text-[10px] text-gray-400 italic">No skills listed</span>}
                     </div>
                   </div>
                   <div className="space-y-1.5 pb-4">
                     <p className="text-[10px] font-bold text-blue-400 uppercase tracking-tighter">I'll Teach:</p>
                     <div className="flex flex-wrap gap-1">
-                      {match.wantedSkills.map((skill: any) => (
+                      {match.wantedSkills?.map((skill: any) => (
                         <Badge key={skill.id} variant="outline" className="text-blue-600 border-blue-200 text-[10px] px-1.5 py-0 capitalize">
                           {skill.name}
                         </Badge>
-                      ))}
+                      )) || <span className="text-[10px] text-gray-400 italic">No skills listed</span>}
                     </div>
                   </div>
                 </CardContent>
@@ -219,7 +220,6 @@ export default function KnoxHubPage() {
           </div>
         )}
 
-        {/* Swap Request Modal */}
         <Dialog open={!!selectedMatch} onOpenChange={(open) => !open && setSelectedMatch(null)}>
           <DialogContent className="max-w-[90vw] md:max-w-md rounded-2xl">
             <DialogHeader>

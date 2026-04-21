@@ -21,96 +21,32 @@ import NotificationCenterPage from "@/app/pages/NotificationCenterPage";
 import AnalyticsDashboardPage from "@/app/pages/AnalyticsDashboardPage";
 import ActivityTimelinePage from "@/app/pages/ActivityTimelinePage";
 import MySkillsPage from "@/app/pages/MySkillsPage";
+// 🚀 New Import
+import SwapDetailsPage from "@/app/pages/SwapDetailsPage"; 
 
 export const router = createBrowserRouter([
-  {
-    path: "/",
-    Component: LoginPage,
-  },
-  {
-    path: "/signup",
-    Component: SignupPage,
-  },
-  {
-    path: "/dashboard",
-    Component: DashboardPage,
-  },
-  {
-    path: "/profile",
-    Component: ProfilePage,
-  },
-  {
-    path: "/my-skills",
-    Component: MySkillsPage,
-  },
-  {
-    path: "/chat",
-    Component: ChatPage,
-  },
-  {
-    // Added :swapId so the page knows which specific swap to load
-    path: "/swap-agreement/:swapId",
-    Component: SwapAgreementPage,
-  },
-  {
-    // Added the success confirmation route
-    path: "/agreement-success",
-    Component: AgreementSuccessPage,
-  },
-  {
-    path: "/reputation",
-    Component: ReputationPage,
-  },
-  {
-    path: "/admin",
-    Component: AdminDashboardPage,
-  },
-  {
-    path: "/knox-hub",
-    Component: KnoxHubPage,
-  },
-  {
-    path: "/calendar",
-    Component: CalendarPage,
-  },
-  {
-    path: "/privacy",
-    Component: PrivacyPolicyPage,
-  },
-  {
-    path: "/security",
-    Component: SecurityPage,
-  },
-  {
-    path: "/report",
-    Component: ReportUserPage,
-  },
-  {
-    path: "/leaderboard",
-    Component: LeaderboardPage,
-  },
-  {
-    path: "/achievements",
-    Component: AchievementsPage,
-  },
-  {
-    path: "/skill-requests",
-    Component: SkillRequestBoardPage,
-  },
-  {
-    path: "/community-forum",
-    Component: CommunityForumPage,
-  },
-  {
-    path: "/requests",
-    Component: NotificationCenterPage,
-  },
-  {
-    path: "/analytics",
-    Component: AnalyticsDashboardPage,
-  },
-  {
-    path: "/activity-timeline",
-    Component: ActivityTimelinePage,
-  },
+  { path: "/", Component: LoginPage },
+  { path: "/signup", Component: SignupPage },
+  { path: "/dashboard", Component: DashboardPage },
+  { path: "/profile", Component: ProfilePage },
+  { path: "/my-skills", Component: MySkillsPage },
+  { path: "/chat", Component: ChatPage },
+  { path: "/swap-agreement/:swapId", Component: SwapAgreementPage },
+  { path: "/agreement-success", Component: AgreementSuccessPage },
+  { path: "/reputation", Component: ReputationPage }, // 🚀 Registered
+  { path: "/admin", Component: AdminDashboardPage },
+  { path: "/knox-hub", Component: KnoxHubPage },
+  { path: "/calendar", Component: CalendarPage },
+  { path: "/privacy", Component: PrivacyPolicyPage },
+  { path: "/security", Component: SecurityPage },
+  { path: "/report", Component: ReportUserPage },
+  { path: "/leaderboard", Component: LeaderboardPage },
+  { path: "/achievements", Component: AchievementsPage },
+  { path: "/skill-requests", Component: SkillRequestBoardPage },
+  { path: "/community-forum", Component: CommunityForumPage },
+  { path: "/requests", Component: NotificationCenterPage },
+  // 🚀 Active Swap Management
+  { path: "/swap-details/:swapId", Component: SwapDetailsPage },
+  { path: "/analytics", Component: AnalyticsDashboardPage },
+  { path: "/activity-timeline", Component: ActivityTimelinePage },
 ]);

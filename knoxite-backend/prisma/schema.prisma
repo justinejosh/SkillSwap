@@ -23,11 +23,9 @@ model User {
   offeredSkills Skill[] @relation("OfferedSkills")
   wantedSkills  Skill[] @relation("WantedSkills")
 
-  // Relation to SwapRequest (Historical/Marketplace requests)
   requestsSent     SwapRequest[] @relation("Requester")
   requestsReceived SwapRequest[] @relation("Receiver")
 
-  // Relation to Swap (The actual active swap agreement)
   swapsRequested Swap[] @relation("RequestedSwaps")
   swapsReceived  Swap[] @relation("ReceivedSwaps")
 
@@ -54,7 +52,6 @@ model Skill {
   swapsOffered SwapRequest[] @relation("SwapOfferedSkill")
   swapsWanted  SwapRequest[] @relation("SwapWantedSkill")
 
-  // FIXED: Changed SwapsInvolved to Swap
   activeOffered Swap[] @relation("ActiveOfferedSkill")
   activeWanted  Swap[] @relation("ActiveWantedSkill")
 }
@@ -74,33 +71,34 @@ model SwapRequest {
   offeredSkillId String
   wantedSkillId  String
 
-  requester    User   @relation("Requester", fields: [requesterId], references: [id])
-  receiver     User   @relation("Receiver", fields: [receiverId], references: [id])
-  offeredSkill Skill  @relation("SwapOfferedSkill", fields: [offeredSkillId], references: [id])
-  wantedSkill  Skill  @relation("SwapWantedSkill", fields: [wantedSkillId], references: [id])
-
-  reviews Review[]
+  requester    User  @relation("Requester", fields: [requesterId], references: [id])
+  receiver     User  @relation("Receiver", fields: [receiverId], references: [id])
+  offeredSkill Skill @relation("SwapOfferedSkill", fields: [offeredSkillId], references: [id])
+  wantedSkill  Skill @relation("SwapWantedSkill", fields: [wantedSkillId], references: [id])
 }
 
 // -------------------------------------------------
-// 4. REVIEW MODEL
+// 4. REVIEW MODEL (Updated to link to Swap)
 // -------------------------------------------------
 model Review {
-  id            String   @id @default(uuid())
-  rating        Int
-  comment       String?  @db.Text
-  createdAt     DateTime @default(now())
-  swapRequestId String
-  reviewerId    String
-  revieweeId    String
+  id          String   @id @default(uuid())
+  rating      Int
+  comment     String?  @db.Text
+  createdAt   DateTime @default(now())
+  
+  // 🚀 Changed from swapRequestId to swapId
+  swapId      String
+  reviewerId  String
+  revieweeId  String
 
-  swapRequest SwapRequest @relation(fields: [swapRequestId], references: [id])
-  reviewer    User        @relation("Reviewer", fields: [reviewerId], references: [id])
-  reviewee    User        @relation("Reviewee", fields: [revieweeId], references: [id])
+  // 🚀 Relation now points to Swap
+  swap     Swap   @relation(fields: [swapId], references: [id])
+  reviewer User   @relation("Reviewer", fields: [reviewerId], references: [id])
+  reviewee User   @relation("Reviewee", fields: [revieweeId], references: [id])
 }
 
 // -------------------------------------------------
-// 5. MESSAGE MODEL (Merged & Fixed)
+// 5. MESSAGE MODEL
 // -------------------------------------------------
 model Message {
   id         String   @id @default(uuid())
@@ -128,18 +126,27 @@ model BoardPost {
 }
 
 // -------------------------------------------------
-// 7. SWAP MODEL (The Active Agreement - Fixed IDs)
+// 7. SWAP MODEL (Added Relation to Reviews)
 // -------------------------------------------------
 model Swap {
-  id             String @id @default(uuid()) // Changed to String/UUID to match User
-  status         String // e.g., "PENDING", "ACCEPTED", "CONFIRMED"
-  requesterId    String
-  receiverId     String
-  offeredSkillId String
-  wantedSkillId  String
+  id                String   @id @default(uuid())
+  status            String   
+  requesterId       String
+  receiverId        String
+  offeredSkillId    String
+  wantedSkillId     String
+  
+  duration          Int      @default(1)
+  sessions          Int      @default(4)
+  completedSessions Int      @default(0)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   requester    User  @relation("RequestedSwaps", fields: [requesterId], references: [id])
   receiver     User  @relation("ReceivedSwaps", fields: [receiverId], references: [id])
   offeredSkill Skill @relation("ActiveOfferedSkill", fields: [offeredSkillId], references: [id])
   wantedSkill  Skill @relation("ActiveWantedSkill", fields: [wantedSkillId], references: [id])
+
+  // 🚀 Added this line to allow reviews for a Swap
+  reviews      Review[]
 }
