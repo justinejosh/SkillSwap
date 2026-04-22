@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useNavigate, useSearchParams } from "react-router"; // 🚀 Added useSearchParams
+import { useNavigate, useSearchParams } from "react-router"; 
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/app/components/ui/card";
@@ -10,7 +10,7 @@ import { API_BASE_URL } from "@/config";
 
 export default function ChatPage() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams(); // 🚀 Grab ?partnerId= from URL
+  const [searchParams] = useSearchParams(); 
   const [conversations, setConversations] = useState<any[]>([]);
   const [selectedPartner, setSelectedPartner] = useState<any>(null);
   const [messages, setMessages] = useState<any[]>([]);
@@ -34,8 +34,6 @@ export default function ChatPage() {
 
         if (res.ok) {
           const data = await res.json();
-          
-          // 🚀 FIX: Allow all active statuses, not just "ACCEPTED"
           const activeStatuses = ["ACCEPTED", "CONFIRMED", "PENDING_AGREEMENT"];
           const activeSwaps = data.filter((s: any) => activeStatuses.includes(s.status));
           
@@ -43,7 +41,7 @@ export default function ChatPage() {
             const partner = s.requesterId === currentUser.id ? s.receiver : s.requester;
             return {
               id: partner.id,
-              swapId: s.id,
+              swapId: s.id, // 🚀 This is now critical
               user: partner.name,
               swapInfo: `${s.offeredSkill.name} ↔ ${s.wantedSkill.name}`,
               avatar: partner.name.charAt(0)
@@ -52,9 +50,6 @@ export default function ChatPage() {
 
           setConversations(formatted);
 
-          // 🚀 AUTO-SELECT logic:
-          // 1. If there's an ID in the URL, find that person.
-          // 2. Otherwise, pick the first person in the list.
           if (urlPartnerId) {
             const target = formatted.find(c => c.id === urlPartnerId);
             if (target) setSelectedPartner(target);
@@ -69,9 +64,7 @@ export default function ChatPage() {
       }
     };
     fetchConversations();
-  }, [urlPartnerId]); // Re-run if the URL partner changes
-
-  // ... (Keep your existing fetchMessages and handleSendMessage logic)
+  }, [urlPartnerId]);
 
   useEffect(() => {
     if (!selectedPartner) return;
@@ -79,7 +72,8 @@ export default function ChatPage() {
     const fetchMessages = async () => {
       try {
         const token = localStorage.getItem("knoxite_token");
-        const res = await fetch(`${API_BASE_URL}/chat/conversation/${selectedPartner.id}`, {
+        // 🚀 FIX: Included swapId as a query parameter
+        const res = await fetch(`${API_BASE_URL}/chat/conversation/${selectedPartner.id}?swapId=${selectedPartner.swapId}`, {
           headers: { 
             "Authorization": `Bearer ${token}`,
             "bypass-tunnel-reminder": "true"
@@ -97,7 +91,7 @@ export default function ChatPage() {
     fetchMessages();
     const interval = setInterval(fetchMessages, 3000);
     return () => clearInterval(interval);
-  }, [selectedPartner?.id]);
+  }, [selectedPartner?.id, selectedPartner?.swapId]); // 🚀 Track both ID and swapId
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -118,9 +112,11 @@ export default function ChatPage() {
           "Authorization": `Bearer ${token}`,
           "bypass-tunnel-reminder": "true"
         },
+        // 🚀 FIX: Sending swapId in the request body
         body: JSON.stringify({ 
           receiverId: selectedPartner.id, 
-          content: messageInput 
+          content: messageInput,
+          swapId: selectedPartner.swapId 
         })
       });
 
@@ -134,7 +130,6 @@ export default function ChatPage() {
     }
   };
 
-  // Rendering logic below...
   if (loading) {
     return (
       <div className="h-screen bg-blue-50 flex flex-col items-center justify-center">
@@ -180,10 +175,10 @@ export default function ChatPage() {
                 <div className="space-y-1 p-2">
                   {conversations.map((conv) => (
                     <div
-                      key={conv.id}
+                      key={`${conv.id}-${conv.swapId}`} // 🚀 Unique key using both IDs
                       onClick={() => setSelectedPartner(conv)}
                       className={`p-3 rounded-xl cursor-pointer transition-all border ${
-                        selectedPartner?.id === conv.id ? "bg-blue-600 text-white border-blue-700 shadow-md" : "hover:bg-blue-50 border-transparent text-blue-900"
+                        selectedPartner?.swapId === conv.swapId ? "bg-blue-600 text-white border-blue-700 shadow-md" : "hover:bg-blue-50 border-transparent text-blue-900"
                       }`}
                     >
                       <div className="flex items-center gap-3">
@@ -191,8 +186,8 @@ export default function ChatPage() {
                           <AvatarFallback className="bg-blue-900 text-white font-bold">{conv.avatar}</AvatarFallback>
                         </Avatar>
                         <div className="flex-1 min-w-0">
-                          <h3 className={`font-bold text-sm truncate ${selectedPartner?.id === conv.id ? "text-white" : "text-blue-900"}`}>{conv.user}</h3>
-                          <p className={`text-[10px] truncate uppercase font-bold tracking-tighter ${selectedPartner?.id === conv.id ? "text-blue-100" : "text-blue-400"}`}>{conv.swapInfo}</p>
+                          <h3 className={`font-bold text-sm truncate ${selectedPartner?.swapId === conv.swapId ? "text-white" : "text-blue-900"}`}>{conv.user}</h3>
+                          <p className={`text-[10px] truncate uppercase font-bold tracking-tighter ${selectedPartner?.swapId === conv.swapId ? "text-blue-100" : "text-blue-400"}`}>{conv.swapInfo}</p>
                         </div>
                       </div>
                     </div>
@@ -236,7 +231,7 @@ export default function ChatPage() {
                         const isOwn = m.senderId === currentUser.id;
                         return (
                           <div key={m.id} className={`flex ${isOwn ? "justify-end" : "justify-start"}`}>
-                            <div className={`max-w-[85%] md:max-w-[70%] rounded-2xl p-3 shadow-sm ${isOwn ? "bg-blue-600 text-white rounded-tr-none" : "bg-white text-blue-900 rounded-tl-none border border-blue-50"}`}>
+                            <div className={`max-w-[85%] md:max-w-[70%] rounded-2xl p-3 shadow-sm ${isOwn ? "bg-blue-600 text-white rounded-tr-none" : "bg-white text-blue-900 rounded-tl-none border border-blue-100"}`}>
                               <p className="text-sm leading-relaxed">{m.content}</p>
                               <span className={`text-[9px] mt-1 block opacity-70 font-bold ${isOwn ? "text-right" : "text-left"}`}>
                                 {new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}

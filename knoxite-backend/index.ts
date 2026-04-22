@@ -6,6 +6,7 @@ import profileRoutes from "./routes/profile";
 import swapRoutes from "./routes/swaps"; 
 import boardRoutes from "./routes/board";
 import chatRoutes from "./routes/chat";
+import analyticsRoutes from "./routes/analytics";
 import { authenticateToken } from "./middleware/authMiddleware";
 
 const app = express();
@@ -48,11 +49,51 @@ app.get("/api/leaderboard", authenticateToken, async (req, res) => {
   }
 });
 
-// --- 2. MATCHING RADAR: DYNAMIC AVAILABILITY ---
+// --- 1.5 LEADERBOARD: MOST SWAPS AGGREGATION ---
+// 🚀 ADDED: This resolves the 404 error on the Most Swaps tab
+app.get("/api/leaderboard/swaps", authenticateToken, async (req, res) => {
+  try {
+    const allUsers = await prisma.user.findMany({
+      include: {
+        swapsRequested: { where: { status: "COMPLETED" } },
+        swapsReceived: { where: { status: "COMPLETED" } },
+      }
+    });
+
+    const formattedData = allUsers.map((user) => {
+      const totalSwaps = user.swapsRequested.length + user.swapsReceived.length;
+      return {
+        id: user.id,
+        name: user.name,
+        totalSwaps: totalSwaps
+      };
+    }).sort((a, b) => b.totalSwaps - a.totalSwaps);
+
+    res.json(formattedData);
+  } catch (error) {
+    console.error("Swaps Leaderboard Aggregation Error:", error);
+    res.status(500).json({ error: "Failed to compile swap activity metrics." });
+  }
+});
+
+// --- 2. MATCHING RADAR: MUTUAL SKILL MATCHING ---
 app.get("/api/matches", authenticateToken, async (req, res) => {
   const userId = (req as any).user?.id || (req as any).userId;
 
   try {
+    const currentUser = await prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        offeredSkills: { select: { id: true } },
+        wantedSkills: { select: { id: true } }
+      }
+    });
+
+    if (!currentUser) return res.status(404).json({ error: "User not found" });
+
+    const myOfferedIds = currentUser.offeredSkills.map(s => s.id);
+    const myWantedIds = currentUser.wantedSkills.map(s => s.id);
+
     const activeSwaps = await prisma.swap.findMany({
       where: {
         OR: [{ requesterId: userId }, { receiverId: userId }],
@@ -67,7 +108,15 @@ app.get("/api/matches", authenticateToken, async (req, res) => {
     excludedIds.push(userId);
 
     const recommendedPeers = await prisma.user.findMany({
-      where: { id: { notIn: excludedIds } },
+      where: { 
+        id: { notIn: excludedIds },
+        offeredSkills: {
+          some: { id: { in: myWantedIds } } 
+        },
+        wantedSkills: {
+          some: { id: { in: myOfferedIds } } 
+        }
+      },
       include: {
         offeredSkills: { select: { id: true, name: true } },
         wantedSkills: { select: { id: true, name: true } }
@@ -77,12 +126,12 @@ app.get("/api/matches", authenticateToken, async (req, res) => {
 
     res.json(recommendedPeers);
   } catch (error) {
+    console.error("Radar Error:", error);
     res.status(500).json({ error: "Radar fetch error" });
   }
 });
 
-// --- 3. SWAP REQUEST HANDLERS (NOTIFICATION LOGIC) ---
-
+// --- 3. SWAP REQUEST HANDLERS ---
 app.post("/api/swaps/request", authenticateToken, async (req, res) => {
   const { receiverId, offeredSkillId, wantedSkillId } = req.body;
   const requesterId = (req as any).user?.id || (req as any).userId;
@@ -173,7 +222,7 @@ app.patch("/api/swap-requests/:id/status", authenticateToken, async (req, res) =
   }
 });
 
-// --- 4. SWAP MANAGEMENT & SESSION LOGGING ---
+// --- 4. SWAP MANAGEMENT & BILATERAL LOGGING ---
 app.get("/api/swaps", authenticateToken, async (req, res) => {
   const userId = (req as any).user?.id || (req as any).userId;
   try {
@@ -217,23 +266,33 @@ app.get("/api/swaps/:id", authenticateToken, async (req, res: any) => {
 
 app.post("/api/swaps/:id/log-session", authenticateToken, async (req, res) => {
   const id = req.params.id as string;
+  const userId = (req as any).user?.id || (req as any).userId;
+
   try {
-    const current = await prisma.swap.findUnique({ where: { id } });
-    if (!current || current.completedSessions >= current.sessions) {
-      return res.status(400).json({ error: "Session limit reached" });
+    const swap = await prisma.swap.findUnique({ where: { id } });
+    if (!swap) return res.status(404).json({ error: "Swap not found" });
+
+    const isRequester = swap.requesterId === userId;
+    const currentCount = isRequester ? swap.requesterSessions : swap.receiverSessions;
+
+    if (currentCount >= swap.sessions) {
+      return res.status(400).json({ error: "Session validation limit reached for this user." });
     }
-    const updated = await prisma.swap.update({
+
+    const updatedSwap = await prisma.swap.update({
       where: { id },
-      data: { completedSessions: current.completedSessions + 1 }
+      data: isRequester 
+        ? { requesterSessions: currentCount + 1 } 
+        : { receiverSessions: currentCount + 1 }
     });
-    res.json(updated);
+
+    res.json(updatedSwap);
   } catch (error) {
-    res.status(500).json({ error: "Failed to log session" });
+    res.status(500).json({ error: "Failed to log verification session." });
   }
 });
 
-// --- 5. FINALIZE AGREEMENT (SET SESSIONS) ---
-// 🚀 THIS FIXES THE 404 IN SWAP AGREEMENT STEP 3
+// --- 5. FINALIZE AGREEMENT ---
 app.post("/api/swaps/:id/agreement", authenticateToken, async (req, res) => {
   const id = req.params.id as string;
   const { sessions } = req.body;
@@ -257,13 +316,14 @@ app.post("/api/swaps/:id/agreement", authenticateToken, async (req, res) => {
   }
 });
 
-// --- 6. REPUTATION & FINALIZATION ---
+// --- 6. REPUTATION & BILATERAL FINALIZATION ---
 app.post("/api/reputation/submit", authenticateToken, async (req, res) => {
   const { swapId, partnerId, rating, comment } = req.body;
   const reviewerId = (req as any).user?.id || (req as any).userId;
 
   try {
-    const review = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
+      // 1. Log the individual review
       const newReview = await tx.review.create({
         data: {
           rating: Number(rating),
@@ -273,13 +333,21 @@ app.post("/api/reputation/submit", authenticateToken, async (req, res) => {
           swap: { connect: { id: swapId } }
         }
       });
-      await tx.swap.update({ 
-        where: { id: swapId }, 
-        data: { status: "COMPLETED" } 
-      });
+
+      // 2. Count existing reviews for this specific swap
+      const totalReviews = await tx.review.count({ where: { swapId } });
+
+      // 3. Mark completed ONLY if both peers have submitted evaluations
+      if (totalReviews >= 2) {
+        await tx.swap.update({ 
+          where: { id: swapId }, 
+          data: { status: "COMPLETED" } 
+        });
+      }
+      
       return newReview;
     });
-    res.json(review);
+    res.json(result);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
@@ -307,6 +375,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/profile", profileRoutes);
 app.use("/api/chat", chatRoutes);
 app.use("/api/board", boardRoutes);
+app.use("/api/analytics", analyticsRoutes);
 
 app.listen(Number(PORT), '0.0.0.0', () => {
   console.log(`🚀 Knoxite Server Live on Port ${PORT}`);

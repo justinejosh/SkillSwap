@@ -10,7 +10,7 @@ import { Label } from "@/app/components/ui/label";
 import { 
   Bell, User, Trophy, LayoutGrid, Loader2, 
   X, BookOpen, Star, ArrowRight, Zap, Search, CheckCircle2,
-  MessageSquare // 🚀 Added for Chat
+  MessageSquare, Activity // 🚀 Added Activity icon
 } from "lucide-react";
 import { API_BASE_URL } from "@/config";
 
@@ -116,10 +116,19 @@ export default function DashboardPage() {
         <h1 className="text-2xl font-black text-blue-900 italic tracking-tighter cursor-pointer" onClick={() => navigate("/dashboard")}>
           KNOXITE
         </h1>
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
           {successMessage && <Badge className="bg-green-500 text-white animate-pulse mr-2">{successMessage}</Badge>}
           
-          {/* 🚀 NEW: CHAT BUTTON */}
+          {/* 🚀 NEW: ANALYTICS BUTTON */}
+          <Button 
+            variant="outline" 
+            onClick={() => navigate("/analytics")}
+            className="border-blue-200 text-blue-600 font-bold hidden md:flex items-center gap-2 hover:bg-blue-50 transition-colors mr-2 rounded-xl text-xs uppercase"
+          >
+            <Activity className="size-4" />
+            Analytics
+          </Button>
+
           <Button variant="ghost" size="icon" onClick={() => navigate("/chat")} className="text-blue-600">
             <MessageSquare className="size-5" />
           </Button>
@@ -243,7 +252,10 @@ function ActiveSwapCard({ swap, currentUserId, onCancel }: any) {
   const navigate = useNavigate();
   const isReq = swap.requesterId === currentUserId;
   const partner = isReq ? swap.receiver : swap.requester;
-  const progress = (Math.min(swap.completedSessions, swap.sessions) / swap.sessions) * 100;
+  
+  // 🚀 UPDATED PROGRESS BAR LOGIC: Now uses the bilateral tracking fields
+  const mySessions = isReq ? swap.requesterSessions : swap.receiverSessions;
+  const progress = (Math.min(mySessions, swap.sessions) / swap.sessions) * 100;
 
   return (
     <Card 

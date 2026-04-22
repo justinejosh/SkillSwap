@@ -18,7 +18,7 @@ import AchievementsPage from "@/app/pages/AchievementsPage";
 import SkillRequestBoardPage from "@/app/pages/SkillRequestBoardPage";
 import CommunityForumPage from "@/app/pages/CommunityForumPage";
 import NotificationCenterPage from "@/app/pages/NotificationCenterPage";
-import AnalyticsDashboardPage from "@/app/pages/AnalyticsDashboardPage";
+import AnalyticsPage from "@/app/pages/AnalyticsPage";
 import ActivityTimelinePage from "@/app/pages/ActivityTimelinePage";
 import MySkillsPage from "@/app/pages/MySkillsPage";
 // 🚀 New Import
@@ -47,6 +47,6 @@ export const router = createBrowserRouter([
   { path: "/requests", Component: NotificationCenterPage },
   // 🚀 Active Swap Management
   { path: "/swap-details/:swapId", Component: SwapDetailsPage },
-  { path: "/analytics", Component: AnalyticsDashboardPage },
+  { path: "/analytics", Component: AnalyticsPage },
   { path: "/activity-timeline", Component: ActivityTimelinePage },
 ]);

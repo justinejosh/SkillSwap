@@ -86,19 +86,17 @@ model Review {
   comment     String?  @db.Text
   createdAt   DateTime @default(now())
   
-  // 🚀 Changed from swapRequestId to swapId
   swapId      String
   reviewerId  String
   revieweeId  String
 
-  // 🚀 Relation now points to Swap
   swap     Swap   @relation(fields: [swapId], references: [id])
   reviewer User   @relation("Reviewer", fields: [reviewerId], references: [id])
   reviewee User   @relation("Reviewee", fields: [revieweeId], references: [id])
 }
 
 // -------------------------------------------------
-// 5. MESSAGE MODEL
+// 5. MESSAGE MODEL (Updated to link to Swap)
 // -------------------------------------------------
 model Message {
   id         String   @id @default(uuid())
@@ -106,9 +104,11 @@ model Message {
   createdAt  DateTime @default(now())
   senderId   String
   receiverId String
+  swapId     String   // 🚀 Link to the specific Swap instance
 
   sender   User @relation("Sender", fields: [senderId], references: [id])
   receiver User @relation("Receiver", fields: [receiverId], references: [id])
+  swap     Swap @relation(fields: [swapId], references: [id]) // 🚀 Establishing relation
 }
 
 // -------------------------------------------------
@@ -126,7 +126,7 @@ model BoardPost {
 }
 
 // -------------------------------------------------
-// 7. SWAP MODEL (Added Relation to Reviews)
+// 7. SWAP MODEL (Updated with Bilateral Accountability)
 // -------------------------------------------------
 model Swap {
   id                String   @id @default(uuid())
@@ -138,7 +138,11 @@ model Swap {
   
   duration          Int      @default(1)
   sessions          Int      @default(4)
-  completedSessions Int      @default(0)
+  
+  // 🚀 Bilateral Session Tracking
+  requesterSessions Int      @default(0)
+  receiverSessions  Int      @default(0)
+  
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
@@ -147,6 +151,6 @@ model Swap {
   offeredSkill Skill @relation("ActiveOfferedSkill", fields: [offeredSkillId], references: [id])
   wantedSkill  Skill @relation("ActiveWantedSkill", fields: [wantedSkillId], references: [id])
 
-  // 🚀 Added this line to allow reviews for a Swap
   reviews      Review[]
+  messages     Message[] // 🚀 Allows chat history to be tied to this swap
 }
