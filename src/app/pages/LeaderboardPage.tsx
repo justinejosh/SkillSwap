@@ -83,7 +83,7 @@ export default function LeaderboardPage() {
 
       <div className="max-w-5xl mx-auto p-6 space-y-8">
         <Tabs defaultValue="mentors" onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3 bg-white border border-slate-200 h-12 p-1 rounded-lg">
+          <TabsList className="flex w-full overflow-x-auto whitespace-nowrap bg-white border border-slate-200 h-12 p-1 rounded-lg no-scrollbar">
             <TabsTrigger value="mentors" className="rounded-md data-[state=active]:bg-blue-600 data-[state=active]:text-white font-semibold text-sm">
               <Award className="mr-2 size-4" /> Top Mentors
             </TabsTrigger>
@@ -104,7 +104,7 @@ export default function LeaderboardPage() {
               </CardHeader>
               <CardContent className="space-y-3">
                 {mentors.map((mentor, index) => (
-                  <div key={mentor.id} className="flex items-center justify-between p-4 rounded-lg bg-white border border-slate-100 hover:border-blue-300 transition-colors">
+                  <div key={mentor.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 gap-4 rounded-lg bg-white border border-slate-100 hover:border-blue-300 transition-colors">
                     <div className="flex items-center gap-4 min-w-0">
                       {getRankIcon(index + 1)}
                       <div className="relative">
@@ -122,7 +122,7 @@ export default function LeaderboardPage() {
                       </div>
                     </div>
                     
-                    <div className="flex flex-col items-end gap-2">
+                    <div className="flex flex-row sm:flex-col items-center sm:items-end justify-between sm:justify-start gap-2 w-full sm:w-auto border-t sm:border-none pt-2 sm:pt-0">
                       <Badge variant="secondary" className="bg-blue-50 text-blue-700 font-bold px-2 py-0.5 border-blue-100">
                         {mentor.reviews || 0} COMPLETED REVIEW(S)
                       </Badge>
@@ -144,7 +144,7 @@ export default function LeaderboardPage() {
       {/* Persistent User Performance Bar */}
       {myStats && (
         <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-slate-200 shadow-[0_-4px_10px_rgba(0,0,0,0.05)] z-30">
-          <div className="max-w-5xl mx-auto flex items-center justify-between bg-slate-900 p-4 rounded-xl text-white">
+          <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-start sm:items-center justify-between bg-slate-900 p-4 rounded-xl text-white gap-4">
              <div className="flex items-center gap-4">
                 <div className="bg-blue-600 text-white size-10 rounded-lg flex items-center justify-center font-bold">
                    #{mentors.findIndex(u => u.id === myStats.id) + 1 || '?'}

@@ -5,6 +5,8 @@ import { authenticateToken, AuthRequest } from "../middleware/authMiddleware";
 const router = express.Router();
 const prisma = new PrismaClient();
 
+console.log("Profile Routes Loaded and Ready!");
+
 // ==========================================
 // 1. GET USER PROFILE & SKILLS
 // ==========================================
@@ -95,7 +97,7 @@ router.post("/skills/want", authenticateToken, async (req: AuthRequest, res: any
   }
 });
 
-  // ==========================================
+// ==========================================
 // 4. REMOVE A SKILL (OFFERED OR WANTED)
 // ==========================================
 router.delete("/skills/:type/:skillId", authenticateToken, async (req: AuthRequest, res: any) => {
@@ -127,6 +129,32 @@ router.delete("/skills/:type/:skillId", authenticateToken, async (req: AuthReque
   } catch (error: any) {
     console.error("Delete Skill Error:", error.message);
     res.status(500).json({ error: "Failed to remove skill from your profile." });
+  }
+});
+
+// ==========================================
+// 5. UPDATE USER BIO/PROFILE
+// ==========================================
+router.put("/", authenticateToken, async (req: AuthRequest, res: any) => {
+  try {
+    const newName = req.body.name;
+    const newBio = req.body.bio;
+
+    const updatedUser = await prisma.user.update({
+      where: {id: req.userId},
+      data: {
+        name: String(newName),
+        bio: String(newBio)
+      },
+    });
+
+    res.status(200).json({
+      message: "Profile updated successfully!",
+      user: updatedUser
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json( {error: "Failed to update profile bio." });
   }
 });
 

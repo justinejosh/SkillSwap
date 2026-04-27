@@ -30,7 +30,7 @@ export default function ProfilePage() {
       const token = localStorage.getItem("knoxite_token");
       if (!token) { navigate("/"); return; }
 
-      const response = await fetch(`${API_BASE_URL}/profile`, {
+      const response = await fetch(`${API_BASE_URL}/profile/`, {
         headers: { 
           "Authorization": `Bearer ${token}`,
           "bypass-tunnel-reminder": "true" 

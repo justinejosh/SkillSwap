@@ -20,6 +20,14 @@ export default function ChatPage() {
 
   const currentUser = JSON.parse(localStorage.getItem("knoxite_user") || "{}");
   const urlPartnerId = searchParams.get("partnerId");
+  
+  const handleBackClick = () => {
+    if (window.innerWidth < 768 && selectedPartner) {
+      setSelectedPartner(null);
+    } else {
+      navigate("/dashboard");
+    }
+  };
 
   useEffect(() => {
     const fetchConversations = async () => {
@@ -157,7 +165,7 @@ export default function ChatPage() {
       <header className="bg-white border-b border-blue-100 shadow-sm flex-none">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")} className="text-blue-600">
+            <Button variant="ghost" size="icon" onClick={handleBackClick} className="text-blue-600">
               <ArrowLeft className="size-6" />
             </Button>
             <h1 className="text-xl font-black text-blue-900 italic tracking-tighter uppercase">Messages</h1>
@@ -168,7 +176,7 @@ export default function ChatPage() {
       <div className="flex-1 max-w-7xl w-full mx-auto p-2 md:p-4 overflow-hidden min-h-0">
         <div className="grid grid-cols-12 gap-4 h-full min-h-0">
           
-          <Card className="hidden md:flex col-span-4 bg-white/90 backdrop-blur border-blue-100 flex-col overflow-hidden h-full rounded-2xl">
+          <Card className={`${selectedPartner ? "hidden md:flex" : "flex"} col-span-12 md:col-span-4 bg-white/90 backdrop-blur border-blue-100 flex-col overflow-hidden h-full rounded-2xl`}>
             <CardHeader className="flex-none border-b"><CardTitle className="text-blue-900 text-sm font-black uppercase tracking-widest">Inbox</CardTitle></CardHeader>
             <CardContent className="flex-1 overflow-hidden p-0">
               <ScrollArea className="h-full">
@@ -197,7 +205,7 @@ export default function ChatPage() {
             </CardContent>
           </Card>
 
-          <Card className="col-span-12 md:col-span-8 bg-white shadow-xl border-blue-100 flex flex-col overflow-hidden h-full rounded-2xl">
+          <Card className={`${!selectedPartner ? "hidden md:flex" : "flex"} col-span-12 md:col-span-8 bg-white shadow-xl border-blue-100 flex flex-col overflow-hidden h-full rounded-2xl`}>
             {selectedPartner ? (
               <>
                 <CardHeader className="border-b border-blue-100 flex-none p-3 md:p-4">

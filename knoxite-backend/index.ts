@@ -377,6 +377,19 @@ app.use("/api/chat", chatRoutes);
 app.use("/api/board", boardRoutes);
 app.use("/api/analytics", analyticsRoutes);
 
-app.listen(Number(PORT), '0.0.0.0', () => {
+app.use((err: any, req: any, res: any, next: any) => {
+  console.error("SERVER CRASHED:", err.stack);
+  res.status(500).send('Something broke!');
+});
+
+const server = app.listen(Number(PORT), '0.0.0.0', () => {
   console.log(`🚀 Knoxite Server Live on Port ${PORT}`);
+
+});
+  server.on('error', (error: any) => {
+  if (error.code === 'EADDRINUSE') {
+    console.error(`❌ Port ${PORT} is already in use. Try a different port!`);
+  } else {
+    console.error('❌ Server error:', error);
+  }
 });
