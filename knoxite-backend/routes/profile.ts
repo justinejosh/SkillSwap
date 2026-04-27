@@ -95,4 +95,39 @@ router.post("/skills/want", authenticateToken, async (req: AuthRequest, res: any
   }
 });
 
+  // ==========================================
+// 4. REMOVE A SKILL (OFFERED OR WANTED)
+// ==========================================
+router.delete("/skills/:type/:skillId", authenticateToken, async (req: AuthRequest, res: any) => {
+  const type = req.params.type as string;
+  const skillId = req.params.skillId as string; // 🚀 Force type to string
+  const userId = req.userId as string;
+
+  try {
+    // We update directly inside the call to avoid 'updateData' typing issues
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        [type === "offer" ? "offeredSkills" : "wantedSkills"]: {
+          disconnect: { id: skillId }
+        }
+      },
+      include: { 
+        offeredSkills: true, 
+        wantedSkills: true 
+      }
+    });
+
+    res.status(200).json({ 
+      message: `Skill removed from your ${type === "offer" ? "offerings" : "wishlist"}!`,
+      // Using type casting (as any) here prevents the property access error
+      offeredSkills: (updatedUser as any).offeredSkills,
+      wantedSkills: (updatedUser as any).wantedSkills
+    });
+  } catch (error: any) {
+    console.error("Delete Skill Error:", error.message);
+    res.status(500).json({ error: "Failed to remove skill from your profile." });
+  }
+});
+
 export default router;

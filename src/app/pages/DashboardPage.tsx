@@ -1,224 +1,287 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
-import { Input } from "@/app/components/ui/input";
 import { Button } from "@/app/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/app/components/ui/card";
 import { Badge } from "@/app/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/app/components/ui/avatar";
-import { Search, Users, BookOpen, Bell, User, MessageCircle, Calendar, Trophy, LayoutGrid, Shield, MessageSquare, Loader2 } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/app/components/ui/dialog";
+import { Input } from "@/app/components/ui/input";
+import { Label } from "@/app/components/ui/label";
+import { 
+  Bell, User, Trophy, LayoutGrid, Loader2, 
+  X, BookOpen, Star, ArrowRight, Zap, Search, CheckCircle2,
+  MessageSquare, Activity // 🚀 Added Activity icon
+} from "lucide-react";
 import { API_BASE_URL } from "@/config";
 
 export default function DashboardPage() {
   const navigate = useNavigate();
-  const [searchQuery, setSearchQuery] = useState("");
-  const [matches, setMatches] = useState<any[]>([]);
   const [swaps, setSwaps] = useState<any[]>([]);
+  const [matches, setMatches] = useState<any[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Modal State
+  const [selectedMatch, setSelectedMatch] = useState<any | null>(null);
+  const [swapMessage, setSwapMessage] = useState("Hi! I saw we have matching skills. Would you be interested in swapping?");
+  const [isRequesting, setIsRequesting] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
+
   useEffect(() => {
-    const userString = localStorage.getItem("knoxite_user");
-    if (userString) {
-      setCurrentUserId(JSON.parse(userString).id);
-    }
+    const user = JSON.parse(localStorage.getItem("knoxite_user") || "{}");
+    setCurrentUserId(user.id);
     fetchDashboardData();
   }, []);
 
   const fetchDashboardData = async () => {
     try {
       const token = localStorage.getItem("knoxite_token");
-      if (!token) {
-        navigate("/");
-        return;
-      }
-
-      const headers = { 
-        "Authorization": `Bearer ${token}`,
-        "bypass-tunnel-reminder": "true" 
-      };
-
-      const matchesRes = await fetch(`${API_BASE_URL}/matches`, { headers });
-      if (matchesRes.ok) {
-        const matchesData = await matchesRes.json();
-        setMatches(matchesData.slice(0, 3)); 
-      }
-
-      const swapsRes = await fetch(`${API_BASE_URL}/swaps`, { headers });
-      if (swapsRes.ok) {
-        const swapsData = await swapsRes.json();
-        setSwaps(swapsData);
-      }
-
+      const headers = { "Authorization": `Bearer ${token}`, "bypass-tunnel-reminder": "true" };
+      const [sRes, mRes] = await Promise.all([
+        fetch(`${API_BASE_URL}/swaps`, { headers }),
+        fetch(`${API_BASE_URL}/matches`, { headers })
+      ]);
+      if (sRes.ok) setSwaps(await sRes.json());
+      if (mRes.ok) setMatches(await mRes.json());
     } catch (error) {
-      console.error("Failed to load dashboard data", error);
+      console.error("Dashboard Sync Error:", error);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const incomingRequests = swaps.filter(s => s.status === "PENDING" && s.receiverId === currentUserId);
-  const activeSwaps = swaps.filter(s => s.status === "ACCEPTED");
+  const handleSubmitSwapRequest = async () => {
+    if (!selectedMatch) return;
+    setIsRequesting(true);
+    try {
+      const token = localStorage.getItem("knoxite_token");
+      const response = await fetch(`${API_BASE_URL}/swaps/request`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+          "bypass-tunnel-reminder": "true"
+        },
+        body: JSON.stringify({
+          receiverId: selectedMatch.id,
+          offeredSkillId: selectedMatch.wantedSkills[0]?.id, 
+          wantedSkillId: selectedMatch.offeredSkills[0]?.id,  
+          message: swapMessage
+        })
+      });
+
+      if (response.ok) {
+        setSuccessMessage(`Request sent to ${selectedMatch.name}!`);
+        setTimeout(() => setSuccessMessage(""), 4000);
+        setSelectedMatch(null);
+        fetchDashboardData(); 
+      }
+    } catch (error: any) {
+      alert("Failed to send request.");
+    } finally {
+      setIsRequesting(false);
+    }
+  };
+
+  const handleCancel = async (id: string, type: string) => {
+    if (!window.confirm("Cancel this rotation?")) return;
+    try {
+      const token = localStorage.getItem("knoxite_token");
+      const res = await fetch(`${API_BASE_URL}/swaps/cancel/${type}/${id}`, {
+        method: "DELETE",
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      if (res.ok) fetchDashboardData();
+    } catch (err) {
+      alert("Failed to cancel.");
+    }
+  };
+
+  const activeRotations = swaps.filter(s => 
+    s.status === "CONFIRMED" || s.status === "PENDING_AGREEMENT" || s.status === "ACCEPTED"
+  );
 
   if (isLoading) {
     return (
-      <div className="flex flex-col justify-center items-center min-h-screen bg-blue-50">
-        <Loader2 className="animate-spin size-10 text-blue-600 mb-4" />
-        <p className="text-blue-900 font-medium text-center px-4">Syncing with Knoxite...</p>
+      <div className="flex flex-col h-screen items-center justify-center bg-blue-50">
+        <Loader2 className="animate-spin text-blue-600 size-10 mb-4" />
+        <p className="text-blue-900 font-black italic tracking-tighter uppercase">Syncing Knoxite Hub...</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-100">
-      {/* Header */}
-      <header className="bg-white border-b border-blue-100 shadow-sm sticky top-0 z-20">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <h1 className="text-xl md:text-2xl font-bold text-blue-900 tracking-tight">Knoxite</h1>
-          </div>
-          <div className="flex items-center gap-1 md:gap-2">
-            <Button variant="ghost" size="icon" onClick={() => navigate("/requests")} className="text-blue-600 relative">
-              <Bell className="size-5 md:size-6" />
-              {incomingRequests.length > 0 && (
-                <span className="absolute top-1 right-1 size-4 bg-red-500 text-white text-[10px] rounded-full flex items-center justify-center border-2 border-white">
-                  {incomingRequests.length}
-                </span>
-              )}
-            </Button>
-            <Button variant="ghost" size="icon" onClick={() => navigate("/chat")} className="text-blue-600">
-              <MessageCircle className="size-5 md:size-6" />
-            </Button>
-            <Button variant="ghost" size="icon" onClick={() => navigate("/profile")} className="text-blue-600">
-              <User className="size-5 md:size-6" />
-            </Button>
-          </div>
+    <div className="min-h-screen bg-blue-50/30 flex flex-col font-sans">
+      <header className="bg-white border-b p-4 flex justify-between items-center sticky top-0 z-10 shadow-sm">
+        <h1 className="text-2xl font-black text-blue-900 italic tracking-tighter cursor-pointer" onClick={() => navigate("/dashboard")}>
+          KNOXITE
+        </h1>
+        <div className="flex gap-2 items-center">
+          {successMessage && <Badge className="bg-green-500 text-white animate-pulse mr-2">{successMessage}</Badge>}
+          
+          {/* 🚀 NEW: ANALYTICS BUTTON */}
+          <Button 
+            variant="outline" 
+            onClick={() => navigate("/analytics")}
+            className="border-blue-200 text-blue-600 font-bold hidden md:flex items-center gap-2 hover:bg-blue-50 transition-colors mr-2 rounded-xl text-xs uppercase"
+          >
+            <Activity className="size-4" />
+            Analytics
+          </Button>
+
+          <Button variant="ghost" size="icon" onClick={() => navigate("/chat")} className="text-blue-600">
+            <MessageSquare className="size-5" />
+          </Button>
+
+          <Button variant="ghost" size="icon" onClick={() => navigate("/requests")} className="relative">
+            <Bell className="text-blue-600" />
+            <span className="absolute top-2 right-2 size-2 bg-red-500 rounded-full border-2 border-white"></span>
+          </Button>
+          <Button variant="ghost" size="icon" onClick={() => navigate("/profile")}>
+            <User className="text-blue-600" />
+          </Button>
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto p-4 pt-6">
-        <div className="grid grid-cols-12 gap-6">
-          
-          {/* Sidebar / Top Navigation for Mobile */}
-          <aside className="col-span-12 md:col-span-3 space-y-4">
-            <Card className="bg-white/90 backdrop-blur border-blue-100 shadow-sm">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-xs uppercase text-blue-400 font-bold tracking-wider">Navigation</CardTitle>
-              </CardHeader>
-              <CardContent className="p-2 grid grid-cols-2 md:grid-cols-1 gap-1">
-                {/* Always Visible Buttons */}
-                <Button variant="ghost" className="justify-start text-blue-900 hover:bg-blue-50 text-xs md:text-sm" onClick={() => navigate("/knox-hub")}>
-                  <LayoutGrid className="mr-2 md:mr-3 size-4 md:size-5 text-blue-500 shrink-0" /> KnoxHub
-                </Button>
-                <Button variant="ghost" className="justify-start text-blue-900 hover:bg-blue-50 text-xs md:text-sm" onClick={() => navigate("/my-skills")}>
-                  <BookOpen className="mr-2 md:mr-3 size-4 md:size-5 text-blue-500 shrink-0" /> My Skills
-                </Button>
-                <Button variant="ghost" className="justify-start text-blue-900 hover:bg-blue-50 text-xs md:text-sm" onClick={() => navigate("/requests")}>
-                  <Users className="mr-2 md:mr-3 size-4 md:size-5 text-blue-500 shrink-0" /> My Requests
-                </Button>
-                
-                {/* These buttons are now VISIBLE ON MOBILE because they are in this grid */}
-                <Button variant="ghost" className="justify-start text-blue-900 hover:bg-blue-50 text-xs md:text-sm" onClick={() => navigate("/community-forum")}>
-                  <MessageSquare className="mr-2 md:mr-3 size-4 md:size-5 text-indigo-500 shrink-0" /> Forum
-                </Button>
-                <Button variant="ghost" className="justify-start text-blue-900 hover:bg-blue-50 text-xs md:text-sm" onClick={() => navigate("/leaderboard")}>
-                  <Trophy className="mr-2 md:mr-3 size-4 md:size-5 text-yellow-500 shrink-0" /> Leaders
-                </Button>
-                <Button variant="ghost" className="justify-start text-blue-900 hover:bg-blue-50 text-xs md:text-sm" onClick={() => navigate("/calendar")}>
-                  <Calendar className="mr-2 md:mr-3 size-4 md:size-5 text-blue-500 shrink-0" /> Calendar
-                </Button>
-              </CardContent>
-            </Card>
+      <div className="flex-1 max-w-7xl mx-auto w-full p-4 md:p-6 grid grid-cols-1 md:grid-cols-12 gap-6 pb-24">
+        {/* Sidebar */}
+        <aside className="md:col-span-3 space-y-4">
+          <Card className="border-none shadow-sm bg-white/80 backdrop-blur">
+            <CardContent className="p-4 flex flex-col gap-2">
+              <Button variant="ghost" className="justify-start text-blue-900 font-bold hover:bg-blue-50" onClick={() => navigate("/knox-hub")}>
+                <LayoutGrid className="mr-3 size-5 text-blue-500" /> KnoxHub
+              </Button>
+              <Button variant="ghost" className="justify-start text-blue-900 font-bold hover:bg-blue-50" onClick={() => navigate("/leaderboard")}>
+                <Trophy className="mr-3 size-5 text-yellow-500" /> Leaderboard
+              </Button>
+              <Button variant="ghost" className="justify-start text-blue-900 font-bold hover:bg-blue-50" onClick={() => navigate("/my-skills")}>
+                <BookOpen className="mr-3 size-5 text-emerald-500" /> My Skills
+              </Button>
+            </CardContent>
+          </Card>
+        </aside>
 
-            {/* Desktop-only Security Card */}
-            <Card className="bg-white/90 backdrop-blur border-blue-100 shadow-sm hidden md:block">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-xs uppercase text-blue-400 font-bold tracking-wider">System</CardTitle>
-              </CardHeader>
-              <CardContent className="p-2">
-                <Button variant="ghost" className="w-full justify-start text-blue-900 hover:bg-blue-50" onClick={() => navigate("/security")}>
-                  <Shield className="mr-3 size-5 text-green-500" /> Security
-                </Button>
-              </CardContent>
-            </Card>
-          </aside>
-
-          {/* Main Content */}
-          <main className="col-span-12 md:col-span-9 space-y-6">
-            <Card className="bg-white/90 border-blue-100 shadow-md overflow-hidden">
-              <div className="h-2 bg-blue-600 w-full" />
-              <CardHeader>
-                <CardTitle className="text-blue-900">Top Algorithm Matches</CardTitle>
-                <CardDescription>Based on your profile interests</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {matches.length === 0 ? (
-                  <div className="text-center py-10 border-2 border-dashed border-blue-50 rounded-xl">
-                    <p className="text-gray-400 italic px-4">No matches yet.</p>
-                  </div>
-                ) : (
-                  matches.map((match) => (
-                    <div key={match.id} className="flex items-center justify-between p-3 rounded-xl border border-blue-50 bg-white hover:shadow-md transition-all">
-                      <div className="flex items-center gap-3 overflow-hidden">
-                        <Avatar className="size-10 border-2 border-blue-100 shrink-0">
-                          <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${match.name}`} />
-                          <AvatarFallback>{match.name[0]}</AvatarFallback>
-                        </Avatar>
-                        <div className="min-w-0">
-                          <h3 className="font-bold text-blue-900 truncate">{match.name}</h3>
-                          <div className="flex gap-1 mt-1">
-                            <Badge className="bg-blue-50 text-blue-700 border-none px-2 py-0 text-[10px]">
-                              {match.offeredSkills[0]?.name || "Skill"}
-                            </Badge>
-                          </div>
-                        </div>
-                      </div>
-                      <Button onClick={() => navigate("/knox-hub")} size="sm" className="bg-blue-600 hover:bg-blue-700 ml-2 h-8 text-xs">
-                        Connect
-                      </Button>
-                    </div>
-                  ))
-                )}
-              </CardContent>
-            </Card>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Card className="border-blue-100 shadow-sm">
-                <CardHeader><CardTitle className="text-xs font-bold text-blue-900 uppercase">Active Swaps</CardTitle></CardHeader>
-                <CardContent className="space-y-3">
-                  {activeSwaps.length === 0 ? (
-                    <p className="text-xs text-gray-400 py-4 text-center">No active sessions.</p>
-                  ) : (
-                    activeSwaps.map((swap) => (
-                      <div key={swap.id} className="flex justify-between items-center p-3 rounded-lg bg-blue-50/50 border border-blue-100">
-                        <span className="text-xs font-medium text-blue-900 truncate mr-2">
-                          With {swap.requesterId === currentUserId ? swap.receiver.name : swap.requester.name}
-                        </span>
-                        <Badge className="bg-green-500 text-white border-none shrink-0">Live</Badge>
-                      </div>
-                    ))
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card className="border-blue-100 shadow-sm">
-                <CardHeader><CardTitle className="text-xs font-bold text-blue-900 uppercase">Alerts</CardTitle></CardHeader>
-                <CardContent className="space-y-3">
-                  {incomingRequests.length === 0 ? (
-                    <p className="text-xs text-gray-400 py-4 text-center">Inbox empty.</p>
-                  ) : (
-                    incomingRequests.map((req) => (
-                      <div key={req.id} className="p-3 rounded-lg bg-red-50 border border-red-100 flex justify-between items-center">
-                        <p className="text-[10px] font-semibold text-red-900 truncate mr-2">{req.requester.name} requested!</p>
-                        <Button size="sm" variant="link" className="text-red-600 text-[10px] h-auto p-0" onClick={() => navigate("/requests")}>View</Button>
-                      </div>
-                    ))
-                  )}
-                </CardContent>
-              </Card>
+        {/* Main Feed */}
+        <main className="md:col-span-9 space-y-8">
+          <section className="space-y-4">
+            <h2 className="text-sm font-black text-blue-900 uppercase tracking-widest flex items-center gap-2">
+              <Zap className="size-4 fill-blue-600 text-blue-600" /> Active Rotations
+            </h2>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {activeRotations.length === 0 ? (
+                <div className="col-span-full py-12 text-center border-2 border-dashed rounded-2xl border-blue-100 bg-white/50">
+                  <p className="text-blue-300 font-medium italic">No active rotations.</p>
+                </div>
+              ) : (
+                activeRotations.map(swap => (
+                  <ActiveSwapCard key={swap.id} swap={swap} currentUserId={currentUserId} onCancel={handleCancel} />
+                ))
+              )}
             </div>
-          </main>
-        </div>
+          </section>
+
+          <section className="space-y-4">
+            <h2 className="text-sm font-black text-blue-900 uppercase tracking-widest flex items-center gap-2">
+              <Search className="size-4 text-blue-600" /> Skill Radar
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {matches.map((peer) => (
+                <Card key={peer.id} className="border-none shadow-md hover:shadow-xl transition-all group bg-white rounded-2xl overflow-hidden">
+                  <CardContent className="p-5 space-y-4">
+                    <div className="flex items-center gap-3">
+                      <Avatar className="size-12 ring-2 ring-blue-50">
+                        <AvatarFallback className="bg-blue-600 text-white font-black">{peer.name[0]}</AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <h4 className="font-bold text-blue-900">{peer.name}</h4>
+                        <p className="text-[10px] text-blue-400 font-bold uppercase">Matches your profile</p>
+                      </div>
+                    </div>
+                    <Button 
+                      className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs h-10 group-hover:translate-y-[-2px] transition-all"
+                      onClick={() => setSelectedMatch(peer)}
+                    >
+                      Quick Connect <ArrowRight className="ml-2 size-3" />
+                    </Button>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </section>
+        </main>
       </div>
+
+      {/* 🚀 STICKY FOOTER */}
+      <footer className="fixed bottom-0 left-0 right-0 bg-white border-t border-blue-100 p-3 z-30">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center text-[10px] font-black uppercase tracking-widest text-blue-400">
+          <p>© 2026 Knoxite Hub — OLFU Computer Science</p>
+          <div className="flex gap-4 items-center">
+            <span className="text-blue-900 italic">Knoxite.org</span>
+            <span className="h-3 w-[1px] bg-blue-100"></span>
+            <p>Developed by: Bulawan, Estrada, Larona, Palma</p>
+          </div>
+        </div>
+      </footer>
+
+      {/* Swap Request Modal */}
+      <Dialog open={!!selectedMatch} onOpenChange={(open) => !open && setSelectedMatch(null)}>
+        <DialogContent className="max-w-[90vw] md:max-w-md rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-blue-900">Request Swap</DialogTitle>
+            <DialogDescription className="text-xs">
+              Sending handshake to <span className="font-bold text-blue-600">{selectedMatch?.name}</span>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <Label htmlFor="message" className="text-xs text-blue-900 uppercase font-black">Message</Label>
+            <Input id="message" value={swapMessage} onChange={(e) => setSwapMessage(e.target.value)} className="text-sm h-12 rounded-xl" />
+          </div>
+          <DialogFooter className="flex-row gap-2 mt-2">
+            <Button variant="ghost" onClick={() => setSelectedMatch(null)} className="flex-1 text-xs">Cancel</Button>
+            <Button onClick={handleSubmitSwapRequest} disabled={isRequesting} className="flex-[2] bg-blue-600 text-white text-xs font-bold rounded-xl">
+              {isRequesting ? "Sending..." : "Send Request"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
+  );
+}
+
+function ActiveSwapCard({ swap, currentUserId, onCancel }: any) {
+  const navigate = useNavigate();
+  const isReq = swap.requesterId === currentUserId;
+  const partner = isReq ? swap.receiver : swap.requester;
+  
+  // 🚀 UPDATED PROGRESS BAR LOGIC: Now uses the bilateral tracking fields
+  const mySessions = isReq ? swap.requesterSessions : swap.receiverSessions;
+  const progress = (Math.min(mySessions, swap.sessions) / swap.sessions) * 100;
+
+  return (
+    <Card 
+      className="border-none shadow-md overflow-hidden cursor-pointer hover:shadow-lg transition-all bg-white rounded-2xl group border-l-4 border-l-blue-600"
+      onClick={() => navigate(swap.status === "PENDING_AGREEMENT" ? `/swap-agreement/${swap.id}` : `/swap-details/${swap.id}`)}
+    >
+      <div className="p-4 flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Avatar className="size-12 ring-2 ring-blue-50 shadow-sm">
+            <AvatarFallback className="bg-blue-900 text-white font-black">{partner?.name?.[0]}</AvatarFallback>
+          </Avatar>
+          <div>
+            <h4 className="font-black text-blue-900 text-base tracking-tight">{partner?.name}</h4>
+            <p className="text-[10px] text-blue-600 font-black uppercase">{swap.status}</p>
+          </div>
+        </div>
+        <Button 
+          variant="ghost" size="icon" className="hover:bg-red-50 hover:text-red-500 text-gray-200"
+          onClick={(e) => { e.stopPropagation(); onCancel(swap.id, "agreement"); }}
+        >
+          <X className="size-5" />
+        </Button>
+      </div>
+      <div className="h-1 w-full bg-blue-50">
+        <div className="h-full bg-blue-600 transition-all duration-1000" style={{ width: `${progress}%` }} />
+      </div>
+    </Card>
   );
 }

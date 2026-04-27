@@ -19,11 +19,14 @@ import AchievementsPage from "@/app/pages/AchievementsPage";
 import SkillRequestBoardPage from "@/app/pages/SkillRequestBoardPage";
 import CommunityForumPage from "@/app/pages/CommunityForumPage";
 import NotificationCenterPage from "@/app/pages/NotificationCenterPage";
-import AnalyticsDashboardPage from "@/app/pages/AnalyticsDashboardPage";
+import AnalyticsPage from "@/app/pages/AnalyticsPage";
 import ActivityTimelinePage from "@/app/pages/ActivityTimelinePage";
 import MySkillsPage from "@/app/pages/MySkillsPage";
+// 🚀 New Import
+import SwapDetailsPage from "@/app/pages/SwapDetailsPage"; 
 
 export const router = createBrowserRouter([
+<<<<<<< HEAD
   {
     path: "/",
     Component: PreviewPage,
@@ -116,4 +119,30 @@ export const router = createBrowserRouter([
     path: "/activity-timeline",
     Component: ActivityTimelinePage,
   },
+=======
+  { path: "/", Component: LoginPage },
+  { path: "/signup", Component: SignupPage },
+  { path: "/dashboard", Component: DashboardPage },
+  { path: "/profile", Component: ProfilePage },
+  { path: "/my-skills", Component: MySkillsPage },
+  { path: "/chat", Component: ChatPage },
+  { path: "/swap-agreement/:swapId", Component: SwapAgreementPage },
+  { path: "/agreement-success", Component: AgreementSuccessPage },
+  { path: "/reputation", Component: ReputationPage }, // 🚀 Registered
+  { path: "/admin", Component: AdminDashboardPage },
+  { path: "/knox-hub", Component: KnoxHubPage },
+  { path: "/calendar", Component: CalendarPage },
+  { path: "/privacy", Component: PrivacyPolicyPage },
+  { path: "/security", Component: SecurityPage },
+  { path: "/report", Component: ReportUserPage },
+  { path: "/leaderboard", Component: LeaderboardPage },
+  { path: "/achievements", Component: AchievementsPage },
+  { path: "/skill-requests", Component: SkillRequestBoardPage },
+  { path: "/community-forum", Component: CommunityForumPage },
+  { path: "/requests", Component: NotificationCenterPage },
+  // 🚀 Active Swap Management
+  { path: "/swap-details/:swapId", Component: SwapDetailsPage },
+  { path: "/analytics", Component: AnalyticsPage },
+  { path: "/activity-timeline", Component: ActivityTimelinePage },
+>>>>>>> main
 ]);
