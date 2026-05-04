@@ -16,9 +16,10 @@ export default function SwapAgreementPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [debugError, setDebugError] = useState<string | null>(null);
   
+  // Initialize with safe defaults, wait for backend data
   const [participants, setParticipants] = useState<any>({
-    me: { name: "You", headline: "Streetwear Enthusiast" },
-    partner: { name: "Partner", headline: "Knoxite Member" }
+    me: { name: "You", headline: "Student/Teacher", avatarUrl: "" },
+    partner: { name: "Partner", headline: "Student/Teacher", avatarUrl: "" }
   });
   
   const [agreement, setAgreement] = useState({
@@ -43,7 +44,8 @@ export default function SwapAgreementPage() {
         method: "GET",
         headers: {
           "Authorization": `Bearer ${token}`,
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
+          "bypass-tunnel-reminder": "true" // Ensure ngrok compatibility
         }
       });
 
@@ -55,9 +57,20 @@ export default function SwapAgreementPage() {
 
       const data = await response.json();
 
+      // Ensure we extract the actual user data, including bio and avatarUrl
       setParticipants({
-        me: data.me || { name: "You", headline: "Streetwear Enthusiast" },
-        partner: data.partner || { name: "Partner", headline: "Knoxite Member" }
+        me: {
+          name: data.me?.name || "You",
+          // Map bio to headline, fallback to "Student"
+          headline: data.me?.bio || "Student/Teacher",
+          // Use the real avatar URL if it exists
+          avatarUrl: data.me?.avatarUrl || "" 
+        },
+        partner: {
+          name: data.partner?.name || "Partner",
+          headline: data.partner?.bio || "Student/Teacher",
+          avatarUrl: data.partner?.avatarUrl || ""
+        }
       });
 
       setAgreement(prev => ({
@@ -87,7 +100,8 @@ export default function SwapAgreementPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
+          "Authorization": `Bearer ${token}`,
+          "bypass-tunnel-reminder": "true"
         },
         // Sending the final logistics to the backend
         body: JSON.stringify({
@@ -150,24 +164,35 @@ export default function SwapAgreementPage() {
               <CardTitle className="text-blue-900 text-base">Participants</CardTitle>
             </CardHeader>
             <CardContent className="pt-6 space-y-6">
-              <div className="flex items-center gap-4 bg-white p-3 rounded-xl border border-blue-50">
-                <Avatar className="size-12"><AvatarFallback>ME</AvatarFallback></Avatar>
-                <div>
-                  <p className="font-bold text-blue-900">{participants.me.name}</p>
-                  <p className="text-xs text-blue-500">{participants.me.headline}</p>
-                </div>
-              </div>
-              <div className="flex justify-center"><ArrowRight className="text-blue-200" /></div>
+              
+              {/* ME Participant */}
               <div className="flex items-center gap-4 bg-white p-3 rounded-xl border border-blue-50">
                 <Avatar className="size-12">
-                   <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${participants.partner.name}`} />
-                   <AvatarFallback>{participants.partner.name?.[0]}</AvatarFallback>
+                  {/* Prioritize uploaded avatar, fallback to Dicebear */}
+                  <AvatarImage src={participants.me.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${participants.me.name}`} />
+                  <AvatarFallback>{participants.me.name?.[0] || 'M'}</AvatarFallback>
+                </Avatar>
+                <div>
+                  <p className="font-bold text-blue-900">{participants.me.name}</p>
+                  <p className="text-xs text-blue-500 line-clamp-1">{participants.me.headline}</p>
+                </div>
+              </div>
+              
+              <div className="flex justify-center"><ArrowRight className="text-blue-200" /></div>
+              
+              {/* PARTNER Participant */}
+              <div className="flex items-center gap-4 bg-white p-3 rounded-xl border border-blue-50">
+                <Avatar className="size-12">
+                   {/* Prioritize uploaded avatar, fallback to Dicebear */}
+                   <AvatarImage src={participants.partner.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${participants.partner.name}`} />
+                   <AvatarFallback>{participants.partner.name?.[0] || 'P'}</AvatarFallback>
                 </Avatar>
                 <div>
                   <p className="font-bold text-blue-900">{participants.partner.name}</p>
-                  <p className="text-xs text-blue-500">{participants.partner.headline}</p>
+                  <p className="text-xs text-blue-500 line-clamp-1">{participants.partner.headline}</p>
                 </div>
               </div>
+
             </CardContent>
           </Card>
         )}

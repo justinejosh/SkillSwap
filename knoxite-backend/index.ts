@@ -14,7 +14,42 @@ const prisma = new PrismaClient();
 const PORT = process.env.PORT || 5000;
 
 app.use(cors());
-app.use(express.json());
+// 🚀 INCREASE PAYLOAD LIMIT for base64 images
+app.use(express.json({ limit: '10mb' }));
+
+// --- THE BULLETPROOF PROFILE UPDATE BYPASS ---
+// Placed at the root level to guarantee route registration
+app.put("/api/profile/update", authenticateToken, async (req: any, res: any) => {
+  console.log("✅ SUCCESS: The backend received the profile update request!");
+  
+  try {
+    const { name, bio, gender, avatarUrl } = req.body;
+    const userId = req.user?.id || req.userId;
+
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        name: name ? String(name) : undefined,
+        bio: bio !== undefined ? String(bio) : undefined,
+        gender: gender ? String(gender) : undefined,
+        avatarUrl: avatarUrl ? String(avatarUrl) : undefined,
+      },
+    });
+
+    res.status(200).json({
+      message: "Profile updated successfully!",
+      user: {
+        id: updatedUser.id,
+        name: updatedUser.name,
+        bio: updatedUser.bio,
+        gender: updatedUser.gender,
+      }
+    });
+  } catch (error) {
+    console.error("Profile Update Error:", error);
+    res.status(500).json( {error: "Failed to update profile." });
+  }
+});
 
 // --- 1. LEADERBOARD: LIVE RATING AGGREGATION ---
 app.get("/api/leaderboard", authenticateToken, async (req, res) => {
@@ -36,6 +71,7 @@ app.get("/api/leaderboard", authenticateToken, async (req, res) => {
       return {
         id: user.id,
         name: user.name,
+        avatarUrl: user.avatarUrl, // 🚀 ADDED AVATAR
         skills: user.offeredSkills.map(s => s.name).join(", ") || "Member",
         rating: avgRating.toFixed(1),
         reviews: totalReviews,
@@ -50,7 +86,6 @@ app.get("/api/leaderboard", authenticateToken, async (req, res) => {
 });
 
 // --- 1.5 LEADERBOARD: MOST SWAPS AGGREGATION ---
-// 🚀 ADDED: This resolves the 404 error on the Most Swaps tab
 app.get("/api/leaderboard/swaps", authenticateToken, async (req, res) => {
   try {
     const allUsers = await prisma.user.findMany({
@@ -65,6 +100,7 @@ app.get("/api/leaderboard/swaps", authenticateToken, async (req, res) => {
       return {
         id: user.id,
         name: user.name,
+        avatarUrl: user.avatarUrl, // 🚀 ADDED AVATAR
         totalSwaps: totalSwaps
       };
     }).sort((a, b) => b.totalSwaps - a.totalSwaps);
@@ -124,6 +160,7 @@ app.get("/api/matches", authenticateToken, async (req, res) => {
       take: 6
     });
 
+    // Note: Because we use 'include' above, prisma naturally returns all scalars, so avatarUrl and bio are automatically included here!
     res.json(recommendedPeers);
   } catch (error) {
     console.error("Radar Error:", error);
@@ -177,8 +214,9 @@ app.get("/api/swap-requests", authenticateToken, async (req, res) => {
         ]
       },
       include: {
-        requester: { select: { id: true, name: true } },
-        receiver: { select: { id: true, name: true } },
+        // 🚀 ADDED AVATAR
+        requester: { select: { id: true, name: true, avatarUrl: true } },
+        receiver: { select: { id: true, name: true, avatarUrl: true } },
         offeredSkill: { select: { name: true } }, 
         wantedSkill: { select: { name: true } }   
       },
@@ -229,8 +267,9 @@ app.get("/api/swaps", authenticateToken, async (req, res) => {
     const swaps = await prisma.swap.findMany({
       where: { OR: [{ requesterId: userId }, { receiverId: userId }] },
       include: {
-        requester: { select: { id: true, name: true } },
-        receiver: { select: { id: true, name: true } },
+        // 🚀 ADDED AVATAR
+        requester: { select: { id: true, name: true, avatarUrl: true } },
+        receiver: { select: { id: true, name: true, avatarUrl: true } },
         offeredSkill: { select: { name: true } },
         wantedSkill: { select: { name: true } }
       },
@@ -242,24 +281,36 @@ app.get("/api/swaps", authenticateToken, async (req, res) => {
   }
 });
 
+// Fetching avatarUrl and bio for the Swap Agreement Page
 app.get("/api/swaps/:id", authenticateToken, async (req, res: any) => {
   const swapId = req.params.id as string;
   const userId = (req as any).user?.id || (req as any).userId;
+  
   try {
     const swap = await prisma.swap.findUnique({
       where: { id: swapId },
       include: {
-        requester: { select: { id: true, name: true } },
-        receiver: { select: { id: true, name: true } },
+        requester: { select: { id: true, name: true, avatarUrl: true, bio: true } },
+        receiver: { select: { id: true, name: true, avatarUrl: true, bio: true } },
         offeredSkill: true, 
         wantedSkill: true,
       },
     }) as any;
+
     if (!swap) return res.status(404).json({ message: "Swap not found" });
+
     const isRequester = swap.requesterId === userId;
+    const me = isRequester ? swap.requester : swap.receiver;
     const partner = isRequester ? swap.receiver : swap.requester;
-    res.json({ ...swap, partner: { id: partner?.id, name: partner?.name } });
+
+    res.json({ 
+      ...swap, 
+      me: me,
+      partner: partner 
+    });
+
   } catch (error) {
+    console.error("Database Error:", error);
     res.status(500).json({ message: "Database error" });
   }
 });
@@ -393,3 +444,5 @@ const server = app.listen(Number(PORT), '0.0.0.0', () => {
     console.error('❌ Server error:', error);
   }
 });
+
+//comment

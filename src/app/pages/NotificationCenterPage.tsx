@@ -4,6 +4,7 @@ import { Button } from "@/app/components/ui/button";
 import { Card, CardContent } from "@/app/components/ui/card";
 import { Badge } from "@/app/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/app/components/ui/tabs";
+import { Avatar, AvatarFallback, AvatarImage } from "@/app/components/ui/avatar";
 import { 
   ArrowLeft, Bell, Users, Check, X, Loader2, Search, Trash2 
 } from "lucide-react";
@@ -32,7 +33,8 @@ export default function NotificationCenterPage() {
       const res = await fetch(`${API_BASE_URL}/swap-requests`, {
         headers: { 
           "Authorization": `Bearer ${token}`,
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
+          "bypass-tunnel-reminder": "true"
         }
       });
       
@@ -204,7 +206,12 @@ function SwapRequestItem({ swap, isReceiver, onAction, onCancel, isLoading }: an
     <Card className={`overflow-hidden border-blue-100 shadow-sm transition-all hover:border-blue-300 ${isPending && isReceiver ? "ring-1 ring-blue-400" : ""}`}>
       <CardContent className="p-5">
         <div className="flex items-start gap-4">
-          <div className="p-3 bg-blue-50 text-blue-600 rounded-full"><Users className="size-6" /></div>
+          {/* 🚀 FIXED: Replaced generic Users icon with the actual Avatar component */}
+          <Avatar className="size-12 shrink-0 border border-blue-100">
+            <AvatarImage src={partner?.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${partner?.name}`} />
+            <AvatarFallback className="bg-blue-600 text-white font-bold">{partner?.name?.[0] || "U"}</AvatarFallback>
+          </Avatar>
+          
           <div className="flex-1">
             <div className="flex justify-between items-center mb-2">
               <span className="font-bold text-blue-900 text-lg">{partner?.name || "Member"}</span>
@@ -236,7 +243,6 @@ function SwapRequestItem({ swap, isReceiver, onAction, onCancel, isLoading }: an
                 </>
               )}
               
-              {/* 🚀 Withdraw Button for Sent/History */}
               {onCancel && (
                 <Button 
                   variant="ghost" 

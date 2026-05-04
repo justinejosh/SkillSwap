@@ -3,7 +3,7 @@ import { useNavigate } from "react-router";
 import { Button } from "@/app/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/app/components/ui/card";
 import { Badge } from "@/app/components/ui/badge";
-import { Avatar, AvatarFallback } from "@/app/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/app/components/ui/avatar";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/app/components/ui/dialog";
 import { Input } from "@/app/components/ui/input";
 import { Label } from "@/app/components/ui/label";
@@ -166,6 +166,8 @@ export default function KnoxHubPage() {
 
                 <CardHeader className="pb-3 flex flex-row items-center gap-3">
                   <Avatar className="size-12 border border-blue-100">
+                    {/* 🚀 FIXED: Now uses the actual avatarUrl with Dicebear fallback! */}
+                    <AvatarImage src={match.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${match.name}`} />
                     <AvatarFallback className="bg-blue-50 text-blue-700 font-bold">
                       {match.name[0]}
                     </AvatarFallback>
@@ -174,11 +176,9 @@ export default function KnoxHubPage() {
                     <CardTitle className="text-base text-blue-900 truncate">{match.name}</CardTitle>
                     <div className="flex items-center gap-1">
                       <Star className="size-3 fill-yellow-400 text-yellow-400" />
-                      {/* 🚀 FIXED: Fallback to 0.0 if rating is missing */}
                       <span className="text-xs font-medium text-blue-800">{match.rating || "0.0"}</span>
                     </div>
                   </div>
-                  {/* 🚀 FIXED: Safe access to score with fallback */}
                   <Badge className="bg-blue-50 text-blue-700 border-blue-200 text-[10px]">
                     {match.matchScore || (100 - (index * 5))}%
                   </Badge>

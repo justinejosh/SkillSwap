@@ -12,10 +12,11 @@ import { Label } from "@/app/components/ui/label";
 import { ArrowLeft, MessageCircle, Plus, Search, ThumbsUp, MessageSquare, Lightbulb, BookOpen, Clock, Loader2 } from "lucide-react";
 import { API_BASE_URL } from "@/config";
 
-// Interface for type safety
+// Interface for type safety - 🚀 Added avatarUrl here
 interface ForumPost {
   id: number;
   author: string;
+  avatarUrl?: string; 
   title: string;
   content: string;
   category: string;
@@ -38,7 +39,7 @@ export default function CommunityForumPage() {
   const fetchPosts = async () => {
     try {
       setIsLoading(true);
-      const res = await fetch(`${API_BASE_URL}/forum`, {
+      const res = await fetch(`${API_BASE_URL}/board`, { // 🚀 Note: usually this is /api/board depending on your routing setup
         headers: { "bypass-tunnel-reminder": "true" }
       });
       const data = await res.json();
@@ -99,7 +100,8 @@ export default function CommunityForumPage() {
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-3 flex-1">
             <Avatar>
-              <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${post.author}`} />
+              {/* 🚀 FIXED: Added actual AvatarImage for Forum posts */}
+              <AvatarImage src={post.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${post.author}`} />
               <AvatarFallback className="bg-blue-200 text-blue-900">
                 {post.author.split(" ").map((n: string) => n[0]).join("")}
               </AvatarFallback>

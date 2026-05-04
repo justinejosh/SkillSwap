@@ -1,6 +1,6 @@
-//Sayo yan ashton
-//export const API_BASE_URL = "http://10.26.124.71:5000/api";
+//ashton
+export const API_BASE_URL = "http://192.168.1.69:5000/api";
 
-//eto akin
+//chadwick
 //export const API_BASE_URL = "http://localhost:5000/api"; 
-export const API_BASE_URL = "http://192.168.18.2:5000/api"; 
+//export const API_BASE_URL = "http://192.168.18.2:5000/api"; 

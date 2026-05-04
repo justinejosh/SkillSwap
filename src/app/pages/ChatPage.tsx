@@ -49,10 +49,11 @@ export default function ChatPage() {
             const partner = s.requesterId === currentUser.id ? s.receiver : s.requester;
             return {
               id: partner.id,
-              swapId: s.id, // 🚀 This is now critical
+              swapId: s.id,
               user: partner.name,
               swapInfo: `${s.offeredSkill.name} ↔ ${s.wantedSkill.name}`,
-              avatar: partner.name.charAt(0)
+              avatarFallback: partner.name.charAt(0),
+              avatarUrl: partner.avatarUrl // 🚀 Added avatar mapping here
             };
           });
 
@@ -80,7 +81,6 @@ export default function ChatPage() {
     const fetchMessages = async () => {
       try {
         const token = localStorage.getItem("knoxite_token");
-        // 🚀 FIX: Included swapId as a query parameter
         const res = await fetch(`${API_BASE_URL}/chat/conversation/${selectedPartner.id}?swapId=${selectedPartner.swapId}`, {
           headers: { 
             "Authorization": `Bearer ${token}`,
@@ -99,7 +99,7 @@ export default function ChatPage() {
     fetchMessages();
     const interval = setInterval(fetchMessages, 3000);
     return () => clearInterval(interval);
-  }, [selectedPartner?.id, selectedPartner?.swapId]); // 🚀 Track both ID and swapId
+  }, [selectedPartner?.id, selectedPartner?.swapId]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -120,7 +120,6 @@ export default function ChatPage() {
           "Authorization": `Bearer ${token}`,
           "bypass-tunnel-reminder": "true"
         },
-        // 🚀 FIX: Sending swapId in the request body
         body: JSON.stringify({ 
           receiverId: selectedPartner.id, 
           content: messageInput,
@@ -183,7 +182,7 @@ export default function ChatPage() {
                 <div className="space-y-1 p-2">
                   {conversations.map((conv) => (
                     <div
-                      key={`${conv.id}-${conv.swapId}`} // 🚀 Unique key using both IDs
+                      key={`${conv.id}-${conv.swapId}`}
                       onClick={() => setSelectedPartner(conv)}
                       className={`p-3 rounded-xl cursor-pointer transition-all border ${
                         selectedPartner?.swapId === conv.swapId ? "bg-blue-600 text-white border-blue-700 shadow-md" : "hover:bg-blue-50 border-transparent text-blue-900"
@@ -191,7 +190,9 @@ export default function ChatPage() {
                     >
                       <div className="flex items-center gap-3">
                         <Avatar className="size-10 border border-white/20">
-                          <AvatarFallback className="bg-blue-900 text-white font-bold">{conv.avatar}</AvatarFallback>
+                          {/* 🚀 FIXED: Added actual AvatarImage for Inbox Sidebar */}
+                          <AvatarImage src={conv.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${conv.user}`} />
+                          <AvatarFallback className="bg-blue-900 text-white font-bold">{conv.avatarFallback}</AvatarFallback>
                         </Avatar>
                         <div className="flex-1 min-w-0">
                           <h3 className={`font-bold text-sm truncate ${selectedPartner?.swapId === conv.swapId ? "text-white" : "text-blue-900"}`}>{conv.user}</h3>
@@ -212,7 +213,9 @@ export default function ChatPage() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3 min-w-0">
                       <Avatar className="size-10 shrink-0 ring-2 ring-blue-50">
-                        <AvatarFallback className="bg-blue-600 text-white font-black">{selectedPartner.avatar}</AvatarFallback>
+                        {/* 🚀 FIXED: Added actual AvatarImage for Main Chat Header */}
+                        <AvatarImage src={selectedPartner.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${selectedPartner.user}`} />
+                        <AvatarFallback className="bg-blue-600 text-white font-black">{selectedPartner.avatarFallback}</AvatarFallback>
                       </Avatar>
                       <div className="min-w-0">
                         <CardTitle className="text-sm md:text-base text-blue-900 font-bold truncate">{selectedPartner.user}</CardTitle>

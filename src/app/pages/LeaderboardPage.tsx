@@ -109,7 +109,8 @@ export default function LeaderboardPage() {
                       {getRankIcon(index + 1)}
                       <div className="relative">
                         <Avatar className="size-12 border-2 border-slate-50 ring-1 ring-slate-200">
-                          <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${mentor.name}`} />
+                          {/* 🚀 FIXED: Now uses the actual avatarUrl with Dicebear fallback! */}
+                          <AvatarImage src={mentor.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${mentor.name}`} />
                           <AvatarFallback className="bg-slate-100 text-slate-600 font-bold">{mentor.name[0]}</AvatarFallback>
                         </Avatar>
                         <div className="absolute -bottom-1 -right-1 bg-white rounded-full p-0.5 border border-slate-100">

@@ -133,28 +133,37 @@ router.delete("/skills/:type/:skillId", authenticateToken, async (req: AuthReque
 });
 
 // ==========================================
-// 5. UPDATE USER BIO/PROFILE
+// 5. UPDATE USER BIO/PROFILE (AND AVATAR/GENDER)
 // ==========================================
-router.put("/", authenticateToken, async (req: AuthRequest, res: any) => {
+router.put("/update", authenticateToken, async (req: AuthRequest, res: any) => {
   try {
-    const newName = req.body.name;
-    const newBio = req.body.bio;
+    // Destructure all expected fields from the request body
+    const { name, bio, gender, avatarUrl } = req.body;
 
     const updatedUser = await prisma.user.update({
-      where: {id: req.userId},
+      where: { id: req.userId },
       data: {
-        name: String(newName),
-        bio: String(newBio)
+        name: name ? String(name) : undefined,
+        bio: bio !== undefined ? String(bio) : undefined,
+        gender: gender ? String(gender) : undefined,
+        // Since avatarUrl is a base64 string, it can be quite large
+        avatarUrl: avatarUrl ? String(avatarUrl) : undefined,
       },
     });
 
     res.status(200).json({
       message: "Profile updated successfully!",
-      user: updatedUser
+      user: {
+        id: updatedUser.id,
+        name: updatedUser.name,
+        bio: updatedUser.bio,
+        gender: updatedUser.gender,
+        // We do not send back the entire base64 string here to save bandwidth
+      }
     });
   } catch (error) {
-    console.error(error);
-    res.status(500).json( {error: "Failed to update profile bio." });
+    console.error("Profile Update Error:", error);
+    res.status(500).json( {error: "Failed to update profile." });
   }
 });
 

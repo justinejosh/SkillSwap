@@ -5,8 +5,7 @@ import SignupPage from "@/app/pages/SignupPage";
 import DashboardPage from "@/app/pages/DashboardPage";
 import ProfilePage from "@/app/pages/ProfilePage";
 import ChatPage from "@/app/pages/ChatPage";
-import SwapAgreementPage from "@/app/pages/SwapAgreementPage";
-import AgreementSuccessPage from "@/app/pages/AgreementSuccessPage";
+import SwapAgreementPage from "@/app/pages/SwapAgreementPage";  
 import ReputationPage from "@/app/pages/ReputationPage";
 import AdminDashboardPage from "@/app/pages/AdminDashboardPage";
 import KnoxHubPage from "@/app/pages/KnoxHubPage";
@@ -61,10 +60,6 @@ export const router = createBrowserRouter([
   {
     path: "/swap-details/:swapId",
     Component: SwapDetailsPage,
-  },
-  {
-    path: "/agreement-success",
-    Component: AgreementSuccessPage,
   },
   {
     path: "/reputation",

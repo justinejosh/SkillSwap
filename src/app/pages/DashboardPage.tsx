@@ -10,7 +10,7 @@ import { Label } from "@/app/components/ui/label";
 import { 
   Bell, User, Trophy, LayoutGrid, Loader2, 
   X, BookOpen, Star, ArrowRight, Zap, Search, CheckCircle2,
-  MessageSquare, Activity // 🚀 Added Activity icon
+  MessageSquare, Activity 
 } from "lucide-react";
 import { API_BASE_URL } from "@/config";
 
@@ -119,7 +119,6 @@ export default function DashboardPage() {
         <div className="flex gap-2 items-center">
           {successMessage && <Badge className="bg-green-500 text-white animate-pulse mr-2">{successMessage}</Badge>}
           
-          {/* 🚀 NEW: ANALYTICS BUTTON */}
           <Button 
             variant="outline" 
             onClick={() => navigate("/analytics")}
@@ -190,6 +189,8 @@ export default function DashboardPage() {
                   <CardContent className="p-5 space-y-4">
                     <div className="flex items-center gap-3">
                       <Avatar className="size-12 ring-2 ring-blue-50">
+                        {/* 🚀 FIXED: Render the peer's actual avatarUrl first */}
+                        <AvatarImage src={peer.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${peer.name}`} />
                         <AvatarFallback className="bg-blue-600 text-white font-black">{peer.name[0]}</AvatarFallback>
                       </Avatar>
                       <div>
@@ -253,7 +254,6 @@ function ActiveSwapCard({ swap, currentUserId, onCancel }: any) {
   const isReq = swap.requesterId === currentUserId;
   const partner = isReq ? swap.receiver : swap.requester;
   
-  // 🚀 UPDATED PROGRESS BAR LOGIC: Now uses the bilateral tracking fields
   const mySessions = isReq ? swap.requesterSessions : swap.receiverSessions;
   const progress = (Math.min(mySessions, swap.sessions) / swap.sessions) * 100;
 
@@ -265,6 +265,8 @@ function ActiveSwapCard({ swap, currentUserId, onCancel }: any) {
       <div className="p-4 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Avatar className="size-12 ring-2 ring-blue-50 shadow-sm">
+            {/* 🚀 FIXED: Render the partner's actual avatarUrl first */}
+            <AvatarImage src={partner?.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${partner?.name}`} />
             <AvatarFallback className="bg-blue-900 text-white font-black">{partner?.name?.[0]}</AvatarFallback>
           </Avatar>
           <div>
