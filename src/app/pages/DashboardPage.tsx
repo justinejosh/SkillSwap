@@ -7,10 +7,10 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/app/components/ui/avatar"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/app/components/ui/dialog";
 import { Input } from "@/app/components/ui/input";
 import { Label } from "@/app/components/ui/label";
-import { 
-  Bell, User, Trophy, LayoutGrid, Loader2, 
+import {
+  Bell, User, Trophy, LayoutGrid, Loader2,
   X, BookOpen, Star, ArrowRight, Zap, Search, CheckCircle2,
-  MessageSquare, Activity 
+  MessageSquare, Activity, ShieldCheck
 } from "lucide-react";
 import { API_BASE_URL } from "@/config";
 
@@ -19,7 +19,9 @@ export default function DashboardPage() {
   const [swaps, setSwaps] = useState<any[]>([]);
   const [matches, setMatches] = useState<any[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [userRole, setUserRole] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasNewNotifications, setHasNewNotifications] = useState(false); // 🚀 ADDED NEW STATE
 
   // Modal State
   const [selectedMatch, setSelectedMatch] = useState<any | null>(null);
@@ -30,19 +32,35 @@ export default function DashboardPage() {
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem("knoxite_user") || "{}");
     setCurrentUserId(user.id);
+    setUserRole(user.role);
     fetchDashboardData();
   }, []);
 
   const fetchDashboardData = async () => {
     try {
       const token = localStorage.getItem("knoxite_token");
-      const headers = { "Authorization": `Bearer ${token}`, "bypass-tunnel-reminder": "true" };
-      const [sRes, mRes] = await Promise.all([
+      const headers = { 
+        "Authorization": `Bearer ${token}`, 
+        "bypass-tunnel-reminder": "true" 
+      };
+      
+      // 🚀 UPDATED: Fetch requests at the same time to check for notifications
+      const [sRes, mRes, reqRes] = await Promise.all([
         fetch(`${API_BASE_URL}/swaps`, { headers }),
-        fetch(`${API_BASE_URL}/matches`, { headers })
+        fetch(`${API_BASE_URL}/matches`, { headers }),
+        fetch(`${API_BASE_URL}/swap-requests`, { headers })
       ]);
+
       if (sRes.ok) setSwaps(await sRes.json());
       if (mRes.ok) setMatches(await mRes.json());
+      
+      // 🚀 ADDED: Logic to toggle the red dot
+      if (reqRes.ok) {
+        const requests = await reqRes.json();
+        const user = JSON.parse(localStorage.getItem("knoxite_user") || "{}");
+        const hasPending = requests.some((req: any) => req.receiverId === user.id && req.status === "PENDING");
+        setHasNewNotifications(hasPending);
+      }
     } catch (error) {
       console.error("Dashboard Sync Error:", error);
     } finally {
@@ -64,8 +82,8 @@ export default function DashboardPage() {
         },
         body: JSON.stringify({
           receiverId: selectedMatch.id,
-          offeredSkillId: selectedMatch.wantedSkills[0]?.id, 
-          wantedSkillId: selectedMatch.offeredSkills[0]?.id,  
+          offeredSkillId: selectedMatch.wantedSkills[0]?.id,
+          wantedSkillId: selectedMatch.offeredSkills[0]?.id,
           message: swapMessage
         })
       });
@@ -74,7 +92,7 @@ export default function DashboardPage() {
         setSuccessMessage(`Request sent to ${selectedMatch.name}!`);
         setTimeout(() => setSuccessMessage(""), 4000);
         setSelectedMatch(null);
-        fetchDashboardData(); 
+        fetchDashboardData();
       }
     } catch (error: any) {
       alert("Failed to send request.");
@@ -97,7 +115,7 @@ export default function DashboardPage() {
     }
   };
 
-  const activeRotations = swaps.filter(s => 
+  const activeRotations = swaps.filter(s =>
     s.status === "CONFIRMED" || s.status === "PENDING_AGREEMENT" || s.status === "ACCEPTED"
   );
 
@@ -119,22 +137,26 @@ export default function DashboardPage() {
         <div className="flex gap-2 items-center">
           {successMessage && <Badge className="bg-green-500 text-white animate-pulse mr-2">{successMessage}</Badge>}
           
-          <Button 
-            variant="outline" 
-            onClick={() => navigate("/analytics")}
-            className="border-blue-200 text-blue-600 font-bold hidden md:flex items-center gap-2 hover:bg-blue-50 transition-colors mr-2 rounded-xl text-xs uppercase"
-          >
-            <Activity className="size-4" />
-            Analytics
-          </Button>
+          {userRole === "ADMIN" && (
+            <Button
+              variant="outline"
+              onClick={() => navigate("/analytics")}
+              className="border-blue-200 text-blue-600 font-bold hidden md:flex items-center gap-2 hover:bg-blue-50 transition-colors mr-2 rounded-xl text-xs uppercase"
+            >
+              <Activity className="size-4" />
+              Analytics
+            </Button>
+          )}
 
           <Button variant="ghost" size="icon" onClick={() => navigate("/chat")} className="text-blue-600">
             <MessageSquare className="size-5" />
           </Button>
-
           <Button variant="ghost" size="icon" onClick={() => navigate("/requests")} className="relative">
             <Bell className="text-blue-600" />
-            <span className="absolute top-2 right-2 size-2 bg-red-500 rounded-full border-2 border-white"></span>
+            {/* 🚀 CONDITIONAL RED DOT */}
+            {hasNewNotifications && (
+              <span className="absolute top-2 right-2 size-2 bg-red-500 rounded-full border-2 border-white"></span>
+            )}
           </Button>
           <Button variant="ghost" size="icon" onClick={() => navigate("/profile")}>
             <User className="text-blue-600" />
@@ -147,6 +169,21 @@ export default function DashboardPage() {
         <aside className="md:col-span-3 space-y-4">
           <Card className="border-none shadow-sm bg-white/80 backdrop-blur">
             <CardContent className="p-4 flex flex-col gap-2">
+              {userRole === "ADMIN" && (
+                <Button variant="ghost" className="justify-start text-red-600 font-bold hover:bg-red-50" onClick={() => navigate("/admin-dashboard")}>
+                  <ShieldCheck className="mr-3 size-5 text-red-500" /> Admin Dashboard
+                </Button>
+              )}
+
+              <Button
+                variant="ghost"
+                className="w-full justify-start gap-3 text-blue-700 hover:bg-blue-50 hover:text-blue-900"
+                onClick={() => navigate("/community-forum")}
+              >
+                <MessageSquare className="size-5" />
+                Community Forum
+              </Button>
+
               <Button variant="ghost" className="justify-start text-blue-900 font-bold hover:bg-blue-50" onClick={() => navigate("/knox-hub")}>
                 <LayoutGrid className="mr-3 size-5 text-blue-500" /> KnoxHub
               </Button>
@@ -189,7 +226,6 @@ export default function DashboardPage() {
                   <CardContent className="p-5 space-y-4">
                     <div className="flex items-center gap-3">
                       <Avatar className="size-12 ring-2 ring-blue-50">
-                        {/* 🚀 FIXED: Render the peer's actual avatarUrl first */}
                         <AvatarImage src={peer.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${peer.name}`} />
                         <AvatarFallback className="bg-blue-600 text-white font-black">{peer.name[0]}</AvatarFallback>
                       </Avatar>
@@ -198,9 +234,9 @@ export default function DashboardPage() {
                         <p className="text-[10px] text-blue-400 font-bold uppercase">Matches your profile</p>
                       </div>
                     </div>
-                    <Button 
-                      className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs h-10 group-hover:translate-y-[-2px] transition-all"
+                    <Button
                       onClick={() => setSelectedMatch(peer)}
+                      className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs h-10 group-hover:translate-y-[-2px] transition-all"
                     >
                       Quick Connect <ArrowRight className="ml-2 size-3" />
                     </Button>
@@ -212,10 +248,9 @@ export default function DashboardPage() {
         </main>
       </div>
 
-      {/* 🚀 STICKY FOOTER */}
       <footer className="fixed bottom-0 left-0 right-0 bg-white border-t border-blue-100 p-3 z-30">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center text-[10px] font-black uppercase tracking-widest text-blue-400">
-          <p>© 2026 Knoxite Hub — OLFU Computer Science</p>
+          <p>© 2026 Knoxite Hub OLFU Computer Science</p>
           <div className="flex gap-4 items-center">
             <span className="text-blue-900 italic">Knoxite.org</span>
             <span className="h-3 w-[1px] bg-blue-100"></span>
@@ -224,7 +259,6 @@ export default function DashboardPage() {
         </div>
       </footer>
 
-      {/* Swap Request Modal */}
       <Dialog open={!!selectedMatch} onOpenChange={(open) => !open && setSelectedMatch(null)}>
         <DialogContent className="max-w-[90vw] md:max-w-md rounded-2xl">
           <DialogHeader>
@@ -253,19 +287,17 @@ function ActiveSwapCard({ swap, currentUserId, onCancel }: any) {
   const navigate = useNavigate();
   const isReq = swap.requesterId === currentUserId;
   const partner = isReq ? swap.receiver : swap.requester;
-  
   const mySessions = isReq ? swap.requesterSessions : swap.receiverSessions;
   const progress = (Math.min(mySessions, swap.sessions) / swap.sessions) * 100;
 
   return (
-    <Card 
+    <Card
       className="border-none shadow-md overflow-hidden cursor-pointer hover:shadow-lg transition-all bg-white rounded-2xl group border-l-4 border-l-blue-600"
       onClick={() => navigate(swap.status === "PENDING_AGREEMENT" ? `/swap-agreement/${swap.id}` : `/swap-details/${swap.id}`)}
     >
       <div className="p-4 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Avatar className="size-12 ring-2 ring-blue-50 shadow-sm">
-            {/* 🚀 FIXED: Render the partner's actual avatarUrl first */}
             <AvatarImage src={partner?.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${partner?.name}`} />
             <AvatarFallback className="bg-blue-900 text-white font-black">{partner?.name?.[0]}</AvatarFallback>
           </Avatar>
@@ -274,7 +306,7 @@ function ActiveSwapCard({ swap, currentUserId, onCancel }: any) {
             <p className="text-[10px] text-blue-600 font-black uppercase">{swap.status}</p>
           </div>
         </div>
-        <Button 
+        <Button
           variant="ghost" size="icon" className="hover:bg-red-50 hover:text-red-500 text-gray-200"
           onClick={(e) => { e.stopPropagation(); onCancel(swap.id, "agreement"); }}
         >
@@ -282,7 +314,7 @@ function ActiveSwapCard({ swap, currentUserId, onCancel }: any) {
         </Button>
       </div>
       <div className="h-1 w-full bg-blue-50">
-        <div className="h-full bg-blue-600 transition-all duration-1000" style={{ width: `${progress}%` }} />
+        <div className="h-full bg-blue-600 transition-all duration-1000" style={{ width: `${progress}%` }}></div>
       </div>
     </Card>
   );

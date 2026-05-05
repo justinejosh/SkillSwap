@@ -8,6 +8,7 @@ const client_1 = require("@prisma/client");
 const authMiddleware_1 = require("../middleware/authMiddleware");
 const router = express_1.default.Router();
 const prisma = new client_1.PrismaClient();
+console.log("Profile Routes Loaded and Ready!");
 // ==========================================
 // 1. GET USER PROFILE & SKILLS
 // ==========================================
@@ -122,6 +123,39 @@ router.delete("/skills/:type/:skillId", authMiddleware_1.authenticateToken, asyn
     catch (error) {
         console.error("Delete Skill Error:", error.message);
         res.status(500).json({ error: "Failed to remove skill from your profile." });
+    }
+});
+// ==========================================
+// 5. UPDATE USER BIO/PROFILE (AND AVATAR/GENDER)
+// ==========================================
+router.put("/update", authMiddleware_1.authenticateToken, async (req, res) => {
+    try {
+        // Destructure all expected fields from the request body
+        const { name, bio, gender, avatarUrl } = req.body;
+        const updatedUser = await prisma.user.update({
+            where: { id: req.userId },
+            data: {
+                name: name ? String(name) : undefined,
+                bio: bio !== undefined ? String(bio) : undefined,
+                gender: gender ? String(gender) : undefined,
+                // Since avatarUrl is a base64 string, it can be quite large
+                avatarUrl: avatarUrl ? String(avatarUrl) : undefined,
+            },
+        });
+        res.status(200).json({
+            message: "Profile updated successfully!",
+            user: {
+                id: updatedUser.id,
+                name: updatedUser.name,
+                bio: updatedUser.bio,
+                gender: updatedUser.gender,
+                // We do not send back the entire base64 string here to save bandwidth
+            }
+        });
+    }
+    catch (error) {
+        console.error("Profile Update Error:", error);
+        res.status(500).json({ error: "Failed to update profile." });
     }
 });
 exports.default = router;

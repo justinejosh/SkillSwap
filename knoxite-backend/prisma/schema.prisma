@@ -19,6 +19,9 @@ model User {
   gender       String?  
   avatarUrl    String?  @db.Text 
   location     String?
+  role Role @default(USER)
+  posts     Post[]    @relation("UserPosts")
+  comments  Comment[] @relation("UserComments")
   createdAt    DateTime @default(now())
 
 // ... rest of the schema remains the same
@@ -156,4 +159,34 @@ model Swap {
 
   reviews      Review[]
   messages     Message[] // 🚀 Allows chat history to be tied to this swap
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+model Post {
+  id        String    @id @default(uuid())
+  title     String
+  content   String    @db.Text
+  category  String    @default("GENERAL") 
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  authorId  String
+  author    User      @relation("UserPosts", fields: [authorId], references: [id], onDelete: Cascade)
+  comments  Comment[]
+}
+
+model Comment {
+  id        String    @id @default(uuid())
+  content   String    @db.Text
+  createdAt DateTime  @default(now())
+
+  postId    String
+  post      Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  
+  authorId  String
+  author    User      @relation("UserComments", fields: [authorId], references: [id], onDelete: Cascade)
 }

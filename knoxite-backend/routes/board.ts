@@ -56,7 +56,7 @@ router.get("/", authenticateToken, async (req: AuthRequest, res: any) => {
 router.post("/post", authenticateToken, async (req: AuthRequest, res: any) => {
   try {
     const { title, content, category } = req.body;
-    const userId = req.user?.id || req.userId;
+    const userId = (req as any).user?.id || (req as any).userId;
 
     // Save the frontend data into the existing Prisma schema fields
     const newPost = await prisma.boardPost.create({

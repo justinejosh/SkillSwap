@@ -1,5 +1,4 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { Button } from "@/app/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app/components/ui/card";
@@ -14,48 +13,95 @@ import {
   AlertCircle,
   Search,
   Ban,
-  CheckCircle2
+  Loader2
 } from "lucide-react";
+import { API_BASE_URL } from "@/config";
 
 export default function AdminDashboardPage() {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+  
+  const [stats, setStats] = useState({
+    totalUsers: 0,
+    activeSwaps: 0,
+    completedSwaps: 0,
+    reportedIssues: 0,
+  });
 
-  const stats = {
-    totalUsers: 1247,
-    activeSwaps: 89,
-    completedSwaps: 456,
-    reportedIssues: 3,
-    topSkills: [
-      { name: "Web Development", count: 234 },
-      { name: "Graphic Design", count: 189 },
-      { name: "Python", count: 156 },
-      { name: "Photography", count: 142 },
-      { name: "Guitar", count: 128 },
-    ],
+  const [recentUsers, setRecentUsers] = useState<any[]>([]);
+
+  useEffect(() => {
+    fetchAdminData();
+  }, []);
+
+  const fetchAdminData = async () => {
+    try {
+      const token = localStorage.getItem("knoxite_token");
+      
+      const response = await fetch(`${API_BASE_URL}/admin/dashboard-data`, {
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "bypass-tunnel-reminder": "true"
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setStats({
+          totalUsers: data.stats.totalUsers,
+          activeSwaps: data.stats.activeSwaps,
+          completedSwaps: data.stats.completedSwaps,
+          reportedIssues: data.stats.reportedIssues,
+        });
+        setRecentUsers(data.recentUsers);
+      } else {
+        console.error("Failed to fetch admin data. Status:", response.status);
+      }
+    } catch (error) {
+      console.error("Network error while fetching admin data", error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const recentUsers = [
-    { id: 1, name: "John Doe", email: "john@example.com", joined: "2 days ago", status: "active" },
-    { id: 2, name: "Jane Smith", email: "jane@example.com", joined: "3 days ago", status: "active" },
-    { id: 3, name: "Bob Wilson", email: "bob@example.com", joined: "5 days ago", status: "suspended" },
-  ];
+  const handleBanUser = async (userId: string, userName: string) => {
+    if (!window.confirm(`Are you absolutely sure you want to ban ${userName}? This action cannot be undone.`)) {
+      return;
+    }
 
-  const activeSwaps = [
-    { id: 1, user1: "Alice", user2: "Bob", skill: "Piano ↔ Photoshop", status: "In Progress", progress: 60 },
-    { id: 2, user1: "Carol", user2: "Dave", skill: "Guitar ↔ Python", status: "In Progress", progress: 40 },
-    { id: 3, user1: "Eve", user2: "Frank", skill: "Cooking ↔ Spanish", status: "Pending", progress: 0 },
-  ];
+    try {
+      const token = localStorage.getItem("knoxite_token");
+      const response = await fetch(`${API_BASE_URL}/admin/users/${userId}`, {
+        method: "DELETE",
+        headers: {
+          "Authorization": `Bearer ${token}`
+        }
+      });
 
-  const reportedIssues = [
-    { id: 1, reporter: "Alice", reported: "Bob", reason: "No-show", date: "1 hour ago", status: "pending" },
-    { id: 2, reporter: "Carol", reported: "Dave", reason: "Inappropriate behavior", date: "3 hours ago", status: "pending" },
-    { id: 3, reporter: "Eve", reported: "Frank", reason: "Poor quality", date: "1 day ago", status: "resolved" },
-  ];
+      if (response.ok) {
+        fetchAdminData();
+      } else {
+        const errorData = await response.json();
+        alert(errorData.error || "Failed to ban user.");
+      }
+    } catch (error) {
+      console.error("Error banning user:", error);
+      alert("A network error occurred.");
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col h-screen items-center justify-center bg-blue-50">
+        <Loader2 className="animate-spin text-blue-600 size-10 mb-4" />
+        <p className="text-blue-900 font-black italic tracking-tighter uppercase">Loading Admin Data...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-100">
-      {/* Header */}
       <header className="bg-white border-b border-blue-100 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -69,226 +115,124 @@ export default function AdminDashboardPage() {
             </Button>
             <h1 className="text-2xl font-bold text-blue-900">Admin Dashboard</h1>
           </div>
-          <div className="relative">
+          <div className="relative hidden md:block">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-blue-400 size-5" />
             <Input
               type="search"
               placeholder="Search users..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 border-blue-200 focus:border-blue-400 w-64"
+              className="pl-10 border-blue-200 focus:border-blue-400 w-64 rounded-xl"
             />
           </div>
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto p-4 space-y-6">
-        {/* Stats Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card className="bg-white/90 backdrop-blur border-blue-100">
+      <div className="max-w-7xl mx-auto p-4 md:p-6 space-y-6">
+        {/* Top Stat Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+          <Card className="bg-white/90 backdrop-blur border-blue-100 shadow-sm rounded-2xl">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-blue-600">Total Users</p>
-                  <p className="text-3xl font-bold text-blue-900">{stats.totalUsers}</p>
+                  <p className="text-sm font-bold text-blue-600 uppercase tracking-wider">Total Users</p>
+                  <p className="text-4xl font-black text-blue-900">{stats.totalUsers}</p>
                 </div>
-                <Users className="size-10 text-blue-500" />
+                <Users className="size-10 text-blue-500 opacity-80" />
               </div>
             </CardContent>
           </Card>
           
-          <Card className="bg-white/90 backdrop-blur border-blue-100">
+          <Card className="bg-white/90 backdrop-blur border-blue-100 shadow-sm rounded-2xl">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-blue-600">Active Swaps</p>
-                  <p className="text-3xl font-bold text-blue-900">{stats.activeSwaps}</p>
+                  <p className="text-sm font-bold text-blue-600 uppercase tracking-wider">Active Swaps</p>
+                  <p className="text-4xl font-black text-blue-900">{stats.activeSwaps}</p>
                 </div>
-                <ArrowLeftRight className="size-10 text-green-500" />
+                <ArrowLeftRight className="size-10 text-green-500 opacity-80" />
               </div>
             </CardContent>
           </Card>
           
-          <Card className="bg-white/90 backdrop-blur border-blue-100">
+          <Card className="bg-white/90 backdrop-blur border-blue-100 shadow-sm rounded-2xl">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-blue-600">Completed</p>
-                  <p className="text-3xl font-bold text-blue-900">{stats.completedSwaps}</p>
+                  <p className="text-sm font-bold text-blue-600 uppercase tracking-wider">Completed</p>
+                  <p className="text-4xl font-black text-blue-900">{stats.completedSwaps}</p>
                 </div>
-                <TrendingUp className="size-10 text-purple-500" />
+                <TrendingUp className="size-10 text-purple-500 opacity-80" />
               </div>
             </CardContent>
           </Card>
           
-          <Card className="bg-white/90 backdrop-blur border-blue-100">
+          <Card className="bg-white/90 backdrop-blur border-blue-100 shadow-sm rounded-2xl">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-blue-600">Reported Issues</p>
-                  <p className="text-3xl font-bold text-blue-900">{stats.reportedIssues}</p>
+                  <p className="text-sm font-bold text-blue-600 uppercase tracking-wider">Reports</p>
+                  <p className="text-4xl font-black text-blue-900">{stats.reportedIssues}</p>
                 </div>
-                <AlertCircle className="size-10 text-red-500" />
+                <AlertCircle className="size-10 text-red-500 opacity-80" />
               </div>
             </CardContent>
           </Card>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Recent Users */}
-          <Card className="bg-white/90 backdrop-blur border-blue-100">
-            <CardHeader>
-              <CardTitle className="text-blue-900">Recent Users</CardTitle>
-              <CardDescription className="text-blue-600">
-                Newly registered members
+        {/* Real Data Tables */}
+        <div className="grid grid-cols-1 gap-6">
+          <Card className="bg-white/90 backdrop-blur border-blue-100 shadow-md rounded-2xl overflow-hidden">
+            <CardHeader className="bg-blue-50/50 border-b border-blue-50">
+              <CardTitle className="text-blue-900 font-black">User Directory</CardTitle>
+              <CardDescription className="text-blue-600 font-medium">
+                Manage registered Knoxite members
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {recentUsers.map((user) => (
-                  <div key={user.id} className="flex items-center justify-between p-3 rounded-lg border border-blue-100 bg-blue-50/50">
-                    <div className="flex items-center gap-3">
-                      <Avatar>
-                        <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user.name}`} />
-                        <AvatarFallback className="bg-blue-200 text-blue-900">
-                          {user.name.split(" ").map((n) => n[0]).join("")}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <h3 className="font-medium text-blue-900">{user.name}</h3>
-                        <p className="text-sm text-blue-600">{user.email}</p>
-                        <span className="text-xs text-blue-500">{user.joined}</span>
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                      {user.status === "active" ? (
-                        <Badge className="bg-green-100 text-green-900">Active</Badge>
-                      ) : (
-                        <Badge className="bg-red-100 text-red-900">Suspended</Badge>
-                      )}
-                      <Button variant="ghost" size="icon" className="text-red-500">
-                        <Ban className="size-4" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Top Skills */}
-          <Card className="bg-white/90 backdrop-blur border-blue-100">
-            <CardHeader>
-              <CardTitle className="text-blue-900">Top Skills</CardTitle>
-              <CardDescription className="text-blue-600">
-                Most popular skills on the platform
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {stats.topSkills.map((skill, index) => (
-                  <div key={index} className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="flex items-center justify-center size-8 rounded-full bg-blue-100 text-blue-900 font-medium">
-                        {index + 1}
-                      </div>
-                      <span className="text-blue-900">{skill.name}</span>
-                    </div>
-                    <Badge className="bg-blue-100 text-blue-900">{skill.count} users</Badge>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Active Swaps */}
-        <Card className="bg-white/90 backdrop-blur border-blue-100">
-          <CardHeader>
-            <CardTitle className="text-blue-900">Active Skill Swaps</CardTitle>
-            <CardDescription className="text-blue-600">
-              Currently ongoing exchanges
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {activeSwaps.map((swap) => (
-                <div key={swap.id} className="p-4 rounded-lg border border-blue-100 bg-blue-50/50">
-                  <div className="flex items-center justify-between mb-2">
-                    <div>
-                      <h3 className="font-medium text-blue-900">{swap.user1} ↔ {swap.user2}</h3>
-                      <p className="text-sm text-blue-600">{swap.skill}</p>
-                    </div>
-                    <Badge className={swap.status === "In Progress" ? "bg-yellow-100 text-yellow-900" : "bg-blue-100 text-blue-900"}>
-                      {swap.status}
-                    </Badge>
-                  </div>
-                  <div className="w-full bg-blue-200 rounded-full h-2">
-                    <div 
-                      className="bg-blue-600 h-2 rounded-full transition-all"
-                      style={{ width: `${swap.progress}%` }}
-                    />
-                  </div>
-                  <p className="text-xs text-blue-600 mt-1">{swap.progress}% complete</p>
+            <CardContent className="p-0">
+              {recentUsers.length === 0 ? (
+                <div className="p-8 text-center text-blue-400 font-medium italic">
+                  No users found in the database.
                 </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Reported Issues */}
-        <Card className="bg-white/90 backdrop-blur border-blue-100">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="text-blue-900">Reported Issues</CardTitle>
-                <CardDescription className="text-blue-600">
-                  Issues requiring admin attention
-                </CardDescription>
-              </div>
-              <Button 
-                variant="outline"
-                size="sm"
-                onClick={() => navigate("/report")}
-                className="border-blue-200 text-blue-600 hover:bg-blue-50"
-              >
-                View All Reports
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {reportedIssues.map((issue) => (
-                <div key={issue.id} className="p-4 rounded-lg border border-blue-100 bg-blue-50/50">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <h3 className="font-medium text-blue-900">{issue.reporter} reported {issue.reported}</h3>
-                        <Badge className={issue.status === "pending" ? "bg-yellow-100 text-yellow-900" : "bg-green-100 text-green-900"}>
-                          {issue.status}
+              ) : (
+                <div className="divide-y divide-blue-50">
+                  {recentUsers.map((user) => (
+                    <div key={user.id} className="flex items-center justify-between p-4 hover:bg-blue-50/50 transition-colors">
+                      <div className="flex items-center gap-4">
+                        <Avatar className="size-10 ring-2 ring-blue-100">
+                          {/* 🚀 FIXED: Now checks for user.avatarUrl before falling back to Dicebear */}
+                          <AvatarImage src={user.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.name}`} />
+                          <AvatarFallback className="bg-blue-600 text-white font-bold">
+                            {user.name[0]}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <h3 className="font-bold text-blue-900">{user.name}</h3>
+                          <p className="text-xs text-blue-500 font-medium">{user.email}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <Badge className={user.role === "ADMIN" ? "bg-red-100 text-red-700 hover:bg-red-200" : "bg-blue-100 text-blue-700 hover:bg-blue-200"}>
+                          {user.role || "USER"}
                         </Badge>
+                        {user.role !== "ADMIN" && (
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            onClick={() => handleBanUser(user.id, user.name)}
+                            className="text-red-500 hover:bg-red-100 hover:text-red-700 transition-colors"
+                          >
+                            <Ban className="size-4" />
+                          </Button>
+                        )}
                       </div>
-                      <p className="text-sm text-blue-600 mt-1">Reason: {issue.reason}</p>
-                      <span className="text-xs text-blue-500">{issue.date}</span>
                     </div>
-                    {issue.status === "pending" && (
-                      <div className="flex gap-2">
-                        <Button size="sm" variant="outline" className="border-green-300 text-green-600">
-                          <CheckCircle2 className="size-4 mr-1" />
-                          Resolve
-                        </Button>
-                        <Button size="sm" variant="outline" className="border-red-300 text-red-600">
-                          <Ban className="size-4 mr-1" />
-                          Ban User
-                        </Button>
-                      </div>
-                    )}
-                  </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );

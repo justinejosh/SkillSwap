@@ -1,5 +1,6 @@
+import { createBrowserRouter, Navigate } from "react-router";
+
 import PreviewPage from "@/app/pages/PreviewPage";
-import { createBrowserRouter } from "react-router";
 import LoginPage from "@/app/pages/LoginPage";
 import SignupPage from "@/app/pages/SignupPage";
 import DashboardPage from "@/app/pages/DashboardPage";
@@ -15,14 +16,32 @@ import SecurityPage from "@/app/pages/SecurityPage";
 import ReportUserPage from "@/app/pages/ReportUserPage";
 import LeaderboardPage from "@/app/pages/LeaderboardPage";
 import AchievementsPage from "@/app/pages/AchievementsPage";
-import SkillRequestBoardPage from "@/app/pages/SkillRequestBoardPage";
 import CommunityForumPage from "@/app/pages/CommunityForumPage";
+import PostDetailsPage from "@/app/pages/PostDetailsPage"; // 🚀 NEW IMPORT
 import NotificationCenterPage from "@/app/pages/NotificationCenterPage";
 import AnalyticsPage from "@/app/pages/AnalyticsPage";
 import ActivityTimelinePage from "@/app/pages/ActivityTimelinePage";
 import MySkillsPage from "@/app/pages/MySkillsPage";
-// 🚀 New Import
 import SwapDetailsPage from "@/app/pages/SwapDetailsPage"; 
+
+// This guard checks if the user is an admin
+const AdminRoute = ({ children }: { children: React.ReactNode }) => {
+  const userString = localStorage.getItem("knoxite_user");
+  
+  if (userString) {
+    try {
+      const user = JSON.parse(userString);
+      if (user.role === "ADMIN") {
+        return <>{children}</>;
+      }
+    } catch (e) {
+      console.error("Error reading user data", e);
+    }
+  }
+  
+  // Send normal users back to the dashboard
+  return <Navigate to="/dashboard" replace />;
+};
 
 export const router = createBrowserRouter([
   {
@@ -66,10 +85,6 @@ export const router = createBrowserRouter([
     Component: ReputationPage,
   },
   {
-    path: "/admin",
-    Component: AdminDashboardPage,
-  },
-  {
     path: "/knox-hub",
     Component: KnoxHubPage,
   },
@@ -98,23 +113,29 @@ export const router = createBrowserRouter([
     Component: AchievementsPage,
   },
   {
-    path: "/skill-requests",
-    Component: SkillRequestBoardPage,
-  },
-  {
     path: "/community-forum",
     Component: CommunityForumPage,
+  },
+  {
+    // 🚀 NEW ROUTE
+    path: "/community-forum/:id",
+    Component: PostDetailsPage,
   },
   {
     path: "/requests",
     Component: NotificationCenterPage,
   },
   {
-    path: "/analytics",
-    Component: AnalyticsPage,
-  },
-  {
     path: "/activity-timeline",
     Component: ActivityTimelinePage,
   },
-]);
+  // Protected Admin Routes below
+  {
+    path: "/admin-dashboard",
+    element: <AdminRoute><AdminDashboardPage /></AdminRoute>,
+  },
+  {
+    path: "/analytics",
+    element: <AdminRoute><AnalyticsPage /></AdminRoute>,
+  },
+]); 

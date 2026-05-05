@@ -1,61 +1,54 @@
-**Add your own guidelines here**
-<!--
+## 🚀 Guidelines to Run the Program Locally
 
-System Guidelines
+### 1. Backend Setup
+Open your terminal and navigate to the backend folder:
+```bash
+cd knoxite-backend
+```
 
-Use this file to provide the AI with rules and guidelines you want it to follow.
-This template outlines a few examples of things you can add. You can add your own sections and format it to suit your needs
+Install the required backend dependencies:
+```bash
+npm install
+```
 
-TIP: More context isn't always better. It can confuse the LLM. Try and add the most important rules you need
+Create a `.env` file inside the `knoxite-backend` folder (if it doesn't exist) and add your local database credentials:
+```env
+PORT=5000
+DATABASE_URL="mysql://root:@localhost:3306/knoxite"
+```
+*(Note: If your local MySQL has a password, put it after `root:`)*
 
-# General guidelines
+Sync the database and generate the Prisma client:
+```bash
+npx prisma generate
+npx prisma db push
+```
 
-Any general rules you want the AI to follow.
-For example:
+Start the backend server:
+```bash
+npm run dev
+```
 
-* Only use absolute positioning when necessary. Opt for responsive and well structured layouts that use flexbox and grid by default
-* Refactor code as you go to keep code clean
-* Keep file sizes small and put helper functions and components in their own files.
+---
 
---------------
+### 2. Frontend Setup
+Leave the backend running and open a **new terminal window**. Navigate to your frontend folder:
+```bash
+# Assuming you are in the root directory
+cd YOUR_FRONTEND_FOLDER_NAME
+```
 
-# Design system guidelines
-Rules for how the AI should make generations look like your company's design system
+Install the frontend dependencies:
+```bash
+npm install
+```
 
-Additionally, if you select a design system to use in the prompt box, you can reference
-your design system's components, tokens, variables and components.
-For example:
+Update your API Configuration:
+* Open `config.ts`
+* Change the API URL to your machine's current local IP address (e.g., `[http://192.168.1.](http://192.168.1.)x:5000/api`). 
+* *⚠️ Please do not commit/push your local IP address changes to GitHub!*
 
-* Use a base font-size of 14px
-* Date formats should always be in the format “Jun 10”
-* The bottom toolbar should only ever have a maximum of 4 items
-* Never use the floating action button with the bottom toolbar
-* Chips should always come in sets of 3 or more
-* Don't use a dropdown if there are 2 or fewer options
-
-You can also create sub sections and add more specific details
-For example:
-
-
-## Button
-The Button component is a fundamental interactive element in our design system, designed to trigger actions or navigate
-users through the application. It provides visual feedback and clear affordances to enhance user experience.
-
-### Usage
-Buttons should be used for important actions that users need to take, such as form submissions, confirming choices,
-or initiating processes. They communicate interactivity and should have clear, action-oriented labels.
-
-### Variants
-* Primary Button
-  * Purpose : Used for the main action in a section or page
-  * Visual Style : Bold, filled with the primary brand color
-  * Usage : One primary button per section to guide users toward the most important action
-* Secondary Button
-  * Purpose : Used for alternative or supporting actions
-  * Visual Style : Outlined with the primary color, transparent background
-  * Usage : Can appear alongside a primary button for less important actions
-* Tertiary Button
-  * Purpose : Used for the least important actions
-  * Visual Style : Text-only with no border, using primary color
-  * Usage : For actions that should be available but not emphasized
--->
+Start the Frontend Application:
+```bash
+npm run dev -- --host
+```

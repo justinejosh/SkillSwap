@@ -7,6 +7,8 @@ import swapRoutes from "./routes/swaps";
 import boardRoutes from "./routes/board";
 import chatRoutes from "./routes/chat";
 import analyticsRoutes from "./routes/analytics";
+import adminRoutes from "./routes/admin";
+import forumRoutes from "./routes/forum";
 import { authenticateToken } from "./middleware/authMiddleware";
 
 const app = express();
@@ -427,6 +429,8 @@ app.use("/api/profile", profileRoutes);
 app.use("/api/chat", chatRoutes);
 app.use("/api/board", boardRoutes);
 app.use("/api/analytics", analyticsRoutes);
+app.use("/api/admin", adminRoutes);
+app.use("/api/forum", forumRoutes);
 
 app.use((err: any, req: any, res: any, next: any) => {
   console.error("SERVER CRASHED:", err.stack);
@@ -444,5 +448,3 @@ const server = app.listen(Number(PORT), '0.0.0.0', () => {
     console.error('❌ Server error:', error);
   }
 });
-
-//comment
