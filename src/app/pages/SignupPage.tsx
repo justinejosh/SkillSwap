@@ -1,5 +1,5 @@
 import { api } from "@/app/lib/api";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
@@ -35,17 +35,57 @@ export default function SignupPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [optionsLoading, setOptionsLoading] = useState(true);
+  const [optionsError, setOptionsError] = useState("");
+  const optionsRequest = useRef<AbortController | null>(null);
+  const loadAcademicOptions = useCallback(async () => {
+    optionsRequest.current?.abort();
+    const controller = new AbortController();
+    optionsRequest.current = controller;
+    setOptionsLoading(true);
+    setOptionsError("");
+    try {
+      const result = await api<{ programs: any[]; yearLevels: any[] }>(
+        "/auth/academic-options",
+        { signal: controller.signal },
+      );
+      if (
+        !Array.isArray(result.programs) ||
+        !Array.isArray(result.yearLevels) ||
+        !result.programs.length ||
+        !result.yearLevels.length
+      )
+        throw new Error(
+          "College programs and year levels have not been configured yet. Please contact the Knoxite administrator.",
+        );
+      if (!controller.signal.aborted) setOptions(result);
+    } catch (e: any) {
+      if (!controller.signal.aborted) {
+        setOptions({ programs: [], yearLevels: [] });
+        setProgramId("");
+        setYearLevelId("");
+        setOptionsError(
+          e instanceof TypeError
+            ? "Unable to load college programs and year levels. Check your connection and try again."
+            : e.message,
+        );
+      }
+    } finally {
+      if (!controller.signal.aborted) setOptionsLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     document.documentElement.classList.remove("dark");
-    api("/auth/academic-options")
-      .then(setOptions)
-      .catch((e) => setError(e.message));
-  }, []);
+    void loadAcademicOptions();
+    return () => optionsRequest.current?.abort();
+  }, [loadAcademicOptions]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+
+    if (optionsLoading || optionsError || !options.programs.length) return;
 
     if (!agreedToTerms) {
       setError(
@@ -120,6 +160,26 @@ export default function SignupPage() {
           </CardHeader>
           <CardContent>
             <form noValidate onSubmit={handleSubmit} className="space-y-4">
+              {optionsLoading && (
+                <p role="status" className="text-sm text-slate-600">
+                  Loading college programs and year levels...
+                </p>
+              )}
+              {optionsError && (
+                <div
+                  role="alert"
+                  className="space-y-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700"
+                >
+                  <p>{optionsError}</p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => void loadAcademicOptions()}
+                  >
+                    Retry Academic Options
+                  </Button>
+                </div>
+              )}
               {error && (
                 <div className="p-3 text-xs font-bold text-red-600 bg-red-50 border border-red-100 rounded-xl text-center animate-in fade-in zoom-in duration-300">
                   {error}
@@ -216,6 +276,9 @@ export default function SignupPage() {
                 <select
                   required
                   id="signup-program"
+                  disabled={
+                    optionsLoading || !!optionsError || !options.programs.length
+                  }
                   value={programId}
                   onChange={(e) => {
                     setProgramId(e.target.value);
@@ -236,6 +299,7 @@ export default function SignupPage() {
                 <select
                   required
                   id="signup-year"
+                  disabled={optionsLoading || !!optionsError || !programId}
                   value={yearLevelId}
                   onChange={(e) => setYearLevelId(e.target.value)}
                   className="w-full rounded-xl border border-blue-100 p-3 text-sm"
@@ -295,7 +359,12 @@ export default function SignupPage() {
 
               <Button
                 type="submit"
-                disabled={isLoading}
+                disabled={
+                  isLoading ||
+                  optionsLoading ||
+                  !!optionsError ||
+                  !options.programs.length
+                }
                 className="w-full bg-blue-600 hover:bg-blue-700 text-white h-12 rounded-xl shadow-lg shadow-blue-100 mt-2 text-base font-bold transition-all active:scale-[0.98]"
               >
                 {isLoading ? (

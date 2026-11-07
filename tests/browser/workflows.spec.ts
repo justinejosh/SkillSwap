@@ -870,3 +870,86 @@ test("private administrator review records a neutral disposition without account
     ),
   ).toBe(true);
 });
+
+test("unavailable academic options disable registration until a successful retry", async ({
+  page,
+}) => {
+  await fixture(page);
+  let available = false;
+  let requests = 0;
+  await page.route("**/api/auth/academic-options", async (route) => {
+    requests++;
+    if (!available) {
+      await route.fulfill({
+        status: 503,
+        json: {
+          error:
+            "College programs and year levels are temporarily unavailable. Please try again later.",
+        },
+      });
+      return;
+    }
+    await route.fulfill({
+      json: {
+        programs: catalog.programs.map((p: any) => ({
+          ...p,
+          id: p.code,
+          yearLevels: catalog.yearLevels.map((y: any) => ({
+            ...y,
+            id: y.code,
+          })),
+        })),
+        yearLevels: catalog.yearLevels,
+      },
+    });
+  });
+  await page.goto("/signup");
+  await expect(page.getByRole("alert")).toContainText(
+    "temporarily unavailable",
+  );
+  await expect(
+    page.getByLabel("College program", { exact: true }),
+  ).toBeDisabled();
+  await expect(page.getByLabel("Year level", { exact: true })).toBeDisabled();
+  await expect(
+    page.getByRole("button", { name: "Create Account", exact: true }),
+  ).toBeDisabled();
+  await page
+    .getByLabel("Full Name", { exact: true })
+    .fill("Preserved Student Name");
+  available = true;
+  await page
+    .getByRole("button", { name: "Retry Academic Options", exact: true })
+    .click();
+  await expect(page.getByRole("alert")).toHaveCount(0);
+  await expect(page.getByLabel("Full Name", { exact: true })).toHaveValue(
+    "Preserved Student Name",
+  );
+  const program = page.getByLabel("College program", { exact: true });
+  await expect(program.locator("option")).toHaveCount(14);
+  await program.selectOption({ label: "BSCS" });
+  await expect(
+    page.getByLabel("Year level", { exact: true }).locator("option"),
+  ).toHaveCount(5);
+  await expect(
+    page.getByRole("button", { name: "Create Account", exact: true }),
+  ).toBeEnabled();
+  expect(requests).toBe(2);
+});
+
+test("empty catalog responses never appear as usable registration choices", async ({
+  page,
+}) => {
+  await fixture(page);
+  await page.route("**/api/auth/academic-options", (route) =>
+    route.fulfill({ json: { programs: [], yearLevels: [] } }),
+  );
+  await page.goto("/signup");
+  await expect(page.getByRole("alert")).toContainText("not been configured");
+  await expect(
+    page.getByRole("button", { name: "Create Account", exact: true }),
+  ).toBeDisabled();
+  await expect(
+    page.getByRole("button", { name: "Retry Academic Options", exact: true }),
+  ).toBeVisible();
+});

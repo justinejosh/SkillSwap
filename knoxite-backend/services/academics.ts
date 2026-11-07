@@ -76,6 +76,15 @@ export async function academicOptions(db: PrismaClient) {
     select: { id: true, code: true, name: true, order: true },
     orderBy: { order: "asc" },
   });
+  if (
+    !programs.length ||
+    !yearLevels.length ||
+    !programs.some((p) => p.yearLevels.length)
+  )
+    throw new HttpError(
+      503,
+      "College programs and year levels have not been configured yet. Please contact the Knoxite administrator.",
+    );
   return {
     scope: catalog.scope,
     programs: programs.map(

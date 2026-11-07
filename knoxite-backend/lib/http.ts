@@ -76,15 +76,37 @@ export const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
     return;
   }
   if (err?.code === "P2034") {
-    res
-      .status(409)
-      .json({
-        error: "Another operation changed this record. Retry the request.",
-      });
+    res.status(409).json({
+      error: "Another operation changed this record. Retry the request.",
+    });
     return;
   }
   if (err?.code === "P2025") {
     res.status(404).json({ error: "Record not found." });
+    return;
+  }
+  const databaseCode = err?.code ?? err?.errorCode;
+  if (
+    [
+      "P1000",
+      "P1001",
+      "P1002",
+      "P1003",
+      "P1008",
+      "P1010",
+      "P1011",
+      "P1017",
+      "P2021",
+      "P2022",
+    ].includes(databaseCode)
+  ) {
+    // Log only the stable diagnostic code; Prisma messages can contain SQL or credentials.
+    console.error("Database service unavailable", databaseCode);
+    res.status(503).json({
+      error: _req.path.endsWith("/academic-options")
+        ? "College programs and year levels are temporarily unavailable. Please try again later."
+        : "The service is temporarily unavailable. Please try again later.",
+    });
     return;
   }
   // Do not return Prisma errors, SQL, request bodies, or tokens to the client.
