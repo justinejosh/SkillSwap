@@ -1,0 +1,51 @@
+{
+  "status": "PROVISIONAL",
+  "source": "Working draft supplied by the Knoxite thesis team on 2026-11-07; OLFU Santa Rosa campus-specific confirmation is pending.",
+  "departments": [
+    {
+      "code": "COLLEGE_NURSING",
+      "name": "College of Nursing",
+      "programCodes": ["BSN"]
+    },
+    {
+      "code": "COLLEGE_COMPUTER_STUDIES",
+      "name": "College of Computer Studies",
+      "programCodes": ["BSCS", "BSIT"]
+    },
+    {
+      "code": "COLLEGE_PHARMACY",
+      "name": "College of Pharmacy",
+      "programCodes": ["BS_PHARM"]
+    },
+    {
+      "code": "COLLEGE_ARTS_SCIENCES",
+      "name": "College of Arts and Sciences",
+      "programCodes": ["BS_PSYCH"]
+    },
+    {
+      "code": "COLLEGE_MEDICAL_LAB_SCIENCE",
+      "name": "College of Medical Laboratory Science",
+      "programCodes": ["BSMLS"]
+    },
+    {
+      "code": "COLLEGE_HOSPITALITY",
+      "name": "College of Hospitality and Institutional Management",
+      "programCodes": ["BSIHM-CA", "BSIHM-HACLO", "BSTOM"]
+    },
+    {
+      "code": "COLLEGE_PHYSICAL_THERAPY",
+      "name": "College of Physical Therapy",
+      "programCodes": ["BSPT"]
+    },
+    {
+      "code": "COLLEGE_BUSINESS_ACCOUNTANCY",
+      "name": "College of Business and Accountancy",
+      "programCodes": ["BSAIS", "BSACC"]
+    },
+    {
+      "code": "COLLEGE_CRIMINAL_JUSTICE",
+      "name": "College of Criminal Justice",
+      "programCodes": ["BSCRIM"]
+    }
+  ]
+}

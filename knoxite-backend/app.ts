@@ -23,6 +23,11 @@ import {
   publicPortfolio,
 } from "./services/portfolios";
 import { loadUserMetrics } from "./services/userMetrics";
+import {
+  LEADERBOARD_POLICY,
+  leaderboardEligibility,
+  compareActivity,
+} from "./services/leaderboards";
 import { configuredMailer, VerificationMailer } from "./services/email";
 export function createApp(
   db: PrismaClient,
@@ -73,7 +78,17 @@ export function createApp(
       users.map((u) => u.id),
     );
     res.json({
+      policy: LEADERBOARD_POLICY,
+      viewer: {
+        ...leaderboardEligibility(
+          metrics.get(actor(req)) ??
+            (await loadUserMetrics(db, [actor(req)])).get(actor(req))!,
+        ),
+        uniqueCompletedPartners:
+          metrics.get(actor(req))?.uniqueCompletedPartners ?? 0,
+      },
       topMentors: users
+        .filter((u) => leaderboardEligibility(metrics.get(u.id)!).eligible)
         .map((u) => {
           const m = metrics.get(u.id)!;
           const p = publicPortfolio(u);
@@ -84,6 +99,8 @@ export function createApp(
             skills: p.offeredSkills.map((s) => s.name).join(", "),
             rating: m.averageRating,
             reviews: m.ratingCount,
+            uniqueRatingPartners: m.uniqueRatingPartners,
+            uniqueCompletedPartners: m.uniqueCompletedPartners,
             isCurrentUser: u.id === actor(req),
           };
         })
@@ -104,12 +121,14 @@ export function createApp(
     );
     res.json(
       users
-        .map((u) => ({ ...u, totalSwaps: metrics.get(u.id)!.completedSwaps }))
-        .sort(
-          (a, b) =>
-            (b.totalSwaps ?? -1) - (a.totalSwaps ?? -1) ||
-            a.id.localeCompare(b.id),
-        ),
+        .filter((u) => leaderboardEligibility(metrics.get(u.id)!).eligible)
+        .map((u) => ({
+          ...u,
+          totalSwaps: metrics.get(u.id)!.completedSwaps,
+          uniqueCompletedPartners: metrics.get(u.id)!.uniqueCompletedPartners,
+          completionRate: metrics.get(u.id)!.completionRate!,
+        }))
+        .sort(compareActivity),
     );
   });
   const swaps = swapRouters(db, config);

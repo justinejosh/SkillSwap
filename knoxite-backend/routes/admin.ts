@@ -5,9 +5,56 @@ import { HttpError, integer, onlyKeys, text } from "../lib/http";
 import { transaction } from "../lib/transaction";
 import { validateBankInput } from "../services/bankValidation";
 import { seedAcademicCatalog } from "../services/academics";
+import {
+  importDepartmentDraft,
+  reviewedDepartmentDraft,
+} from "../services/departmentDraft";
+import { integrityRouter } from "./integrity";
+import { INTEGRITY_REVIEW_REASON } from "../services/exchangeIntegrity";
 export function adminRouter(db: PrismaClient) {
   const router = express.Router();
   router.use(requireAdmin);
+  router.use("/integrity", integrityRouter(db));
+  router.post("/academic-programs/provisional-mapping", async (req, res) => {
+    onlyKeys(req.body, []);
+    res.json(await importDepartmentDraft(db));
+  });
+  router.patch("/academic-programs/:id/department-draft", async (req, res) => {
+    onlyKeys(req.body, ["departmentId", "proposalNotes", "mappingVersion"]);
+    const departmentId = text(req.body.departmentId, "Department");
+    if (
+      !(await db.department.findFirst({
+        where: { id: departmentId, isActive: true },
+      }))
+    )
+      throw new HttpError(422, "Choose a configured department.");
+    const result = await db.program.updateMany({
+      where: {
+        id: String(req.params.id),
+        mappingValidatedAt: null,
+        mappingVersion: integer(
+          req.body.mappingVersion,
+          "Mapping version",
+          0,
+          1000000,
+        ),
+      },
+      data: {
+        departmentId,
+        mappingNotes: text(req.body.proposalNotes, "Proposal notes", 5000),
+        mappingValidatedById: null,
+        mappingVersion: { increment: 1 },
+      },
+    });
+    if (!result.count)
+      throw new HttpError(
+        409,
+        "Mapping changed or is already validated. Reload and use the evidence-backed workflow for validated mappings.",
+      );
+    res.json({
+      message: "Provisional mapping saved. It does not contribute to WRMR.",
+    });
+  });
   router.post("/academic-options/initialize", async (req, res) => {
     onlyKeys(req.body, []);
     await seedAcademicCatalog(db);
@@ -25,7 +72,12 @@ export function adminRouter(db: PrismaClient) {
       db.department.findMany({ orderBy: { name: "asc" } }),
       db.yearLevel.findMany({ orderBy: { order: "asc" } }),
     ]);
-    res.json({ programs, departments, yearLevels });
+    res.json({
+      programs,
+      departments,
+      yearLevels,
+      provisionalDraft: reviewedDepartmentDraft(),
+    });
   });
   router.post("/academic-programs", async (req, res) => {
     onlyKeys(req.body, ["code", "label", "yearLevelIds"]);
@@ -42,17 +94,15 @@ export function adminRouter(db: PrismaClient) {
       })) !== ids.length
     )
       throw new HttpError(422, "Choose supported year levels.");
-    res
-      .status(201)
-      .json(
-        await db.program.create({
-          data: {
-            code,
-            label,
-            yearLevels: { connect: ids.map((id) => ({ id })) },
-          },
-        }),
-      );
+    res.status(201).json(
+      await db.program.create({
+        data: {
+          code,
+          label,
+          yearLevels: { connect: ids.map((id) => ({ id })) },
+        },
+      }),
+    );
   });
   router.patch("/academic-programs/:id/year-levels", async (req, res) => {
     onlyKeys(req.body, ["yearLevelIds"]);
@@ -184,17 +234,15 @@ export function adminRouter(db: PrismaClient) {
         .status(201)
         .json(await db.department.create({ data: { code, name } }));
     else if (req.body.type === "yearLevel")
-      res
-        .status(201)
-        .json(
-          await db.yearLevel.create({
-            data: {
-              code,
-              name,
-              order: integer(req.body.order, "Order", 1, 100),
-            },
-          }),
-        );
+      res.status(201).json(
+        await db.yearLevel.create({
+          data: {
+            code,
+            name,
+            order: integer(req.body.order, "Order", 1, 100),
+          },
+        }),
+      );
     else throw new HttpError(422, "Choose department or yearLevel.");
   });
   router.get("/assessment-catalog", async (_req, res) => {
@@ -348,6 +396,7 @@ export function adminRouter(db: PrismaClient) {
   router.get("/reports", async (_req, res) => {
     res.json(
       await db.userReport.findMany({
+        where: { reason: { not: INTEGRITY_REVIEW_REASON } },
         include: {
           reporter: { select: { id: true, name: true } },
           target: { select: { id: true, name: true } },
@@ -361,7 +410,11 @@ export function adminRouter(db: PrismaClient) {
     if (!["RESOLVED", "DISMISSED"].includes(req.body.status))
       throw new HttpError(422, "Choose RESOLVED or DISMISSED.");
     const result = await db.userReport.updateMany({
-      where: { id: String(req.params.id), status: "PENDING" },
+      where: {
+        id: String(req.params.id),
+        status: "PENDING",
+        reason: { not: INTEGRITY_REVIEW_REASON },
+      },
       data: {
         status: req.body.status,
         resolution: text(req.body.resolution, "Resolution", 2000),

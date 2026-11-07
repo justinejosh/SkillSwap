@@ -2,6 +2,7 @@ import { Prisma, PrismaClient } from "@prisma/client";
 import catalog from "../config/academic-catalog.json";
 import { HttpError } from "../lib/http";
 import { AppConfig } from "../lib/config";
+import { proposedDepartment } from "./departmentDraft";
 export function eligibleStudentWhere(config: AppConfig): Prisma.UserWhereInput {
   return {
     role: "USER",
@@ -60,6 +61,8 @@ export async function academicOptions(db: PrismaClient) {
       id: true,
       code: true,
       label: true,
+      mappingValidatedAt: true,
+      department: { select: { id: true, name: true, isActive: true } },
       yearLevels: {
         where: { isActive: true },
         select: { id: true, code: true, name: true, order: true },
@@ -73,7 +76,26 @@ export async function academicOptions(db: PrismaClient) {
     select: { id: true, code: true, name: true, order: true },
     orderBy: { order: "asc" },
   });
-  return { scope: catalog.scope, programs, yearLevels };
+  return {
+    scope: catalog.scope,
+    programs: programs.map(
+      ({ department, mappingValidatedAt, ...program }) => ({
+        ...program,
+        department:
+          mappingValidatedAt && department?.isActive
+            ? { id: department.id, name: department.name }
+            : null,
+        proposedDepartment: !mappingValidatedAt
+          ? department?.isActive
+            ? { id: department.id, name: department.name }
+            : !department
+              ? proposedDepartment(program.code)
+              : null
+          : null,
+      }),
+    ),
+    yearLevels,
+  };
 }
 export async function validateAcademicSelection(
   db: PrismaClient | Prisma.TransactionClient,

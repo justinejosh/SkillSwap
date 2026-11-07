@@ -1,38 +1,58 @@
-import { PrismaClient } from "@prisma/client";
+import { Prisma, PrismaClient } from "@prisma/client";
+
+export const METRIC_POLICY = "partner-balanced-outcomes-v1";
 export interface UserMetrics {
+  metricPolicy: string;
   averageRating: number | null;
+  rawAverageRating: number | null;
   ratingCount: number;
+  uniqueRatingPartners: number;
+  uniqueCompletedPartners: number;
+  uniqueConcludedPartners: number;
   completedSwaps: number | null;
   validatedCompletedSwaps: number;
   eligibleConcludedSwaps: number;
   completionRate: number | null;
+  rawCompletionRate: number | null;
   legacyConcludedSwaps: number;
 }
+export interface MetricOutcome {
+  requesterId: string;
+  receiverId: string;
+  status: string;
+  integrityVerified: boolean;
+  requesterApprovedAt: Date | null;
+  receiverApprovedAt: Date | null;
+  completedAt: Date | null;
+  sessions: number;
+  requesterSessions: number;
+  receiverSessions: number;
+  reviews: Array<{
+    reviewerId: string;
+    revieweeId: string;
+    rating: number;
+    isValidated: boolean;
+  }>;
+}
+const average = (values: number[]) =>
+  values.length ? values.reduce((a, b) => a + b, 0) / values.length : null;
 export function aggregateMetrics(
   userIds: string[],
-  swaps: Array<{
-    requesterId: string;
-    receiverId: string;
-    status: string;
-    integrityVerified: boolean;
-    requesterApprovedAt: Date | null;
-    receiverApprovedAt: Date | null;
-    completedAt: Date | null;
-    sessions: number;
-    requesterSessions: number;
-    receiverSessions: number;
-    reviews: Array<{
-      reviewerId: string;
-      revieweeId: string;
-      rating: number;
-      isValidated: boolean;
-    }>;
-  }>,
+  swaps: MetricOutcome[],
 ): Map<string, UserMetrics> {
   const accum = new Map(
     userIds.map((id) => [
       id,
-      { completed: 0, concluded: 0, legacy: 0, ratings: [] as number[] },
+      {
+        completed: 0,
+        concluded: 0,
+        legacy: 0,
+        ratings: [] as number[],
+        partners: new Map<
+          string,
+          { completed: number; concluded: number; ratings: number[] }
+        >(),
+      },
     ]),
   );
   for (const s of swaps) {
@@ -67,43 +87,79 @@ export function aggregateMetrics(
         a.legacy++;
         continue;
       }
-      // Cancellation before bilateral confirmation is not an attempted teaching exchange.
       if (!s.requesterApprovedAt || !s.receiverApprovedAt) continue;
+      const partnerId = s.requesterId === id ? s.receiverId : s.requesterId;
+      const partner = a.partners.get(partnerId) ?? {
+        completed: 0,
+        concluded: 0,
+        ratings: [],
+      };
+      partner.concluded++;
       a.concluded++;
       if (completed) {
         a.completed++;
-        a.ratings.push(
-          ...reviews.filter((r) => r.revieweeId === id).map((r) => r.rating),
-        );
+        partner.completed++;
+        const received = reviews
+          .filter((r) => r.revieweeId === id)
+          .map((r) => r.rating);
+        a.ratings.push(...received);
+        partner.ratings.push(...received);
       }
+      a.partners.set(partnerId, partner);
     }
   }
   return new Map(
-    [...accum].map(([id, a]) => [
-      id,
-      {
-        averageRating: a.ratings.length
-          ? a.ratings.reduce((x, y) => x + y, 0) / a.ratings.length
-          : null,
-        ratingCount: a.ratings.length,
-        completedSwaps: a.legacy ? null : a.completed,
-        validatedCompletedSwaps: a.completed,
-        eligibleConcludedSwaps: a.concluded,
-        completionRate:
-          a.legacy || !a.concluded ? null : a.completed / a.concluded,
-        legacyConcludedSwaps: a.legacy,
-      },
-    ]),
+    [...accum].map(([id, a]) => {
+      const partners = [...a.partners.values()];
+      return [
+        id,
+        {
+          metricPolicy: METRIC_POLICY,
+          averageRating: average(
+            partners
+              .filter((p) => p.ratings.length)
+              .map((p) => average(p.ratings)!),
+          ),
+          rawAverageRating: average(a.ratings),
+          ratingCount: a.ratings.length,
+          uniqueRatingPartners: partners.filter((p) => p.ratings.length).length,
+          uniqueCompletedPartners: partners.filter((p) => p.completed > 0)
+            .length,
+          uniqueConcludedPartners: partners.length,
+          completedSwaps: a.legacy ? null : a.completed,
+          validatedCompletedSwaps: a.completed,
+          eligibleConcludedSwaps: a.concluded,
+          completionRate: a.legacy
+            ? null
+            : average(partners.map((p) => p.completed / p.concluded)),
+          rawCompletionRate:
+            a.legacy || !a.concluded ? null : a.completed / a.concluded,
+          legacyConcludedSwaps: a.legacy,
+        },
+      ];
+    }),
   );
 }
-export async function loadUserMetrics(db: PrismaClient, userIds: string[]) {
-  if (!userIds.length) return new Map<string, UserMetrics>();
-  const swaps = await db.swap.findMany({
+export async function loadMetricOutcomes(
+  db: PrismaClient | Prisma.TransactionClient,
+  userIds?: string[],
+) {
+  if (userIds && !userIds.length) return [];
+  return db.swap.findMany({
     where: {
-      OR: [{ requesterId: { in: userIds } }, { receiverId: { in: userIds } }],
+      ...(userIds
+        ? {
+            OR: [
+              { requesterId: { in: userIds } },
+              { receiverId: { in: userIds } },
+            ],
+          }
+        : {}),
       status: { in: ["COMPLETED", "CANCELLED"] },
     },
     select: {
+      id: true,
+      createdAt: true,
       requesterId: true,
       receiverId: true,
       status: true,
@@ -124,5 +180,7 @@ export async function loadUserMetrics(db: PrismaClient, userIds: string[]) {
       },
     },
   });
-  return aggregateMetrics(userIds, swaps);
+}
+export async function loadUserMetrics(db: PrismaClient, userIds: string[]) {
+  return aggregateMetrics(userIds, await loadMetricOutcomes(db, userIds));
 }

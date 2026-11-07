@@ -2,6 +2,7 @@ import { academicSelect, eligibleStudentWhere } from "./academics";
 import { AppConfig, studentEmailAllowed } from "../lib/config";
 import { Prisma, PrismaClient } from "@prisma/client";
 import { loadUserMetrics } from "./userMetrics";
+import { proposedDepartment } from "./departmentDraft";
 export const skillSelect = {
   id: true,
   name: true,
@@ -41,8 +42,21 @@ export function publicPortfolio(user: PortfolioRecord) {
       ? { id: user.yearLevel.id, name: user.yearLevel.name }
       : null,
     department:
-      user.program?.mappingValidatedAt && user.program.department?.isActive
+      user.program?.isActive &&
+      user.program.mappingValidatedAt &&
+      user.program.department?.isActive
         ? { id: user.program.department.id, name: user.program.department.name }
+        : null,
+    proposedDepartment:
+      user.program?.isActive && !user.program.mappingValidatedAt
+        ? user.program.department?.isActive
+          ? {
+              id: user.program.department.id,
+              name: user.program.department.name,
+            }
+          : !user.program.department
+            ? proposedDepartment(user.program.code)
+            : null
         : null,
     offeredSkills: user.offeringLinks.map((o) => ({
       id: o.skill.id,

@@ -154,6 +154,12 @@ test("registered student journey and authorization review on isolated MySQL", as
         const endpoints = [
           ["POST", "/admin/academic-options/initialize"],
           ["GET", "/admin/academic-programs"],
+          ["POST", "/admin/academic-programs/provisional-mapping"],
+          ["PATCH", `/admin/academic-programs/${programA.id}/department-draft`],
+          ["GET", "/admin/integrity/signals"],
+          ["GET", "/admin/integrity/reviews"],
+          ["POST", "/admin/integrity/reviews"],
+          ["PATCH", "/admin/integrity/reviews/missing"],
           ["POST", "/admin/academic-programs"],
           ["PATCH", `/admin/academic-programs/${programA.id}/year-levels`],
           ["POST", `/admin/academic-programs/${programA.id}/department`],

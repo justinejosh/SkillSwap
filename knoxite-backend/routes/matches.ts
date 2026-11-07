@@ -86,6 +86,9 @@ export function matchesRouter(db: PrismaClient, config: AppConfig) {
           matchScore: calculated.score,
           matchDetails: {
             ...calculated,
+            metricPolicy: m.metricPolicy,
+            uniqueRatingPartners: m.uniqueRatingPartners,
+            uniqueCompletedPartners: m.uniqueCompletedPartners,
             proximity,
             averageRating: m.averageRating,
             ratingCount: m.ratingCount,
