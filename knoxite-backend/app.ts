@@ -33,6 +33,7 @@ export function createApp(
   db: PrismaClient,
   config: AppConfig,
   mailer: VerificationMailer = configuredMailer(),
+  maintenance: () => boolean = () => false,
 ) {
   const app = express();
   app.disable("x-powered-by");
@@ -57,6 +58,19 @@ export function createApp(
   app.use(express.json({ limit: "750kb" }));
   app.get("/api/health", (_req, res) => {
     res.json({ status: "ok" });
+  });
+  app.use((_req, res, next) => {
+    if (maintenance()) {
+      res
+        .status(503)
+        .json({
+          error:
+            "Knoxite is temporarily unavailable for maintenance. Please try again later.",
+          maintenance: true,
+        });
+      return;
+    }
+    next();
   });
   app.use("/api/auth", authRouter(db, config, mailer));
   app.use("/api", authentication(db, config));

@@ -3,6 +3,7 @@ import { PrismaClient } from "@prisma/client";
 import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 import { requireLocalDatabase } from "./safeDatabase";
+import { requireMigrationDatabase } from "./localRecoverySafety";
 export const backendRoot = resolve(
   __dirname,
   __dirname.includes(
@@ -28,8 +29,12 @@ export function prismaCommand(args: string[], accepted = [0]) {
     );
   return result;
 }
-export async function preflight(db: PrismaClient, compareSchema = true) {
-  const url = requireLocalDatabase();
+export async function preflight(
+  db: PrismaClient,
+  compareSchema = true,
+  approvalFile?: string,
+) {
+  requireMigrationDatabase(approvalFile);
   const history = await db.$queryRaw<
     Array<{ count: bigint }>
   >`SELECT COUNT(*) count FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '_prisma_migrations'`;
@@ -47,8 +52,8 @@ export async function preflight(db: PrismaClient, compareSchema = true) {
       [
         "migrate",
         "diff",
-        "--from-url",
-        url,
+        "--from-schema-datasource",
+        "prisma/schema.prisma",
         "--to-schema-datamodel",
         "prisma/baseline/pre-upgrade.prisma",
         "--exit-code",
@@ -98,10 +103,14 @@ export async function preflight(db: PrismaClient, compareSchema = true) {
   >`SELECT COLUMN_NAME, REFERENCED_TABLE_NAME FROM information_schema.KEY_COLUMN_USAGE WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '_OfferedSkills' AND REFERENCED_TABLE_NAME IS NOT NULL`;
   if (
     !mapping.some(
-      (m) => m.COLUMN_NAME === "A" && m.REFERENCED_TABLE_NAME === "Skill",
+      (m) =>
+        m.COLUMN_NAME === "A" &&
+        m.REFERENCED_TABLE_NAME.toLowerCase() === "skill",
     ) ||
     !mapping.some(
-      (m) => m.COLUMN_NAME === "B" && m.REFERENCED_TABLE_NAME === "User",
+      (m) =>
+        m.COLUMN_NAME === "B" &&
+        m.REFERENCED_TABLE_NAME.toLowerCase() === "user",
     )
   )
     throw new Error(

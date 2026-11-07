@@ -16,7 +16,7 @@ The team subsequently supplied a provisional nine-college mapping covering all 1
 
 ### Existing record inspection
 
-The original Prisma User model has no program, department, year-level, or SHS fields. No student-data export was present in the repository. The existing environment points to a loopback MySQL service on port 3306, but no listener was running; that database was not opened or changed. Actual student records have therefore **not** been audited. The existing schema snapshot is preserved in `prisma/baseline/pre-upgrade.prisma`. A sanitized local record audit remains necessary before a real-data upgrade.
+The initial audit found no student export and did not open the configured local database. During registration recovery, read-only checks subsequently confirmed that `localhost:3306/knoxite` was XAMPP MariaDB 10.4.32 with the exact preserved pre-upgrade schema. The user explicitly authorized a backed-up local upgrade. Its backup was restored and verified, the private clone was sanitized and rehearsed on the same engine, and all original values/relationships across 11 tables were fingerprint-verified before and after the approved original upgrade. Existing users, skills, swaps, reviews, messages, and associations were retained. No historical consent, rating validity, academic data, or verified email ownership was invented. This is local-data preservation evidence, not a production-data audit or semantic validation of legacy outcomes. See `docs/LOCAL_DATABASE_RECOVERY.md`.
 
 ## Security and runtime
 
@@ -27,7 +27,7 @@ The original Prisma User model has no program, department, year-level, or SHS fi
 - Request acceptance creates one explicitly linked agreement. Both parties approve the same revision before confirmation. Session acknowledgements are idempotent per participant/session number. Cancellation and suspension retain history.
 - Login sessions, logout, password change with session revocation, reports, administrator dispositions, and session scheduling use real APIs.
 - Removed checked-in JavaScript copies. Development uses Node watch with ts-node; production starts `dist/index.js`. TypeScript never emits over source.
-- `predev`, `prebuild`, and `pretypecheck` generate Prisma Client from the checked-in schema before those commands run. Fresh dependency installations may otherwise expose Prisma's placeholder `PrismaClient: any`, causing implicit-any and missing-model errors. Generation writes the local client and types; it does not migrate a database. Keep strict TypeScript checks enabled rather than annotating affected callbacks as `any`.
+- `predev`, `prebuild`, and `pretypecheck` ensure Prisma Client matches the schema and installed version. Matching clients are reused to avoid replacing a Windows engine DLL held by another backend process. Missing/stale clients are generated; a schema change may require stopping other backend processes before explicit `npm run db:generate`. Fresh installations may otherwise expose Prisma's placeholder `PrismaClient: any`. Generation writes code/types and does not migrate a database; strict TypeScript checks remain enabled.
 - Dependency audit fixes retain Prisma 6. A development-only `deepmerge-ts` override addresses its advisory; Prisma generation, schema diff, baseline resolution, and migration paths are validated with that override. Nodemon was removed in favor of Node's built-in watcher.
 
 **Deployment operator action:** rotate the previously exposed JWT signing secret and replace old running artifacts. Removing it from current source does not revoke tokens served by an old deployment. No production secret or deployment was changed here.
@@ -93,6 +93,8 @@ Never use production credentials for the scripts below. Every preparation script
 
 The old two-migration chain does not recreate the original checked-in schema. Those migration files are retained; the guarded baseline workflow handles this explicitly. Do not run the old `prisma db push` instructions against existing records.
 
+An explicitly authorized exception was implemented for the confirmed existing local `localhost:3306/knoxite` database. Ordinary preparation tools still reject unsuffixed databases. The recovery path requires `dev-justine`, an explicit local acknowledgement, private verified backup/manifest hashes, a successful same-engine clone rehearsal, application maintenance, the unchanged reviewed SQL, and exact old-row fingerprints. Its one-time proof is consumed on success. Remote targets and production mode are rejected. Recovery evidence/backups stay outside OneDrive and Git with restricted access. This does not authorize production migrations or future unreviewed upgrades.
+
 Rollback must retain the additive offering/attempt tables and assessment evidence. Both offered relationships are maintained together during this rollout; wanted associations remain unchanged. Do not roll back to the vulnerable JavaScript artifacts or hardcoded signing secret.
 
 ## Validation
@@ -105,4 +107,4 @@ Remaining release gates: official domain/campus confirmation, actual program-to-
 
 `docs/ACADEMIC_CONFIGURATION_APPROVAL.md` records the exact pending institutional and subject-review evidence. No official mapping or real question bank was invented to complete configuration. The continuous local student-journey test supplements the separate feature regressions; see `VALIDATION.md` for the latest full run.
 
-Deployment details now supplied by the team are recorded in `docs/DEPLOYMENT_READINESS.md`: Vercel frontend, Render backend `skillswap-50cf`, automatic backend deployments from `main`, and an unresolved production MySQL provider/backup/access plan. Current authorization expressly excludes production connections, deployments, migrations, and merging into `main`. The partner-integrity follow-up used a new disposable database initialized from the unchanged schema snapshot and did not execute upgrade migrations.
+Deployment details supplied by the team are recorded in `docs/DEPLOYMENT_READINESS.md`: Vercel frontend, Render backend `skillswap-50cf`, automatic deployments from `main`, and an unresolved production MySQL provider/backup/access plan. Production connections, deployments, production migrations, and merging into `main` remain unauthorized. The earlier partner-integrity follow-up did not execute upgrade migrations; the subsequent user-approved local recovery and its same-engine rehearsals are recorded separately.

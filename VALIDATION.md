@@ -2,6 +2,24 @@
 
 Date: 2026-11-07 (Asia/Manila). Branch: `dev-justine`. These results describe local validation, not production deployment or a completed student study.
 
+## Academic-options recovery and authorized local upgrade
+
+| Check | Result |
+| --- | --- |
+| Backend build and rule/API-boundary tests | 35 passed |
+| Full isolated MariaDB 10.4.32 API/migration/student-flow suite | 27 passed, including parent tests |
+| Desktop/mobile browser regression suite | 36 passed |
+| Runner-reported tests | 98 passed, zero failures/skips in the final runs |
+| Actual frontend + actual recovered backend signup checks | Passed at 1280px and 390px; 13 programs, four years per program, no horizontal overflow |
+| Original local database preservation | Every original row/relationship across 11 tables fingerprint-matched before and after the approved upgrade |
+| Exact browser API URL | `http://localhost:5000/api/auth/academic-options` returned HTTP 200 |
+
+Read-only diagnosis found the old schema in the confirmed local XAMPP database. Following explicit user authorization, recovery used an access-restricted backup outside Git/OneDrive, verified restoration, a sanitized clone on the same MariaDB version, reviewed additive SQL, strict preflight/schema checks, one-time proof evidence, and application maintenance. The existing connection target was retained. No production resource was contacted or changed, no mail was sent, and actual-browser verification did not create a student account. See `docs/LOCAL_DATABASE_RECOVERY.md` for the receipt location and procedure. Legacy outcome legitimacy and actual email delivery remain separate requirements.
+
+The recovery also fixes a Windows startup-hook issue: matching Prisma clients are reused rather than regenerated while another process holds the engine DLL. Missing/stale schema/version metadata still requests generation. Academic availability failures return safe 503 responses without SQL/credentials; an empty catalog does not seed itself on a GET request. Registration disables unavailable choices/submission, supports retry, preserves typed form data, and never substitutes fabricated IDs.
+
+The earlier no-migration boundaries/results below describe their respective historical phases. The later explicit local authorization superseded the restriction only for this backed-up local procedure and its isolated rehearsals. Production restrictions remain in force.
+
 ## Development startup recovery
 
 Reproduced the reported `TS7006` failures with an ungenerated `.prisma/client` placeholder declaring `PrismaClient` as `any`. Added automatic generation before development, builds, and type checking. From that failing local state, `npm run typecheck`, the actual `ts-node/register` application loader, the backend build, and all 26 rule tests passed after generation.

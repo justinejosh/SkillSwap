@@ -1,18 +1,53 @@
 import { seedAcademicCatalog } from "../services/academics";
 import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
-import { readdirSync } from "node:fs";
+import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { requireLocalDatabase } from "./safeDatabase";
 import { backendRoot, preflight, prismaCommand } from "./preflight";
 import { backfillOfferings } from "./backfill";
+import {
+  assertLegacyDataPreserved,
+  captureLegacyData,
+  readLocalUpgradeApproval,
+  requireMigrationDatabase,
+} from "./localRecoverySafety";
+import { localDatabaseMaintenance } from "../lib/localMaintenance";
 async function main() {
-  requireLocalDatabase();
   const mode = process.argv[2];
-  if (mode !== "bootstrap" && mode !== "upgrade")
+  const approvalFile =
+    mode === "upgrade-existing-local"
+      ? process.env.KNOXITE_LOCAL_UPGRADE_APPROVAL_FILE
+      : undefined;
+  if (mode === "upgrade-existing-local" && !approvalFile)
+    throw new Error("An explicit private approval file is required.");
+  requireMigrationDatabase(approvalFile);
+  if (
+    mode !== "bootstrap" &&
+    mode !== "upgrade" &&
+    mode !== "upgrade-existing-local"
+  )
     throw new Error("Choose bootstrap or upgrade.");
   const db = new PrismaClient();
   try {
+    const proof = approvalFile ? readLocalUpgradeApproval(approvalFile) : null;
+    const original = proof
+      ? JSON.parse(readFileSync(proof.manifestPath, "utf8"))
+      : null;
+    if (original) {
+      if (!localDatabaseMaintenance())
+        throw new Error(
+          "Local application maintenance must be active before the existing-database upgrade.",
+        );
+      const version = await db.$queryRaw<
+        Array<{ version: string }>
+      >`SELECT VERSION() version`;
+      if (version[0].version !== proof.engineVersion)
+        throw new Error("The database engine changed after rehearsal.");
+      assertLegacyDataPreserved(
+        original,
+        await captureLegacyData(db, original),
+      );
+    }
     if (mode === "bootstrap") {
       const tables = await db.$queryRaw<
         Array<{ count: bigint }>
@@ -28,7 +63,7 @@ async function main() {
         "prisma/schema.prisma",
       ]);
     } else {
-      const before = await preflight(db);
+      const before = await preflight(db, true, approvalFile);
       console.log("Preflight passed:", JSON.stringify(before));
       // MySQL DDL is not fully transactional: use a restored clone and take a backup before this step.
       prismaCommand([
@@ -39,8 +74,8 @@ async function main() {
         "--schema",
         "prisma/schema.prisma",
       ]);
-      await backfillOfferings(db);
-      const after = await preflight(db, false);
+      await backfillOfferings(db, approvalFile);
+      const after = await preflight(db, false, approvalFile);
       if (JSON.stringify(before) !== JSON.stringify(after))
         throw new Error(
           "Historical counts changed. Stop rollout and restore the isolated clone backup.",
@@ -77,8 +112,8 @@ async function main() {
       [
         "migrate",
         "diff",
-        "--from-url",
-        process.env.DATABASE_URL!,
+        "--from-schema-datasource",
+        "prisma/schema.prisma",
         "--to-schema-datamodel",
         "prisma/schema.prisma",
         "--exit-code",
@@ -87,6 +122,26 @@ async function main() {
     );
     if (diff.status !== 0)
       throw new Error("Post-migration schema differs. Do not release.");
+    if (original) {
+      assertLegacyDataPreserved(
+        original,
+        await captureLegacyData(db, original),
+        true,
+      );
+      writeFileSync(
+        approvalFile!,
+        JSON.stringify(
+          {
+            ...proof,
+            consumedAt: new Date().toISOString(),
+            originalUpgradePassed: true,
+          },
+          null,
+          2,
+        ),
+        "utf8",
+      );
+    }
     console.log(
       "Local database prepared and verified. No historical rows were deleted.",
     );

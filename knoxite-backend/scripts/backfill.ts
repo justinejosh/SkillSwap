@@ -1,8 +1,12 @@
 import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
 import { requireLocalDatabase } from "./safeDatabase";
-export async function backfillOfferings(db: PrismaClient) {
-  requireLocalDatabase();
+import { requireMigrationDatabase } from "./localRecoverySafety";
+export async function backfillOfferings(
+  db: PrismaClient,
+  approvalFile?: string,
+) {
+  requireMigrationDatabase(approvalFile);
   await db.$transaction(async (tx) => {
     // A = Skill and B = User, verified by preflight. Never overwrite earned tiers/history.
     await tx.$executeRaw`INSERT INTO UserOfferedSkill (id, userId, skillId, isActive, tier, createdAt, updatedAt)
