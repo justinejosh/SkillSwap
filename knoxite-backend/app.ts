@@ -1,0 +1,134 @@
+import { academicOptions, eligibleStudentWhere } from "./services/academics";
+import { sessionsRouter } from "./routes/sessions";
+import express from "express";
+import cors from "cors";
+import { PrismaClient } from "@prisma/client";
+import { AppConfig } from "./lib/config";
+import { errorHandler, HttpError } from "./lib/http";
+import { actor, authentication } from "./middleware/authMiddleware";
+import { authRouter } from "./routes/auth";
+import { profileRouter } from "./routes/profile";
+import { matchesRouter } from "./routes/matches";
+import { swapRouters } from "./routes/swaps";
+import { assessmentsRouter } from "./routes/assessments";
+import { adminRouter } from "./routes/admin";
+import { chatRouter } from "./routes/chat";
+import { analyticsRouter } from "./routes/analytics";
+import { forumRouter } from "./routes/forum";
+import { boardRouter } from "./routes/board";
+import { reportsRouter } from "./routes/reports";
+import {
+  portfolio,
+  portfolioSelect,
+  publicPortfolio,
+} from "./services/portfolios";
+import { loadUserMetrics } from "./services/userMetrics";
+import { configuredMailer, VerificationMailer } from "./services/email";
+export function createApp(
+  db: PrismaClient,
+  config: AppConfig,
+  mailer: VerificationMailer = configuredMailer(),
+) {
+  const app = express();
+  app.disable("x-powered-by");
+  app.use((_req, res, next) => {
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("Referrer-Policy", "no-referrer");
+    res.setHeader("Cache-Control", "no-store");
+    next();
+  });
+  app.use(
+    cors({
+      origin: (origin, done) =>
+        done(null, !origin || config.origins.includes(origin)),
+      methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
+      allowedHeaders: [
+        "Authorization",
+        "Content-Type",
+        "bypass-tunnel-reminder",
+      ],
+    }),
+  );
+  app.use(express.json({ limit: "750kb" }));
+  app.get("/api/health", (_req, res) => {
+    res.json({ status: "ok" });
+  });
+  app.use("/api/auth", authRouter(db, config, mailer));
+  app.use("/api", authentication(db, config));
+  app.get("/api/academic-options", async (_req, res) => {
+    res.json(await academicOptions(db));
+  });
+  app.get("/api/users/:userId/profile", async (req, res) => {
+    const result = await portfolio(db, String(req.params.userId), config);
+    if (!result) throw new HttpError(404, "Student not found.");
+    res.json(result);
+  });
+  app.get("/api/leaderboard", async (req, res) => {
+    const users = await db.user.findMany({
+      where: eligibleStudentWhere(config),
+      select: portfolioSelect,
+    });
+    const metrics = await loadUserMetrics(
+      db,
+      users.map((u) => u.id),
+    );
+    res.json({
+      topMentors: users
+        .map((u) => {
+          const m = metrics.get(u.id)!;
+          const p = publicPortfolio(u);
+          return {
+            id: p.id,
+            name: p.name,
+            avatarUrl: p.avatarUrl,
+            skills: p.offeredSkills.map((s) => s.name).join(", "),
+            rating: m.averageRating,
+            reviews: m.ratingCount,
+            isCurrentUser: u.id === actor(req),
+          };
+        })
+        .sort(
+          (a, b) =>
+            (b.rating ?? -1) - (a.rating ?? -1) || a.id.localeCompare(b.id),
+        ),
+    });
+  });
+  app.get("/api/leaderboard/swaps", async (_req, res) => {
+    const users = await db.user.findMany({
+      where: eligibleStudentWhere(config),
+      select: { id: true, name: true, avatarUrl: true },
+    });
+    const metrics = await loadUserMetrics(
+      db,
+      users.map((u) => u.id),
+    );
+    res.json(
+      users
+        .map((u) => ({ ...u, totalSwaps: metrics.get(u.id)!.completedSwaps }))
+        .sort(
+          (a, b) =>
+            (b.totalSwaps ?? -1) - (a.totalSwaps ?? -1) ||
+            a.id.localeCompare(b.id),
+        ),
+    );
+  });
+  const swaps = swapRouters(db, config);
+  app.use("/api/sessions", sessionsRouter(db));
+  app.use("/api/profile", profileRouter(db));
+  app.use("/api/matches", matchesRouter(db, config));
+  app.use("/api/swaps", swaps.swaps);
+  app.use("/api/swap-requests", swaps.requests);
+  app.use("/api/reputation", swaps.reputation);
+  app.use("/api/assessments", assessmentsRouter(db));
+  app.use("/api/admin", adminRouter(db));
+  app.use("/api/chat", chatRouter(db));
+  app.use("/api/analytics", analyticsRouter(db));
+  app.use("/api/forum", forumRouter(db));
+  app.use("/api/board", boardRouter(db));
+  app.use("/api/reports", reportsRouter(db));
+  app.use((_req, res) => {
+    res.status(404).json({ error: "Endpoint not found." });
+  });
+  app.use(errorHandler);
+  return app;
+}

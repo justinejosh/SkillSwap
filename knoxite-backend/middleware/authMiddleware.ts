@@ -1,39 +1,105 @@
-import { Request, Response, NextFunction } from "express";
-import jwt from "jsonwebtoken";
+import { PrismaClient, Role } from "@prisma/client";
+import { Request, RequestHandler } from "express";
+import jwt, { JwtPayload } from "jsonwebtoken";
+import { AppConfig, studentEmailAllowed } from "../lib/config";
+import { HttpError } from "../lib/http";
 
-// This must be the EXACT SAME secret key you used in your auth.ts file!
-const JWT_SECRET = "knoxite_super_secret_key_2026";
-
-// We have to tell TypeScript that our requests will now carry a custom 'userId'
-export interface AuthRequest extends Request {
-  userId?: string;
+declare global {
+  namespace Express {
+    interface Request {
+      userId?: string;
+      userRole?: Role;
+      sessionId?: string;
+    }
+  }
 }
-
-export const authenticateToken = (req: AuthRequest, res: Response, next: NextFunction): any => {
-  // 1. Look for the "Authorization" header in the incoming request
-  const authHeader = req.header("Authorization");
-  
-  // The frontend will send the token like this: "Bearer eyJhbGciOiJIUzI1..."
-  // We use .split(" ")[1] to grab just the token part
-  const token = authHeader?.split(" ")[1];
-
-  // 2. If the token is missing, the guard blocks the door
-  if (!token) {
-    return res.status(401).json({ error: "Access Denied. No security token provided." });
-  }
-
-  // 3. If the token exists, verify it hasn't been tampered with
-  try {
-    const decoded = jwt.verify(token, JWT_SECRET) as { userId: string };
-    
-    // 4. Attach the user's ID to the request. 
-    // Now, every secure route will automatically know EXACTLY who is making the request!
-    req.userId = decoded.userId;
-    
-    // 5. The token is valid. Open the door and let the request proceed to the route.
+export interface AuthRequest extends Request {}
+export function actor(req: Request): string {
+  if (!req.userId) throw new HttpError(401, "Authentication required.");
+  return req.userId;
+}
+export function authentication(
+  db: PrismaClient,
+  config: AppConfig,
+): RequestHandler {
+  return async (req, _res, next) => {
+    const match = /^Bearer ([^\s]+)$/.exec(req.header("Authorization") || "");
+    if (!match) throw new HttpError(401, "Authentication required.");
+    let claims: JwtPayload;
+    try {
+      const decoded = jwt.verify(match[1], config.jwtSecret, {
+        algorithms: ["HS256"],
+        audience: "knoxite",
+        issuer: "knoxite-api",
+      });
+      if (
+        typeof decoded === "string" ||
+        typeof decoded.sub !== "string" ||
+        !decoded.sub ||
+        typeof decoded.jti !== "string" ||
+        !Number.isInteger(decoded.tokenVersion)
+      )
+        throw new Error("Invalid claims");
+      claims = decoded;
+    } catch {
+      throw new HttpError(
+        401,
+        "Invalid or expired session. Please sign in again.",
+      );
+    }
+    const session = await db.authSession.findFirst({
+      where: {
+        id: claims.jti,
+        userId: claims.sub,
+        revokedAt: null,
+        expiresAt: { gt: new Date() },
+      },
+      select: {
+        id: true,
+        user: {
+          select: {
+            id: true,
+            email: true,
+            role: true,
+            isSuspended: true,
+            tokenVersion: true,
+            emailVerifiedAt: true,
+          },
+        },
+      },
+    });
+    if (!session || session.user.tokenVersion !== claims.tokenVersion)
+      throw new HttpError(401, "Session has been revoked.");
+    if (
+      session.user.role === "USER" &&
+      !studentEmailAllowed(session.user.email, config)
+    )
+      throw new HttpError(
+        403,
+        "This student account is outside the configured campus email rule.",
+      );
+    if (session.user.isSuspended)
+      throw new HttpError(403, "This account is suspended.");
+    if (config.verificationRequired && !session.user.emailVerifiedAt)
+      throw new HttpError(
+        403,
+        "Verify your institutional email before continuing.",
+      );
+    req.userId = session.user.id;
+    req.userRole = session.user.role;
+    req.sessionId = session.id;
     next();
-  } catch (error) {
-    // If the token is expired or fake, block the door
-    return res.status(403).json({ error: "Invalid or expired security token." });
-  }
+  };
+}
+export const requireAdmin: RequestHandler = (req, _res, next) => {
+  actor(req);
+  if (req.userRole !== "ADMIN")
+    throw new HttpError(403, "Administrator access required.");
+  next();
+};
+export const requireStudent: RequestHandler = (req, _res, next) => {
+  actor(req);
+  if (req.userRole !== "USER")
+    throw new HttpError(403, "Student access required.");
+  next();
 };

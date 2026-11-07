@@ -1,0 +1,131 @@
+import express from "express";
+import { PrismaClient } from "@prisma/client";
+import { actor, requireStudent } from "../middleware/authMiddleware";
+import { HttpError, integer, onlyKeys, text } from "../lib/http";
+import { assertParticipant } from "./swaps";
+import { lockSwap, transaction } from "../lib/transaction";
+export function sessionsRouter(db: PrismaClient) {
+  const router = express.Router();
+  router.use(requireStudent);
+  router.get("/", async (req, res) => {
+    const rows = await db.swapSession.findMany({
+      where: {
+        swap: { OR: [{ requesterId: actor(req) }, { receiverId: actor(req) }] },
+      },
+      include: {
+        swap: {
+          select: {
+            id: true,
+            status: true,
+            requesterId: true,
+            receiverId: true,
+            requester: { select: { id: true, name: true } },
+            receiver: { select: { id: true, name: true } },
+            sessionLogs: {
+              select: { sessionNumber: true, participantId: true },
+            },
+          },
+        },
+      },
+      orderBy: { scheduledAt: "asc" },
+    });
+    res.json(
+      rows.map((row) => ({
+        id: row.id,
+        swapId: row.swapId,
+        sessionNumber: row.sessionNumber,
+        scheduledAt: row.scheduledAt,
+        meetingLink: row.meetingLink,
+        partner:
+          row.swap.requesterId === actor(req)
+            ? row.swap.receiver
+            : row.swap.requester,
+        exchangeStatus: row.swap.status,
+        confirmedByMe: row.swap.sessionLogs.some(
+          (l) =>
+            l.sessionNumber === row.sessionNumber &&
+            l.participantId === actor(req),
+        ),
+        confirmedByPartner: row.swap.sessionLogs.some(
+          (l) =>
+            l.sessionNumber === row.sessionNumber &&
+            l.participantId !== actor(req),
+        ),
+      })),
+    );
+  });
+  router.post("/", async (req, res) => {
+    onlyKeys(req.body, [
+      "swapId",
+      "sessionNumber",
+      "scheduledAt",
+      "meetingLink",
+    ]);
+    const swapId = text(req.body.swapId, "Swap");
+    const sessionNumber = integer(
+      req.body.sessionNumber,
+      "Session number",
+      1,
+      30,
+    );
+    const scheduledAt = new Date(
+      text(req.body.scheduledAt, "Scheduled date", 50),
+    );
+    if (
+      !Number.isFinite(scheduledAt.getTime()) ||
+      scheduledAt <= new Date() ||
+      scheduledAt.getTime() > Date.now() + 366 * 86400_000
+    )
+      throw new HttpError(422, "Choose a future date within one year.");
+    const meetingLink = text(
+      req.body.meetingLink ?? "",
+      "Meeting link",
+      2000,
+      true,
+    );
+    if (meetingLink) {
+      let url: URL;
+      try {
+        url = new URL(meetingLink);
+      } catch {
+        throw new HttpError(422, "Invalid meeting URL.");
+      }
+      if (url.protocol !== "https:" || url.username || url.password)
+        throw new HttpError(422, "Meeting links must use HTTPS.");
+    }
+    const result = await transaction(db, async (tx) => {
+      await lockSwap(tx, swapId);
+      const swap = await tx.swap.findUnique({ where: { id: swapId } });
+      if (!swap) throw new HttpError(404, "Swap not found.");
+      assertParticipant(swap, actor(req));
+      if (
+        swap.status !== "CONFIRMED" ||
+        !swap.integrityVerified ||
+        sessionNumber > swap.sessions
+      )
+        throw new HttpError(
+          409,
+          "Schedule a session within a confirmed exchange.",
+        );
+      if (
+        await tx.sessionConfirmation.count({ where: { swapId, sessionNumber } })
+      )
+        throw new HttpError(
+          409,
+          "A session already acknowledged by a participant cannot be rescheduled.",
+        );
+      return tx.swapSession.upsert({
+        where: { swapId_sessionNumber: { swapId, sessionNumber } },
+        create: {
+          swapId,
+          sessionNumber,
+          scheduledAt,
+          meetingLink: meetingLink || null,
+        },
+        update: { scheduledAt, meetingLink: meetingLink || null },
+      });
+    });
+    res.status(201).json(result);
+  });
+  return router;
+}

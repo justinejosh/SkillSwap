@@ -2,9 +2,19 @@
   "name": "knoxite-backend",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "dist/index.js",
   "scripts": {
-    "dev": "nodemon index.ts"
+    "dev": "node --watch --require ts-node/register index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "npm run build && node --test --test-concurrency=1 dist/tests/*.test.js",
+    "test:integration": "npm run build && node --test --test-concurrency=1 dist/tests/integration/*.test.js",
+    "db:generate": "prisma generate",
+    "db:preflight": "ts-node --prefer-ts-exts scripts/preflight.ts",
+    "db:backfill": "ts-node --prefer-ts-exts scripts/backfill.ts",
+    "db:bootstrap": "ts-node --prefer-ts-exts scripts/migrate-local.ts bootstrap",
+    "db:upgrade": "ts-node --prefer-ts-exts scripts/migrate-local.ts upgrade"
   },
   "keywords": [],
   "author": "",
@@ -23,9 +33,11 @@
     "@types/express": "^5.0.6",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^25.5.2",
-    "nodemon": "^3.1.14",
     "prisma": "^6.19.3",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3"
+  },
+  "overrides": {
+    "deepmerge-ts": "^8.0.0"
   }
 }

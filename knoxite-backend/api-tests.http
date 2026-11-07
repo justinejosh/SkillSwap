@@ -1,21 +1,41 @@
-### 1. Test the Health Route
-GET http://192.168.1.21:5000/api/health
+# Local manual examples only. Automated regression tests are under tests/.
+@baseUrl = http://127.0.0.1:5000/api
+@token = replace-with-a-local-session-token
+@programId = copy-an-id-from-academic-options
+@yearLevelId = copy-an-approved-year-id-for-that-program
 
-### 2. Register a New User
-POST http://192.168.1.21:5000/api/auth/register
+### Health (no authentication)
+GET {{baseUrl}}/health
+
+### Read the configured college programs and approved years
+GET {{baseUrl}}/auth/academic-options
+
+### Register using the configured institutional domain/campus rule
+# Requires institutional delivery configuration to receive verification.
+POST {{baseUrl}}/auth/register
 Content-Type: application/json
 
 {
-  "name": "Test User",
-  "email": "test@knoxite.com",
-  "password": "securepassword123"
+  "name": "Local Test Student",
+  "email": "replace-with-your-institutional-email",
+  "password": "replace-with-a-long-local-test-password",
+  "programId": "{{programId}}",
+  "yearLevelId": "{{yearLevelId}}"
 }
 
-### 3. Login with that User
-POST http://192.168.1.21:5000/api/auth/login
+### Login only after email ownership verification
+POST {{baseUrl}}/auth/login
 Content-Type: application/json
 
 {
-  "email": "test@knoxite.com",
-  "password": "securepassword123"
+  "email": "replace-with-your-institutional-email",
+  "password": "replace-with-a-long-local-test-password"
 }
+
+### Owner profile
+GET {{baseUrl}}/profile
+Authorization: Bearer {{token}}
+
+### Reciprocal WRMR candidates; missing evidence stays explicitly unranked
+GET {{baseUrl}}/matches
+Authorization: Bearer {{token}}

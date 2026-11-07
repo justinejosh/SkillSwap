@@ -1,0 +1,80 @@
+{
+  "scope": "OLFU Santa Rosa college students only",
+  "source": "Program labels and year levels supplied by the thesis team on 2026-11-07. Department mapping is pending official validation.",
+  "programs": [
+    {
+      "code": "BSACC",
+      "label": "BSACC"
+    },
+    {
+      "code": "BSAIS",
+      "label": "BSAIS"
+    },
+    {
+      "code": "BSCRIM",
+      "label": "BSCRIM"
+    },
+    {
+      "code": "BSCS",
+      "label": "BSCS"
+    },
+    {
+      "code": "BSIHM-CA",
+      "label": "BSIHM-CA"
+    },
+    {
+      "code": "BSIHM-HACLO",
+      "label": "BSIHM-HACLO"
+    },
+    {
+      "code": "BSIT",
+      "label": "BSIT"
+    },
+    {
+      "code": "BSMLS",
+      "label": "BSMLS"
+    },
+    {
+      "code": "BSN",
+      "label": "BSN"
+    },
+    {
+      "code": "BSPT",
+      "label": "BSPT"
+    },
+    {
+      "code": "BSTOM",
+      "label": "BSTom"
+    },
+    {
+      "code": "BS_PHARM",
+      "label": "BS PHARM"
+    },
+    {
+      "code": "BS_PSYCH",
+      "label": "BS PSYCH"
+    }
+  ],
+  "yearLevels": [
+    {
+      "code": "YEAR_1",
+      "name": "1st Year",
+      "order": 1
+    },
+    {
+      "code": "YEAR_2",
+      "name": "2nd Year",
+      "order": 2
+    },
+    {
+      "code": "YEAR_3",
+      "name": "3rd Year",
+      "order": 3
+    },
+    {
+      "code": "YEAR_4",
+      "name": "4th Year",
+      "order": 4
+    }
+  ]
+}

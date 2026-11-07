@@ -1,89 +1,150 @@
 import express from "express";
 import { PrismaClient } from "@prisma/client";
-import { authenticateToken } from "../middleware/authMiddleware";
-
-const router = express.Router();
-const prisma = new PrismaClient();
-
-// GET /api/analytics
-router.get("/", authenticateToken, async (req, res) => {
-  try {
-    // 1. User Growth & Engagement Metrics
-    const totalUsers = await prisma.user.count();
-    const totalReviews = await prisma.review.count();
-
-    // 2. Success Rates & Swap Statistics
-    const swapStatusData = await prisma.swap.groupBy({
-      by: ['status'],
-      _count: {
-        _all: true,
-      },
+import { actor, requireAdmin } from "../middleware/authMiddleware";
+import { loadUserMetrics } from "../services/userMetrics";
+export function analyticsRouter(db: PrismaClient) {
+  const router = express.Router();
+  router.get("/me", async (req, res) => {
+    const id = actor(req);
+    const metrics = (await loadUserMetrics(db, [id])).get(id)!;
+    const [skills, exchanges] = await Promise.all([
+      db.userOfferedSkill.findMany({
+        where: { userId: id, isActive: true },
+        select: {
+          tier: true,
+          tierAwardedAt: true,
+          skill: { select: { id: true, name: true } },
+        },
+      }),
+      db.swap.findMany({
+        where: { OR: [{ requesterId: id }, { receiverId: id }] },
+        select: {
+          id: true,
+          status: true,
+          sessions: true,
+          requesterSessions: true,
+          receiverSessions: true,
+          requesterId: true,
+          createdAt: true,
+          completedAt: true,
+          integrityVerified: true,
+        },
+      }),
+    ]);
+    res.json({ metrics, skills, exchanges });
+  });
+  router.get("/", requireAdmin, async (_req, res) => {
+    const [users, swaps, skills, totalReviews] = await Promise.all([
+      db.user.findMany({
+        where: { role: "USER" },
+        select: { id: true, createdAt: true },
+      }),
+      db.swap.findMany({
+        select: {
+          status: true,
+          integrityVerified: true,
+          completedAt: true,
+          cancelledAt: true,
+          requesterApprovedAt: true,
+          receiverApprovedAt: true,
+        },
+      }),
+      db.skill.findMany({
+        select: {
+          name: true,
+          _count: {
+            select: {
+              wantedBy: true,
+              offeringLinks: { where: { isActive: true } },
+            },
+          },
+        },
+      }),
+      db.review.count({
+        where: {
+          isValidated: true,
+          swap: { integrityVerified: true, status: "COMPLETED" },
+        },
+      }),
+    ]);
+    const metrics = [
+      ...(
+        await loadUserMetrics(
+          db,
+          users.map((u) => u.id),
+        )
+      ).values(),
+    ];
+    const completedSwaps =
+      metrics.reduce((n, m) => n + m.validatedCompletedSwaps, 0) / 2;
+    const eligibleConcludedSwaps =
+      metrics.reduce((n, m) => n + m.eligibleConcludedSwaps, 0) / 2;
+    const legacyConcludedSwaps =
+      metrics.reduce((n, m) => n + m.legacyConcludedSwaps, 0) / 2;
+    const completionRate =
+      legacyConcludedSwaps || !eligibleConcludedSwaps
+        ? null
+        : (completedSwaps / eligibleConcludedSwaps) * 100;
+    const monthlyCompletion = Array.from({ length: 6 }, (_, i) => {
+      const now = new Date();
+      const start = new Date(
+        Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 5 + i, 1),
+      );
+      const end = new Date(
+        Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 1),
+      );
+      const concluded = swaps.filter((s) => {
+        const date =
+          s.status === "COMPLETED"
+            ? s.completedAt
+            : s.status === "CANCELLED"
+              ? s.cancelledAt
+              : null;
+        return (
+          s.integrityVerified &&
+          s.requesterApprovedAt &&
+          s.receiverApprovedAt &&
+          date &&
+          date >= start &&
+          date < end
+        );
+      });
+      const completed = concluded.filter(
+        (s) => s.status === "COMPLETED",
+      ).length;
+      return {
+        period: start.toISOString().slice(0, 7),
+        rate: concluded.length ? (completed / concluded.length) * 100 : null,
+        completed,
+      };
     });
-
-    let totalSwaps = 0;
-    let completedSwaps = 0;
-    let pendingSwaps = 0;
-    let activeSwaps = 0;
-
-    swapStatusData.forEach((stat) => {
-      totalSwaps += stat._count._all;
-      if (stat.status === "COMPLETED") completedSwaps += stat._count._all;
-      else if (stat.status === "PENDING_AGREEMENT") pendingSwaps += stat._count._all;
-      else activeSwaps += stat._count._all; // CONFIRMED status
-    });
-
-    const completionRate = totalSwaps > 0 ? ((completedSwaps / totalSwaps) * 100).toFixed(1) : 0;
-
-    // 3. Skill Trends (Most Wanted vs. Most Offered)
-    const trendingSkills = await prisma.skill.findMany({
-      select: {
-        name: true,
-        category: true,
-        _count: {
-          select: {
-            wantedBy: true,
-            offeredBy: true,
-          }
-        }
-      }
-    });
-
-    // Sort to find the top 5 most wanted skills
-    const topWantedSkills = [...trendingSkills]
-      .sort((a, b) => b._count.wantedBy - a._count.wantedBy)
-      .slice(0, 5)
-      .map(s => ({ name: s.name, count: s._count.wantedBy }));
-
-    // Sort to find the top 5 most offered skills
-    const topOfferedSkills = [...trendingSkills]
-      .sort((a, b) => b._count.offeredBy - a._count.offeredBy)
-      .slice(0, 5)
-      .map(s => ({ name: s.name, count: s._count.offeredBy }));
-
-    // Construct the final analytics payload
-    const dashboardMetrics = {
+    res.json({
       systemHealth: {
-        totalUsers,
-        totalSwaps,
+        totalUsers: users.length,
+        totalSwaps: swaps.length,
         totalReviews,
       },
       swapMetrics: {
         completedSwaps,
-        activeSwaps,
-        pendingSwaps,
-        completionRate: Number(completionRate),
+        activeSwaps: swaps.filter((s) => s.status === "CONFIRMED").length,
+        pendingSwaps: swaps.filter((s) => s.status === "PENDING_AGREEMENT")
+          .length,
+        completionRate,
+        eligibleConcludedSwaps,
+        legacyConcludedSwaps,
       },
       skillTrends: {
-        topWanted: topWantedSkills,
-        topOffered: topOfferedSkills,
-      }
-    };
-
-    res.json(dashboardMetrics);
-  } catch (error) {
-    console.error("Analytics Aggregation Error:", error);
-    res.status(500).json({ error: "Failed to compile system analytics." });
-  }
-});
-
-export default router;
+        topWanted: [...skills]
+          .sort((a, b) => b._count.wantedBy - a._count.wantedBy)
+          .slice(0, 5)
+          .map((s) => ({ name: s.name, count: s._count.wantedBy })),
+        topOffered: [...skills]
+          .sort((a, b) => b._count.offeringLinks - a._count.offeringLinks)
+          .slice(0, 5)
+          .map((s) => ({ name: s.name, count: s._count.offeringLinks })),
+      },
+      monthlyCompletion,
+    });
+  });
+  return router;
+}

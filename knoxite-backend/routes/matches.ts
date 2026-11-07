@@ -1,85 +1,108 @@
+import { academicInfo, academicSelect } from "../services/academics";
 import express from "express";
 import { PrismaClient } from "@prisma/client";
-import { authenticateToken, AuthRequest } from "../middleware/authMiddleware";
-
-const router = express.Router();
-const prisma = new PrismaClient();
-
-router.get("/", authenticateToken, async (req: AuthRequest, res: any) => {
-  try {
-    // STEP 1: Get the current user's profile to see what they have and want
-    const me = await prisma.user.findUnique({
-      where: { id: req.userId },
-      include: { offeredSkills: true, wantedSkills: true }
-    });
-
-    if (!me || me.offeredSkills.length === 0 || me.wantedSkills.length === 0) {
-      return res.status(400).json({ 
-        error: "You must add at least one offered skill and one wanted skill to see matches." 
-      });
-    }
-
-    // Extract just the ID strings for easy comparison
-    const myOfferedIds = me.offeredSkills.map(skill => skill.id);
-    const myWantedIds = me.wantedSkills.map(skill => skill.id);
-
-    // STEP 2 & 3: The Reciprocal Filter
-    // Find users who offer what I want AND want what I offer
-    const potentialMatches = await prisma.user.findMany({
-      where: {
-        id: { not: req.userId }, // Don't match me with myself!
-        offeredSkills: { some: { id: { in: myWantedIds } } }, // They offer what I want
-        wantedSkills: { some: { id: { in: myOfferedIds } } }  // They want what I offer
+import { actor, requireStudent } from "../middleware/authMiddleware";
+import { HttpError } from "../lib/http";
+import { portfolioSelect, publicPortfolio } from "../services/portfolios";
+import { loadUserMetrics } from "../services/userMetrics";
+import { academicProximity } from "../services/academicProximity";
+import { compareMatches, wrmr } from "../services/wrmr";
+import { AppConfig, studentEmailAllowed } from "../lib/config";
+export function matchesRouter(db: PrismaClient, config: AppConfig) {
+  const router = express.Router();
+  router.use(requireStudent);
+  router.get("/", async (req, res) => {
+    const userId = actor(req);
+    const me = await db.user.findUnique({
+      where: { id: userId },
+      select: {
+        ...academicSelect,
+        offeringLinks: { where: { isActive: true }, select: { skillId: true } },
+        wantedSkills: { select: { id: true } },
       },
-      include: {
-        offeredSkills: true,
-        wantedSkills: true,
-        reviewsReceived: true // Bring their past ratings so we can calculate their weight
-      }
     });
-
-    // STEP 4: The Weighted Ranking (The Math)
-    const rankedMatches = potentialMatches.map(user => {
-      // A. Calculate how many skills specifically overlap between us
-      const matchingOfferedCount = user.offeredSkills.filter(s => myWantedIds.includes(s.id)).length;
-      const matchingWantedCount = user.wantedSkills.filter(s => myOfferedIds.includes(s.id)).length;
-      
-      // Base weight from skill alignment
-      const skillWeight = matchingOfferedCount + matchingWantedCount;
-
-      // B. Calculate Reputation Weight (Average Rating)
-      let averageRating = 0;
-      if (user.reviewsReceived.length > 0) {
-        const totalStars = user.reviewsReceived.reduce((sum, review) => sum + review.rating, 0);
-        averageRating = totalStars / user.reviewsReceived.length;
-      }
-
-      // C. The Final WRMR Formula
-      // Let's say skills are worth 2 points each, and reputation adds up to 5 points
-      const matchScore = (skillWeight * 2) + averageRating;
-
-      // Clean up the object to send back to the React frontend
-      const { passwordHash, ...safeUser } = user;
-      
-      return {
-        ...safeUser,
-        matchDetails: {
-          overlappingSkills: skillWeight,
-          averageRating: averageRating.toFixed(1),
-          totalMatchScore: matchScore.toFixed(2)
-        }
-      };
+    if (!me) throw new HttpError(404, "User not found.");
+    const offered = me.offeringLinks.map((o) => o.skillId);
+    const wanted = me.wantedSkills.map((s) => s.id);
+    if (!offered.length || !wanted.length) {
+      res.json([]);
+      return;
+    }
+    const [swaps, requests] = await Promise.all([
+      db.swap.findMany({
+        where: {
+          OR: [{ requesterId: userId }, { receiverId: userId }],
+          status: { in: ["PENDING_AGREEMENT", "CONFIRMED"] },
+        },
+        select: { requesterId: true, receiverId: true },
+      }),
+      db.swapRequest.findMany({
+        where: {
+          OR: [{ requesterId: userId }, { receiverId: userId }],
+          status: "PENDING",
+        },
+        select: { requesterId: true, receiverId: true },
+      }),
+    ]);
+    const excluded = [
+      userId,
+      ...[...swaps, ...requests].map((s) =>
+        s.requesterId === userId ? s.receiverId : s.requesterId,
+      ),
+    ];
+    const candidates = await db.user.findMany({
+      where: {
+        id: { notIn: excluded },
+        isSuspended: false,
+        role: "USER",
+        offeringLinks: { some: { isActive: true, skillId: { in: wanted } } },
+        wantedSkills: { some: { id: { in: offered } } },
+      },
+      select: { ...portfolioSelect, email: true, emailVerifiedAt: true },
     });
-
-    // STEP 5: Sort the array so the highest match score is at the very top
-    rankedMatches.sort((a, b) => parseFloat(b.matchDetails.totalMatchScore) - parseFloat(a.matchDetails.totalMatchScore));
-
-    res.status(200).json(rankedMatches);
-
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Failed to calculate WRMR matches." });
-  }
-});
-
-export default router;
+    const eligible = candidates.filter(
+      (c) =>
+        studentEmailAllowed(c.email, config) &&
+        (!config.verificationRequired || c.emailVerifiedAt),
+    );
+    const metrics = await loadUserMetrics(
+      db,
+      eligible.map((c) => c.id),
+    );
+    const matches = eligible
+      .map((c) => {
+        const publicUser = publicPortfolio(c);
+        const m = metrics.get(c.id)!;
+        const proximity = academicProximity(academicInfo(me), academicInfo(c));
+        const calculated = wrmr(
+          m.averageRating,
+          m.completionRate,
+          proximity.value,
+        );
+        return {
+          ...publicUser,
+          metrics: m,
+          rating: m.averageRating,
+          matchScore: calculated.score,
+          matchDetails: {
+            ...calculated,
+            proximity,
+            averageRating: m.averageRating,
+            ratingCount: m.ratingCount,
+            completionRate: m.completionRate,
+            eligibleConcludedSwaps: m.eligibleConcludedSwaps,
+          },
+          matchingOfferedSkills: publicUser.offeredSkills.filter((s) =>
+            wanted.includes(s.id),
+          ),
+          matchingWantedSkills: publicUser.wantedSkills.filter((s) =>
+            offered.includes(s.id),
+          ),
+        };
+      })
+      .sort(compareMatches);
+    // Keep unranked reciprocal candidates visible; never truncate the pool before scoring.
+    res.json(matches);
+  });
+  return router;
+}

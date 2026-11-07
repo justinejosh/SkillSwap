@@ -1,61 +1,61 @@
 import express from "express";
 import { PrismaClient } from "@prisma/client";
-import { authenticateToken, AuthRequest } from "../middleware/authMiddleware";
-
-const router = express.Router();
-const prisma = new PrismaClient();
-
-// Send a message
-router.post("/send", authenticateToken, async (req: AuthRequest, res: any) => {
-  const { receiverId, content, swapId } = req.body; // Added swapId
-  const myId = req.userId as string;
-
-  if (!swapId) {
-    return res.status(400).json({ error: "Swap ID is required to link this message." });
+import { actor } from "../middleware/authMiddleware";
+import { HttpError, onlyKeys, text } from "../lib/http";
+import { assertParticipant } from "./swaps";
+export function chatRouter(db: PrismaClient) {
+  const router = express.Router();
+  async function conversation(
+    swapId: string,
+    userId: string,
+    partnerId: string,
+  ) {
+    const swap = await db.swap.findUnique({ where: { id: swapId } });
+    if (!swap) throw new HttpError(404, "Swap not found.");
+    assertParticipant(swap, userId);
+    if (
+      partnerId !==
+      (swap.requesterId === userId ? swap.receiverId : swap.requesterId)
+    )
+      throw new HttpError(422, "Invalid conversation partner.");
+    return swap;
   }
-
-  try {
-    const message = await prisma.message.create({
+  router.post("/send", async (req, res) => {
+    onlyKeys(req.body, ["swapId", "receiverId", "content"]);
+    const swapId = text(req.body.swapId, "Swap");
+    const receiverId = text(req.body.receiverId, "Receiver");
+    const swap = await conversation(swapId, actor(req), receiverId);
+    if (!["PENDING_AGREEMENT", "CONFIRMED"].includes(swap.status))
+      throw new HttpError(
+        409,
+        "This conversation is read-only because the exchange has ended.",
+      );
+    const message = await db.message.create({
       data: {
-        content,
-        senderId: myId,
+        swapId,
+        senderId: actor(req),
         receiverId,
-        swapId, // Now storing the specific swap instance
+        content: text(req.body.content, "Message", 4000),
       },
     });
-    res.json(message);
-  } catch (error) {
-    console.error("Chat Send Error:", error);
-    res.status(500).json({ error: "Failed to send message" });
-  }
-});
-
-// Get conversation with a specific user for a specific swap
-router.get("/conversation/:partnerId", authenticateToken, async (req: AuthRequest, res: any) => {
-  const partnerId = req.params.partnerId as string;
-  const myId = req.userId as string;
-  const { swapId } = req.query; // Get swapId from the URL query parameters
-
-  if (!swapId) {
-    return res.status(400).json({ error: "Swap ID query parameter is required." });
-  }
-
-  try {
-    const messages = await prisma.message.findMany({
-      where: {
-        swapId: swapId as string, // CRITICAL: Filters history by this specific rotation only
-        OR: [
-          { senderId: myId, receiverId: partnerId },
-          { senderId: partnerId, receiverId: myId },
-        ],
-      },
-      orderBy: { createdAt: "asc" },
-    });
-    res.json(messages);
-  } catch (error) {
-    console.error("Chat Fetch Error:", error);
-    res.status(500).json({ error: "Failed to fetch messages" });
-  }
-});
-
-export default router;
+    res.status(201).json(message);
+  });
+  router.get("/conversation/:partnerId", async (req, res) => {
+    const swapId = text(req.query.swapId, "Swap");
+    const partnerId = String(req.params.partnerId);
+    await conversation(swapId, actor(req), partnerId);
+    res.json(
+      await db.message.findMany({
+        where: {
+          swapId,
+          OR: [
+            { senderId: actor(req), receiverId: partnerId },
+            { senderId: partnerId, receiverId: actor(req) },
+          ],
+        },
+        orderBy: { createdAt: "asc" },
+      }),
+    );
+  });
+  return router;
+}
