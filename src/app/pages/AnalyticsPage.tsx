@@ -4,17 +4,17 @@ import { Button } from "@/app/components/ui/button";
 import { Card, CardContent } from "@/app/components/ui/card";
 import { Progress } from "@/app/components/ui/progress";
 import { Badge } from "@/app/components/ui/badge";
-import { 
-  ArrowLeft, 
-  Users, 
-  Activity, 
-  TrendingUp, 
-  CheckCircle2, 
-  Loader2, 
-  BookOpen, 
-  Clock, 
+import {
+  ArrowLeft,
+  Users,
+  Activity,
+  TrendingUp,
+  CheckCircle2,
+  Loader2,
+  BookOpen,
+  Clock,
   ArrowLeftRight,
-  LayoutDashboard
+  LayoutDashboard,
 } from "lucide-react";
 import { API_BASE_URL } from "@/config";
 
@@ -29,7 +29,7 @@ interface AnalyticsData {
     completedSwaps: number;
     activeSwaps: number;
     pendingSwaps: number;
-    completionRate: number;
+    completionRate: number | null;
   };
   skillTrends: {
     topWanted: { name: string; count: number }[];
@@ -52,10 +52,10 @@ export default function AnalyticsPage() {
         }
 
         const res = await fetch(`${API_BASE_URL}/analytics`, {
-          headers: { 
-            "Authorization": `Bearer ${token}`,
-            "bypass-tunnel-reminder": "true" 
-          }
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "bypass-tunnel-reminder": "true",
+          },
         });
 
         if (res.ok) {
@@ -142,7 +142,6 @@ export default function AnalyticsPage() {
 
       {/* 2. MAIN CONTENT AREA */}
       <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 pt-8 space-y-8 relative z-10">
-        
         {/* KPI CARDS */}
         <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Total Network Users */}
@@ -187,7 +186,9 @@ export default function AnalyticsPage() {
                   Completion Rate
                 </span>
                 <p className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">
-                  {data.swapMetrics.completionRate}%
+                  {data.swapMetrics.completionRate === null
+                    ? "Unavailable"
+                    : `${data.swapMetrics.completionRate.toFixed(1)}%`}
                 </p>
               </div>
               <div className="size-11 rounded-2xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200/60 dark:border-emerald-900/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
@@ -216,7 +217,6 @@ export default function AnalyticsPage() {
 
         {/* DETAILED DATA VISUALIZATION SECTION */}
         <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          
           {/* Column 1 & 2: Skill Demographics (Marketplace Supply & Demand) */}
           <Card className="lg:col-span-2 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/90 dark:border-slate-800 shadow-xs overflow-hidden">
             <div className="p-5 md:p-6 border-b border-slate-100 dark:border-slate-800 space-y-0.5">
@@ -224,13 +224,13 @@ export default function AnalyticsPage() {
                 Skill Distribution Trends
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-                Comparative analysis of academic supply (offered) versus demand (wanted)
+                Comparative analysis of academic supply (offered) versus demand
+                (wanted)
               </p>
             </div>
 
             <CardContent className="p-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                
                 {/* Demand (Wanted) */}
                 <div className="space-y-4">
                   <div className="flex items-center gap-2 pb-1 border-b border-slate-100 dark:border-slate-800">
@@ -249,12 +249,18 @@ export default function AnalyticsPage() {
                               {skill.name}
                             </span>
                             <span className="font-bold text-blue-600 dark:text-blue-400 shrink-0">
-                              {skill.count} {skill.count === 1 ? "Request" : "Requests"}
+                              {skill.count}{" "}
+                              {skill.count === 1 ? "Request" : "Requests"}
                             </span>
                           </div>
-                          <Progress 
-                            value={Math.min((skill.count / Math.max(data.systemHealth.totalUsers, 1)) * 100, 100)} 
-                            className="h-2 bg-slate-100 dark:bg-slate-800 [&>div]:bg-blue-600" 
+                          <Progress
+                            value={Math.min(
+                              (skill.count /
+                                Math.max(data.systemHealth.totalUsers, 1)) *
+                                100,
+                              100,
+                            )}
+                            className="h-2 bg-slate-100 dark:bg-slate-800 [&>div]:bg-blue-600"
                           />
                         </div>
                       ))}
@@ -284,12 +290,18 @@ export default function AnalyticsPage() {
                               {skill.name}
                             </span>
                             <span className="font-bold text-emerald-600 dark:text-emerald-400 shrink-0">
-                              {skill.count} {skill.count === 1 ? "Offering" : "Offerings"}
+                              {skill.count}{" "}
+                              {skill.count === 1 ? "Offering" : "Offerings"}
                             </span>
                           </div>
-                          <Progress 
-                            value={Math.min((skill.count / Math.max(data.systemHealth.totalUsers, 1)) * 100, 100)} 
-                            className="h-2 bg-slate-100 dark:bg-slate-800 [&>div]:bg-emerald-500" 
+                          <Progress
+                            value={Math.min(
+                              (skill.count /
+                                Math.max(data.systemHealth.totalUsers, 1)) *
+                                100,
+                              100,
+                            )}
+                            className="h-2 bg-slate-100 dark:bg-slate-800 [&>div]:bg-emerald-500"
                           />
                         </div>
                       ))}
@@ -300,7 +312,6 @@ export default function AnalyticsPage() {
                     </p>
                   )}
                 </div>
-
               </div>
             </CardContent>
           </Card>
@@ -365,7 +376,7 @@ export default function AnalyticsPage() {
                 <div className="min-w-0 flex-1">
                   <div className="flex justify-between items-baseline">
                     <span className="font-bold text-sm text-emerald-900 dark:text-emerald-200 truncate">
-                      Completed & Verified
+                      Validated Completed Exchanges
                     </span>
                     <span className="font-black text-base text-emerald-700 dark:text-emerald-300">
                       {data.swapMetrics.completedSwaps}
@@ -376,10 +387,8 @@ export default function AnalyticsPage() {
                   </p>
                 </div>
               </div>
-
             </CardContent>
           </Card>
-
         </section>
       </main>
     </div>

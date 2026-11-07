@@ -1,9 +1,16 @@
+import { api } from "@/app/lib/api";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
 import { Label } from "@/app/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/app/components/ui/card";
 import { Loader2, Eye, EyeOff, UserPlus, X } from "lucide-react";
 
 // 1. IMPORT YOUR CONFIG
@@ -11,6 +18,12 @@ import { API_BASE_URL } from "@/config";
 
 export default function SignupPage() {
   const navigate = useNavigate();
+  const [programId, setProgramId] = useState("");
+  const [yearLevelId, setYearLevelId] = useState("");
+  const [options, setOptions] = useState<{
+    programs: any[];
+    yearLevels: any[];
+  }>({ programs: [], yearLevels: [] });
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -25,24 +38,37 @@ export default function SignupPage() {
 
   useEffect(() => {
     document.documentElement.classList.remove("dark");
+    api("/auth/academic-options")
+      .then(setOptions)
+      .catch((e) => setError(e.message));
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
 
-    if (!agreedToTerms) { 
-      setError("To continue, you must agree to the Terms of Service & Privacy Policy."); const termsEl = document.getElementById("terms") as HTMLInputElement | null; termsEl?.reportValidity(); return; 
-      
+    if (!agreedToTerms) {
+      setError(
+        "To continue, you must agree to the Terms of Service & Privacy Policy.",
+      );
+      const termsEl = document.getElementById(
+        "terms",
+      ) as HTMLInputElement | null;
+      termsEl?.reportValidity();
+      return;
     }
 
+    if (!programId || !yearLevelId) {
+      setError("Choose your college program and year level.");
+      return;
+    }
     if (password !== confirmPassword) {
       setError("Passwords do not match!");
       return;
     }
 
-    if (password.length < 6) {
-      setError("Password must be at least 6 characters long.");
+    if (password.length < 12) {
+      setError("Password must be at least 12 characters long.");
       return;
     }
 
@@ -56,7 +82,7 @@ export default function SignupPage() {
           "Content-Type": "application/json",
           "bypass-tunnel-reminder": "true",
         },
-        body: JSON.stringify({ name, email, password }),
+        body: JSON.stringify({ name, email, password, programId, yearLevelId }),
       });
 
       const data = await response.json();
@@ -65,7 +91,7 @@ export default function SignupPage() {
         throw new Error(data.error || "Registration failed.");
       }
 
-      alert("Welcome to the community! Please log in.");
+      alert(data.message);
       navigate("/");
     } catch (err: any) {
       setError(err.message);
@@ -89,7 +115,7 @@ export default function SignupPage() {
               Join Knoxite
             </CardTitle>
             <CardDescription className="text-center text-blue-500 font-medium">
-              Start swapping skills today
+              For OLFU Santa Rosa college students
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -147,7 +173,7 @@ export default function SignupPage() {
                   <Input
                     id="password"
                     type={showPassword ? "text" : "password"}
-                    placeholder="Min. 6 characters"
+                    placeholder="At least 12 characters"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
@@ -158,7 +184,11 @@ export default function SignupPage() {
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-blue-300 hover:text-blue-600 transition-colors"
                   >
-                    {showPassword ? <EyeOff className="size-5" /> : <Eye className="size-5" />}
+                    {showPassword ? (
+                      <EyeOff className="size-5" />
+                    ) : (
+                      <Eye className="size-5" />
+                    )}
                   </button>
                 </div>
               </div>
@@ -181,16 +211,61 @@ export default function SignupPage() {
                 />
               </div>
 
+              <div className="space-y-2">
+                <Label htmlFor="signup-program">College program</Label>
+                <select
+                  required
+                  id="signup-program"
+                  value={programId}
+                  onChange={(e) => {
+                    setProgramId(e.target.value);
+                    setYearLevelId("");
+                  }}
+                  className="w-full rounded-xl border border-blue-100 p-3 text-sm"
+                >
+                  <option value="">Choose your program</option>
+                  {options.programs.map((program) => (
+                    <option key={program.id} value={program.id}>
+                      {program.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="signup-year">Year level</Label>
+                <select
+                  required
+                  id="signup-year"
+                  value={yearLevelId}
+                  onChange={(e) => setYearLevelId(e.target.value)}
+                  className="w-full rounded-xl border border-blue-100 p-3 text-sm"
+                >
+                  <option value="">Choose your year level</option>
+                  {(
+                    options.programs.find((p) => p.id === programId)
+                      ?.yearLevels || []
+                  ).map((year: any) => (
+                    <option key={year.id} value={year.id}>
+                      {year.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <p className="text-xs text-slate-600">
+                Use your institutional email. Campus eligibility follows the
+                configured Santa Rosa email rule and email ownership
+                verification.
+              </p>
               {/* Terms of Service & Privacy Policy Checkbox */}
               <div className="flex items-start gap-2.5 pt-1">
                 <input
                   type="checkbox"
                   id="terms"
                   checked={agreedToTerms}
-                  onChange={(e) => { 
-                    const isChecked = e.target.checked; 
-                    setAgreedToTerms(isChecked); 
-                    if (isChecked) setError("")
+                  onChange={(e) => {
+                    const isChecked = e.target.checked;
+                    setAgreedToTerms(isChecked);
+                    if (isChecked) setError("");
                   }}
                   required
                   className="mt-1 size-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer accent-blue-600"
@@ -281,9 +356,10 @@ export default function SignupPage() {
                   1. Platform Purpose & Campus Exclusivity
                 </h4>
                 <p>
-                  Knoxite is a campus-exclusive peer-to-peer knowledge and skill exchange platform.
-                  Its purpose is to connect student mentors and apprentices for collaborative,
-                  academic, and skill-building pursuits.
+                  Knoxite is a campus-exclusive peer-to-peer knowledge and skill
+                  exchange platform. Its purpose is to connect student mentors
+                  and apprentices for collaborative, academic, and
+                  skill-building pursuits.
                 </p>
               </section>
 
@@ -292,9 +368,10 @@ export default function SignupPage() {
                   2. User Conduct & Safe Exchanges
                 </h4>
                 <p>
-                  All members must treat each other with respect. Harassment, dishonest skill
-                  representation, hate speech, unauthorized commercial solicitations, and academic
-                  integrity breaches are strictly prohibited.
+                  All members must treat each other with respect. Harassment,
+                  dishonest skill representation, hate speech, unauthorized
+                  commercial solicitations, and academic integrity breaches are
+                  strictly prohibited.
                 </p>
               </section>
 
@@ -303,9 +380,10 @@ export default function SignupPage() {
                   3. Privacy & Data Handling
                 </h4>
                 <p>
-                  We collect your registered name, email address, and declared skills to facilitate
-                  matching, community forum participation, and the leaderboard. Your information is
-                  never sold or shared with outside commercial entities.
+                  We collect your registered name, email address, and declared
+                  skills to facilitate matching, community forum participation,
+                  and the leaderboard. Your information is never sold or shared
+                  with outside commercial entities.
                 </p>
               </section>
 
@@ -314,8 +392,9 @@ export default function SignupPage() {
                   4. Account Suspension
                 </h4>
                 <p>
-                  Platform administrators reserve the right to review flagged accounts and suspend
-                  or terminate access for violations of these community guidelines.
+                  Platform administrators reserve the right to review flagged
+                  accounts and suspend or terminate access for violations of
+                  these community guidelines.
                 </p>
               </section>
             </div>
@@ -338,9 +417,9 @@ export default function SignupPage() {
       )}
 
       {/* Website Version Display */}
-      <div className="fixed bottom-3 right-4 z-40 pointer-events-none select-none text-[11px] font-mono tracking-wider text-slate-400   dark:text-slate-500"> 
-        Knoxite v1.0 
-      </div> 
+      <div className="fixed bottom-3 right-4 z-40 pointer-events-none select-none text-[11px] font-mono tracking-wider text-slate-400   dark:text-slate-500">
+        Knoxite v1.0
+      </div>
     </div>
   );
 }

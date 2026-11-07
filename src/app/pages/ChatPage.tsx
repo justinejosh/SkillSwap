@@ -2,10 +2,25 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/app/components/ui/card";
-import { Avatar, AvatarFallback, AvatarImage } from "@/app/components/ui/avatar";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/app/components/ui/card";
+import {
+  Avatar,
+  AvatarFallback,
+  AvatarImage,
+} from "@/app/components/ui/avatar";
 import { ScrollArea } from "@/app/components/ui/scroll-area";
-import { ArrowLeft, Send, Loader2, FileCheck, MessageSquare } from "lucide-react";
+import {
+  ArrowLeft,
+  Send,
+  Loader2,
+  FileCheck,
+  MessageSquare,
+} from "lucide-react";
 import { API_BASE_URL } from "@/config";
 
 export default function ChatPage() {
@@ -20,6 +35,7 @@ export default function ChatPage() {
 
   const currentUser = JSON.parse(localStorage.getItem("knoxite_user") || "{}");
   const urlPartnerId = searchParams.get("partnerId");
+  const urlSwapId = searchParams.get("swapId");
 
   const handleBackClick = () => {
     if (window.innerWidth < 768 && selectedPartner) {
@@ -44,7 +60,7 @@ export default function ChatPage() {
           const data = await res.json();
           const activeStatuses = ["ACCEPTED", "CONFIRMED", "PENDING_AGREEMENT"];
           const activeSwaps = data.filter((s: any) =>
-            activeStatuses.includes(s.status)
+            activeStatuses.includes(s.status),
           );
 
           const formatted = activeSwaps.map((s: any) => {
@@ -63,7 +79,10 @@ export default function ChatPage() {
           setConversations(formatted);
 
           if (urlPartnerId) {
-            const target = formatted.find((c: any) => c.id === urlPartnerId);
+            const target = formatted.find(
+              (c: any) =>
+                c.id === urlPartnerId && (!urlSwapId || c.swapId === urlSwapId),
+            );
             if (target) setSelectedPartner(target);
           } else if (formatted.length > 0 && !selectedPartner) {
             setSelectedPartner(formatted[0]);
@@ -76,7 +95,7 @@ export default function ChatPage() {
       }
     };
     fetchConversations();
-  }, [urlPartnerId]);
+  }, [urlPartnerId, urlSwapId]);
 
   useEffect(() => {
     if (!selectedPartner) return;
@@ -91,7 +110,7 @@ export default function ChatPage() {
               Authorization: `Bearer ${token}`,
               "bypass-tunnel-reminder": "true",
             },
-          }
+          },
         );
         if (res.ok) {
           const data = await res.json();
@@ -167,7 +186,8 @@ export default function ChatPage() {
               No Active Swaps Yet
             </h2>
             <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-              Accept or initiate a bilateral swap to open direct workspace communications.
+              Accept or initiate a bilateral swap to open direct workspace
+              communications.
             </p>
           </div>
           <Button
@@ -183,7 +203,6 @@ export default function ChatPage() {
 
   return (
     <div className="h-screen max-h-screen bg-gradient-to-b from-[#E5F2FA] via-[#E5F2FA] via-70% to-[#F8FAFC] dark:bg-none dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col overflow-hidden font-sans relative transition-colors duration-200">
-
       <div className="absolute inset-0 bg-[linear-gradient(to_right,#e2e8f080_1px,transparent_1px),linear-gradient(to_bottom,#e2e8f080_1px,transparent_1px)] dark:bg-[linear-gradient(to_right,#1e293b50_1px,transparent_1px),linear-gradient(to_bottom,#1e293b50_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_70%_50%_at_50%_0%,#000_70%,transparent_110%)] pointer-events-none" />
 
       {/* FLOATING GLASS HEADER */}
@@ -269,14 +288,18 @@ export default function ChatPage() {
                           <div className="flex-1 min-w-0">
                             <h3
                               className={`font-bold text-sm truncate ${
-                                isSelected ? "text-white" : "text-slate-900 dark:text-white"
+                                isSelected
+                                  ? "text-white"
+                                  : "text-slate-900 dark:text-white"
                               }`}
                             >
                               {conv.user}
                             </h3>
                             <p
                               className={`text-[10px] truncate uppercase font-bold tracking-wider mt-0.5 ${
-                                isSelected ? "text-blue-100" : "text-slate-400 dark:text-slate-500"
+                                isSelected
+                                  ? "text-blue-100"
+                                  : "text-slate-400 dark:text-slate-500"
                               }`}
                             >
                               {conv.swapInfo}
@@ -359,7 +382,9 @@ export default function ChatPage() {
                               </p>
                               <span
                                 className={`text-[10px] mt-1 block font-medium ${
-                                  isOwn ? "text-blue-200 text-right" : "text-slate-500 dark:text-slate-400 text-left"
+                                  isOwn
+                                    ? "text-blue-200 text-right"
+                                    : "text-slate-500 dark:text-slate-400 text-left"
                                 }`}
                               >
                                 {new Date(m.createdAt).toLocaleTimeString([], {
@@ -396,7 +421,8 @@ export default function ChatPage() {
               </>
             ) : (
               <div className="flex-1 flex flex-col items-center justify-center text-slate-400 dark:text-slate-500 p-4 text-center text-xs">
-                Select an active exchange thread from the left to start messaging.
+                Select an active exchange thread from the left to start
+                messaging.
               </div>
             )}
           </Card>

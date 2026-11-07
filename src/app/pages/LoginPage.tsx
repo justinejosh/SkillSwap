@@ -1,9 +1,16 @@
+import { api } from "@/app/lib/api";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
 import { Label } from "@/app/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/app/components/ui/card";
 import { API_BASE_URL } from "@/config";
 
 export default function LoginPage() {
@@ -70,7 +77,9 @@ export default function LoginPage() {
       <div className="w-full max-w-md">
         <Card className="shadow-xl border-blue-100 bg-white/90 backdrop-blur">
           <CardHeader className="space-y-1 text-center">
-            <CardTitle className="text-2xl text-blue-900 font-bold">Knoxite</CardTitle>
+            <CardTitle className="text-2xl text-blue-900 font-bold">
+              Knoxite
+            </CardTitle>
             <CardDescription className="text-blue-600">
               Sign in to your account
             </CardDescription>
@@ -83,7 +92,9 @@ export default function LoginPage() {
                 </div>
               )}
               <div className="space-y-2">
-                <Label htmlFor="email" className="text-blue-900 font-semibold">Email Address</Label>
+                <Label htmlFor="email" className="text-blue-900 font-semibold">
+                  Email Address
+                </Label>
                 <Input
                   id="email"
                   type="email"
@@ -96,13 +107,19 @@ export default function LoginPage() {
               </div>
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="password" className="text-blue-900 font-semibold">Password</Label>
+                  <Label
+                    htmlFor="password"
+                    className="text-blue-900 font-semibold"
+                  >
+                    Password
+                  </Label>
                   <button
                     type="button"
                     className="text-xs text-blue-600 hover:text-blue-800 font-medium transition-colors"
-                    onClick={() => alert("Password reset coming soon!")}
+                    disabled
+                    title="Contact your institution administrator for account recovery"
                   >
-                    Forgot password?
+                    Account recovery: contact administrator
                   </button>
                 </div>
                 <Input
@@ -123,6 +140,23 @@ export default function LoginPage() {
                 {isLoading ? "Authenticating..." : "Sign in"}
               </Button>
             </form>
+            <button
+              type="button"
+              className="mt-4 text-sm text-blue-700 underline"
+              onClick={async () => {
+                try {
+                  const result = await api("/auth/request-verification", {
+                    method: "POST",
+                    body: JSON.stringify({ email }),
+                  });
+                  setError(result.message);
+                } catch (e: any) {
+                  setError(e.message);
+                }
+              }}
+            >
+              Request institutional email verification
+            </button>
             <div className="mt-8 pt-6 border-t border-blue-50 text-center text-sm text-blue-700">
               Don't have an account?{" "}
               <button

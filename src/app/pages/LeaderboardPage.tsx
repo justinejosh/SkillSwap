@@ -1,8 +1,17 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { Button } from "@/app/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/app/components/ui/avatar";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/app/components/ui/tabs";
+import {
+  Avatar,
+  AvatarFallback,
+  AvatarImage,
+} from "@/app/components/ui/avatar";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/app/components/ui/tabs";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { API_BASE_URL } from "@/config";
 
@@ -41,7 +50,7 @@ export default function LeaderboardPage() {
         if (leaderboardRes.ok) {
           const data = await leaderboardRes.json();
           const sortedMentors = [...(data.topMentors || [])].sort(
-            (a, b) => b.rating - a.rating
+            (a, b) => b.rating - a.rating,
           );
           setMentors(sortedMentors);
           setMyStats(data.currentUserStats || null);
@@ -128,7 +137,8 @@ export default function LeaderboardPage() {
             Knoxite Leaderboard
           </h1>
           <p className="text-sm text-slate-500 dark:text-slate-400">
-            Recognize top-rated peer mentors and the most active bilateral swappers on campus.
+            Recognize top-rated peer mentors and the most active bilateral
+            swappers on campus.
           </p>
         </div>
 
@@ -137,12 +147,12 @@ export default function LeaderboardPage() {
           onValueChange={(val: any) => setActiveTab(val)}
           className="space-y-6"
         >
-
           <TabsList className="grid grid-cols-2 w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 h-12 p-1= rounded-2xl shadow-xs">
             <TabsTrigger
               value="mentors"
               style={{
-                backgroundColor: activeTab === "mentors" ? "#2563EB" : "transparent",
+                backgroundColor:
+                  activeTab === "mentors" ? "#2563EB" : "transparent",
                 color: activeTab === "mentors" ? "#ffffff" : undefined,
               }}
               className={`rounded-xl font-bold text-xs sm:text-sm transition-all border-0 ring-0 outline-none shadow-none ${
@@ -156,7 +166,8 @@ export default function LeaderboardPage() {
             <TabsTrigger
               value="swaps"
               style={{
-                backgroundColor: activeTab === "swaps" ? "#059669" : "transparent",
+                backgroundColor:
+                  activeTab === "swaps" ? "#059669" : "transparent",
                 color: activeTab === "swaps" ? "#ffffff" : undefined,
               }}
               className={`rounded-xl font-bold text-xs sm:text-sm transition-all border-0 ring-0 outline-none shadow-none ${
@@ -177,7 +188,8 @@ export default function LeaderboardPage() {
                   Top Mentors
                 </h2>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Ranked by average 5-star quality rating and verified student reviews.
+                  Ranked by average 5-star quality rating and validated student
+                  reviews.
                 </p>
               </div>
 
@@ -195,7 +207,7 @@ export default function LeaderboardPage() {
                       <div className="flex items-center gap-3.5 min-w-0">
                         <div
                           className={`flex items-center justify-center size-10 shrink-0 rounded-xl font-black text-xs border ${getRankStyles(
-                            index + 1
+                            index + 1,
                           )}`}
                         >
                           {index + 1}
@@ -218,7 +230,7 @@ export default function LeaderboardPage() {
                             {mentor.name}
                           </h3>
                           <span className="inline-block text-[10px] font-bold uppercase tracking-wider text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/60 px-2 py-0.5 rounded-md border border-blue-200/60 dark:border-blue-800/60 mt-0.5">
-                            Verified Mentor
+                            Peer Mentor
                           </span>
                         </div>
                       </div>
@@ -226,16 +238,16 @@ export default function LeaderboardPage() {
                       <div className="flex flex-row sm:flex-col items-center sm:items-end justify-between sm:justify-start gap-1 w-full sm:w-auto border-t border-slate-200/60 dark:border-slate-800 sm:border-none pt-2.5 sm:pt-0 shrink-0">
                         <div className="flex items-baseline gap-1">
                           <span className="text-xl font-black text-slate-900 dark:text-white">
-                            {mentor.rating
-                              ? Number(mentor.rating).toFixed(1)
-                              : "0.0"}
+                            {mentor.rating == null
+                              ? "No reviews yet"
+                              : Number(mentor.rating).toFixed(1)}
                           </span>
                           <span className="text-xs font-bold text-slate-400 dark:text-slate-500">
-                            / 5.0
+                            {mentor.rating == null ? "" : "/ 5.0"}
                           </span>
                         </div>
                         <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">
-                          {mentor.reviews || 0} Verified Reviews
+                          {mentor.reviews || 0} Validated Reviews
                         </span>
                       </div>
                     </div>
@@ -253,7 +265,8 @@ export default function LeaderboardPage() {
                   Most Active Swappers
                 </h2>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Ranked strictly by the total number of completed bilateral skill swaps.
+                  Ranked strictly by the total number of completed bilateral
+                  skill swaps.
                 </p>
               </div>
 
@@ -271,7 +284,7 @@ export default function LeaderboardPage() {
                       <div className="flex items-center gap-3.5 min-w-0">
                         <div
                           className={`flex items-center justify-center size-10 shrink-0 rounded-xl font-black text-xs border ${getRankStyles(
-                            index + 1
+                            index + 1,
                           )}`}
                         >
                           {index + 1}
@@ -294,14 +307,16 @@ export default function LeaderboardPage() {
                             {swapper.name}
                           </h3>
                           <span className="text-[11px] font-medium text-slate-400 dark:text-slate-500">
-                            Verified Participant
+                            Swap Participant
                           </span>
                         </div>
                       </div>
 
                       <div className="flex flex-row sm:flex-col items-center sm:items-end justify-between sm:justify-start gap-2 w-full sm:w-auto border-t border-slate-200/60 dark:border-slate-800 sm:border-none pt-2.5 sm:pt-0 shrink-0">
                         <span className="inline-block text-xs font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-100/80 dark:bg-emerald-950/60 px-3 py-1 rounded-lg border border-emerald-200/60 dark:border-emerald-800/60">
-                          {swapper.totalSwaps || 0} Total Swaps
+                          {swapper.totalSwaps == null
+                            ? "Awaiting historical validation"
+                            : `${swapper.totalSwaps} Total Swaps`}
                         </span>
                       </div>
                     </div>
@@ -332,7 +347,7 @@ export default function LeaderboardPage() {
             </div>
             <div className="text-left sm:text-right shrink-0">
               <span className="inline-block text-[11px] font-bold text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-0.5 rounded-lg">
-                Verified Account
+                Registered Student
               </span>
             </div>
           </div>

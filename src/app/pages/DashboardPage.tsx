@@ -1,8 +1,14 @@
+import { MatchResults } from "@/app/components/MatchResults";
+import { api } from "@/app/lib/api";
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router";
 import { Button } from "@/app/components/ui/button";
 import { Badge } from "@/app/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/app/components/ui/avatar";
+import {
+  Avatar,
+  AvatarFallback,
+  AvatarImage,
+} from "@/app/components/ui/avatar";
 import {
   Dialog,
   DialogContent,
@@ -29,6 +35,7 @@ import { API_BASE_URL } from "@/config";
 
 export default function DashboardPage() {
   const navigate = useNavigate();
+  const [dashboardError, setDashboardError] = useState("");
   const [swaps, setSwaps] = useState<any[]>([]);
   const [matches, setMatches] = useState<any[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -43,13 +50,15 @@ export default function DashboardPage() {
 
   const [isDarkMode, setIsDarkMode] = useState(() => {
     const user = JSON.parse(localStorage.getItem("knoxite_user") || "{}");
-    return user.id ? localStorage.getItem(`theme_${user.id}`) === "dark" : false;
+    return user.id
+      ? localStorage.getItem(`theme_${user.id}`) === "dark"
+      : false;
   });
 
   // Modal State
   const [selectedMatch, setSelectedMatch] = useState<any | null>(null);
   const [swapMessage, setSwapMessage] = useState(
-    "Hi! I saw we have matching skills. Would you be interested in swapping?"
+    "Hi! I saw we have matching skills. Would you be interested in swapping?",
   );
   const [isRequesting, setIsRequesting] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
@@ -64,7 +73,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem("knoxite_user") || "{}");
-    
+
     // Redirect admins to their dedicated dashboard
     if (user.role === "ADMIN") {
       navigate("/admin-dashboard", { replace: true });
@@ -73,10 +82,10 @@ export default function DashboardPage() {
 
     setCurrentUserId(user.id);
     setCurrentUserName(user.name || "Student");
-    setCurrentUserEmail(user.email || "student@knoxite.org");
+    setCurrentUserEmail(user.email || "");
     setCurrentUserAvatar(
       user.avatarUrl ||
-        `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.name || "User"}`
+        `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.name || "User"}`,
     );
     fetchDashboardData();
   }, [navigate]);
@@ -103,6 +112,7 @@ export default function DashboardPage() {
   }, []);
 
   const fetchDashboardData = async () => {
+    setDashboardError("");
     try {
       const token = localStorage.getItem("knoxite_token");
       const headers = {
@@ -118,24 +128,36 @@ export default function DashboardPage() {
 
       if (sRes.ok) setSwaps(await sRes.json());
       if (mRes.ok) setMatches(await mRes.json());
+      else {
+        const data = await mRes.json();
+        throw new Error(data.error || "Unable to load matches.");
+      }
 
       if (reqRes.ok) {
         const requests = await reqRes.json();
         const user = JSON.parse(localStorage.getItem("knoxite_user") || "{}");
         const hasPending = requests.some(
-          (req: any) => req.receiverId === user.id && req.status === "PENDING"
+          (req: any) => req.receiverId === user.id && req.status === "PENDING",
         );
         setHasNewNotifications(hasPending);
       }
     } catch (error) {
+      setDashboardError(
+        error instanceof Error
+          ? error.message
+          : "Unable to load dashboard data.",
+      );
       console.error("Dashboard Sync Error:", error);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleSignOut = () => {
+  const handleSignOut = async () => {
     if (confirm("Are you sure you want to sign out?")) {
+      try {
+        await api("/auth/logout", { method: "POST" });
+      } catch {}
       localStorage.removeItem("knoxite_token");
       localStorage.removeItem("knoxite_user");
       document.documentElement.classList.remove("dark");
@@ -157,8 +179,8 @@ export default function DashboardPage() {
         },
         body: JSON.stringify({
           receiverId: selectedMatch.id,
-          offeredSkillId: selectedMatch.wantedSkills?.[0]?.id,
-          wantedSkillId: selectedMatch.offeredSkills?.[0]?.id,
+          offeredSkillId: selectedMatch.matchingWantedSkills?.[0]?.id,
+          wantedSkillId: selectedMatch.matchingOfferedSkills?.[0]?.id,
           message: swapMessage,
         }),
       });
@@ -180,7 +202,7 @@ export default function DashboardPage() {
     (s) =>
       s.status === "CONFIRMED" ||
       s.status === "PENDING_AGREEMENT" ||
-      s.status === "ACCEPTED"
+      s.status === "ACCEPTED",
   );
 
   const toggleDarkMode = () => {
@@ -277,7 +299,10 @@ export default function DashboardPage() {
                 title="Account Menu"
               >
                 <Avatar className="size-9 rounded-full ring-2 ring-slate-200/80 dark:ring-slate-700 hover:ring-blue-500 transition-all">
-                  <AvatarImage src={currentUserAvatar} className="object-cover" />
+                  <AvatarImage
+                    src={currentUserAvatar}
+                    className="object-cover"
+                  />
                   <AvatarFallback className="bg-blue-600 text-white text-xs font-bold">
                     {currentUserName.charAt(0).toUpperCase()}
                   </AvatarFallback>
@@ -487,14 +512,19 @@ export default function DashboardPage() {
               </Button>
             </div>
 
-            {matches.length === 0 ? (
+            {dashboardError && (
+              <p role="alert" className="text-red-700 dark:text-red-300">
+                {dashboardError}
+              </p>
+            )}
+            {matches.length === 0 && !dashboardError ? (
               <div className="p-10 text-center rounded-3xl border border-dashed border-slate-300 dark:border-slate-800 bg-white/70 dark:bg-slate-900/50 space-y-3">
                 <p className="text-sm font-bold text-slate-700 dark:text-slate-300">
                   No direct matches found right now
                 </p>
                 <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto">
-                  Update your offered and wanted skills inside your "My Skills" tab so
-                  Knoxite can pair you with compatible users.
+                  Update your offered and wanted skills inside your "My Skills"
+                  tab so Knoxite can pair you with compatible users.
                 </p>
                 <Button
                   size="sm"
@@ -505,76 +535,11 @@ export default function DashboardPage() {
                 </Button>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {matches.map((peer) => {
-                  const teachesSkill =
-                    peer.offeredSkills?.[0]?.name || "Verified Skill";
-                  const wantsSkill =
-                    peer.wantedSkills?.[0]?.name || "Peer Exchange";
-
-                  return (
-                    <div
-                      key={peer.id}
-                      className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/90 dark:border-slate-800 p-5 shadow-xs hover:shadow-md hover:border-blue-300 dark:hover:border-blue-500/50 transition-all flex flex-col justify-between space-y-4"
-                    >
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-3">
-                          <Avatar className="size-11 rounded-xl ring-1 ring-slate-200 dark:ring-slate-700">
-                            <AvatarImage
-                              src={
-                                peer.avatarUrl ||
-                                `https://api.dicebear.com/7.x/avataaars/svg?seed=${peer.name}`
-                              }
-                            />
-                            <AvatarFallback className="bg-blue-600 text-white font-black rounded-xl text-xs">
-                              {peer.name?.[0]}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <h4 className="font-bold text-slate-900 dark:text-white text-sm">
-                              {peer.name}
-                            </h4>
-                            <span className="inline-block text-[10px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-md border border-emerald-200/60 dark:border-emerald-800/60 mt-0.5">
-                              Mutual Skill Fit
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-800 flex items-center justify-between gap-2">
-                        <div>
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400 block">
-                            Teaches
-                          </span>
-                          <span className="text-xs font-bold text-blue-600 dark:text-blue-400 mt-0.5 block">
-                            {teachesSkill}
-                          </span>
-                        </div>
-
-                        <div className="bg-blue-600 text-white p-1.5 rounded-lg shadow-xs shrink-0">
-                          <Repeat className="size-3" />
-                        </div>
-
-                        <div className="text-right">
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400 block">
-                            Wants to Learn
-                          </span>
-                          <span className="inline-block text-xs font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-100/80 dark:bg-emerald-950/60 px-2 py-0.5 rounded-lg mt-0.5 border border-emerald-200/60 dark:border-emerald-800/60">
-                            {wantsSkill}
-                          </span>
-                        </div>
-                      </div>
-
-                      <Button
-                        onClick={() => setSelectedMatch(peer)}
-                        className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs h-10 shadow-xs transition-all"
-                      >
-                        Propose Bilateral Swap
-                      </Button>
-                    </div>
-                  );
-                })}
-              </div>
+              <MatchResults
+                matches={matches}
+                onRequest={setSelectedMatch}
+                idPrefix="dashboard-matches"
+              />
             )}
           </section>
         </main>
@@ -587,7 +552,9 @@ export default function DashboardPage() {
             <div className="size-5 bg-blue-600 rounded-md flex items-center justify-center text-white font-black text-[10px]">
               K
             </div>
-            <span className="font-bold text-slate-800 dark:text-slate-200">Knoxite</span>
+            <span className="font-bold text-slate-800 dark:text-slate-200">
+              Knoxite
+            </span>
           </div>
           {/*about us stuff*/}
         </div>
@@ -619,7 +586,8 @@ export default function DashboardPage() {
                   They Teach
                 </span>
                 <span className="font-bold text-blue-600 dark:text-blue-400">
-                  {selectedMatch.offeredSkills?.[0]?.name || "Selected Skill"}
+                  {selectedMatch.matchingOfferedSkills?.[0]?.name ||
+                    "Selected Skill"}
                 </span>
               </div>
               <div className="bg-blue-600 text-white p-1.5 rounded-lg">
@@ -630,7 +598,8 @@ export default function DashboardPage() {
                   You Teach
                 </span>
                 <span className="font-bold text-emerald-700 dark:text-emerald-400">
-                  {selectedMatch.wantedSkills?.[0]?.name || "Matching Skill"}
+                  {selectedMatch.matchingWantedSkills?.[0]?.name ||
+                    "Matching Skill"}
                 </span>
               </div>
             </div>
@@ -694,7 +663,7 @@ function ActiveSwapCard({ swap, currentUserId }: any) {
         navigate(
           swap.status === "PENDING_AGREEMENT"
             ? `/swap-agreement/${swap.id}`
-            : `/swap-details/${swap.id}`
+            : `/swap-details/${swap.id}`,
         )
       }
       className="relative mt-3 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/90 dark:border-slate-800 p-5 pt-6 shadow-xs hover:shadow-md hover:border-blue-300 dark:hover:border-blue-500/50 transition-all cursor-pointer flex flex-col justify-between space-y-4 group"
@@ -753,9 +722,7 @@ function ActiveSwapCard({ swap, currentUserId }: any) {
               <div
                 key={index}
                 className={`h-2 flex-1 rounded-full transition-all duration-300 ${
-                  isCompleted
-                    ? "bg-blue-600"
-                    : "bg-slate-200 dark:bg-slate-700"
+                  isCompleted ? "bg-blue-600" : "bg-slate-200 dark:bg-slate-700"
                 }`}
               />
             );

@@ -1,11 +1,26 @@
+import { api } from "@/app/lib/api";
+import { PortfolioContent } from "@/app/pages/PublicProfilePage";
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
 import { Label } from "@/app/components/ui/label";
 import { Card, CardContent } from "@/app/components/ui/card";
-import { Avatar, AvatarFallback, AvatarImage } from "@/app/components/ui/avatar";
-import { ArrowLeft, Star, Loader2, Save, Repeat, Camera, FileText, X } from "lucide-react";
+import {
+  Avatar,
+  AvatarFallback,
+  AvatarImage,
+} from "@/app/components/ui/avatar";
+import {
+  ArrowLeft,
+  Star,
+  Loader2,
+  Save,
+  Repeat,
+  Camera,
+  FileText,
+  X,
+} from "lucide-react";
 import { API_BASE_URL } from "@/config";
 
 export default function ProfilePage() {
@@ -22,10 +37,20 @@ export default function ProfilePage() {
   const [gender, setGender] = useState("Prefer not to say");
   const [avatarUrl, setAvatarUrl] = useState("");
 
+  const [programId, setProgramId] = useState("");
+  const [yearLevelId, setYearLevelId] = useState("");
+  const [academicOptions, setAcademicOptions] = useState<{
+    programs: any[];
+    yearLevels: any[];
+  }>({ programs: [], yearLevels: [] });
+  const [profileError, setProfileError] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetchUserProfile();
+    api("/academic-options")
+      .then(setAcademicOptions)
+      .catch((e) => setProfileError(e.message));
   }, []);
 
   const fetchUserProfile = async () => {
@@ -46,18 +71,18 @@ export default function ProfilePage() {
       if (response.ok) {
         const data = await response.json();
         setProfile(data);
+        setProgramId(data.programId || "");
+        setYearLevelId(data.yearLevelId || "");
         setName(data.name || "");
         setBio(data.bio || "");
         setGender(data.gender || "Prefer not to say");
-        setAvatarUrl(
-          data.avatarUrl ||
-            `https://api.dicebear.com/7.x/avataaars/svg?seed=${data.name.replace(
-              /\s+/g,
-              ""
-            )}`
-        );
+        setAvatarUrl(data.avatarUrl || "");
+      } else {
+        const data = await response.json();
+        setProfileError(data.error || "Unable to fetch profile.");
       }
     } catch (error) {
+      setProfileError("Unable to fetch profile. Please retry.");
       console.error("Error fetching profile:", error);
     } finally {
       setIsLoading(false);
@@ -111,6 +136,7 @@ export default function ProfilePage() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    setProfileError("");
     setIsSaving(true);
     try {
       const token = localStorage.getItem("knoxite_token");
@@ -128,6 +154,8 @@ export default function ProfilePage() {
           bio,
           gender,
           avatarUrl,
+          programId,
+          yearLevelId,
         }),
       });
 
@@ -135,7 +163,8 @@ export default function ProfilePage() {
         alert("Profile updated successfully!");
         fetchUserProfile();
       } else {
-        alert("Failed to update profile. Please check connection.");
+        const data = await response.json();
+        setProfileError(data.error || "Profile update failed.");
       }
     } catch (error) {
       console.error("Save failed", error);
@@ -249,7 +278,9 @@ export default function ProfilePage() {
                   <div className="flex items-center justify-center gap-1">
                     <Star className="size-3.5 fill-amber-400 text-amber-400" />
                     <span className="text-lg font-black text-slate-900 dark:text-white">
-                      {profile?.rating > 0 ? profile.rating : "0.0"}
+                      {profile?.metrics?.averageRating == null
+                        ? "No reviews yet"
+                        : Number(profile.metrics.averageRating).toFixed(1)}
                     </span>
                   </div>
                 </div>
@@ -260,7 +291,9 @@ export default function ProfilePage() {
                   <div className="flex items-center justify-center gap-1">
                     <Repeat className="size-3.5 text-blue-600 dark:text-blue-400" />
                     <span className="text-lg font-black text-slate-900 dark:text-white">
-                      {profile?.swapsCount || 0}
+                      {profile?.metrics?.completedSwaps == null
+                        ? "Awaiting validation"
+                        : profile.metrics.completedSwaps}
                     </span>
                   </div>
                 </div>
@@ -269,6 +302,65 @@ export default function ProfilePage() {
 
             {/* Profile Update Form */}
             <form onSubmit={handleSave} className="space-y-4 max-w-sm mx-auto">
+              {profileError && (
+                <p role="alert" className="text-sm text-red-700">
+                  {profileError}
+                </p>
+              )}
+              <div className="space-y-2">
+                <Label htmlFor="program">College program</Label>
+                <select
+                  required
+                  id="program"
+                  value={programId}
+                  onChange={(e) => {
+                    setProgramId(e.target.value);
+                    setYearLevelId("");
+                  }}
+                  className="w-full rounded-lg border p-2 dark:bg-slate-800"
+                >
+                  <option value="">Choose college program</option>
+                  {academicOptions.programs.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="year-level">Year level</Label>
+                <select
+                  required
+                  id="year-level"
+                  value={yearLevelId}
+                  onChange={(e) => setYearLevelId(e.target.value)}
+                  className="w-full rounded-lg border p-2 dark:bg-slate-800"
+                >
+                  <option value="">Choose year level</option>
+                  {(
+                    academicOptions.programs.find((p) => p.id === programId)
+                      ?.yearLevels || []
+                  ).map((y: any) => (
+                    <option key={y.id} value={y.id}>
+                      {y.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-300">
+                Program and year level are self-reported. Department is derived
+                from your program after official mapping confirmation. Academic
+                proximity uses department and year level, never physical
+                distance.
+              </p>
+              {(!academicOptions.programs.length ||
+                !academicOptions.yearLevels.length) && (
+                <p className="text-xs">
+                  Official academic choices are awaiting administrator
+                  configuration.
+                </p>
+              )}
+
               <div className="space-y-1">
                 <Label
                   htmlFor="name"
@@ -349,6 +441,25 @@ export default function ProfilePage() {
             </form>
           </CardContent>
         </Card>
+        {profile && profile.role !== "ADMIN" && (
+          <div className="mx-auto mt-6 max-w-4xl rounded-2xl border bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+            <h2 className="mb-4 text-lg font-bold">Your student portfolio</h2>
+            <PortfolioContent profile={profile} />
+            <Button
+              className="mt-4"
+              onClick={() => navigate(`/students/${profile.id}`)}
+            >
+              View Public Profile
+            </Button>
+            <Button
+              variant="outline"
+              className="ml-2 mt-4"
+              onClick={() => navigate("/my-skills")}
+            >
+              Manage Skills
+            </Button>
+          </div>
+        )}
       </main>
 
       {/* Accessible Terms Modal */}
@@ -376,9 +487,10 @@ export default function ProfilePage() {
                   1. Platform Purpose & Campus Exclusivity
                 </h4>
                 <p>
-                  Knoxite is a campus-exclusive peer-to-peer knowledge and skill exchange platform.
-                  Its purpose is to connect student mentors and apprentices for collaborative,
-                  academic, and skill-building pursuits.
+                  Knoxite is a campus-exclusive peer-to-peer knowledge and skill
+                  exchange platform. Its purpose is to connect student mentors
+                  and apprentices for collaborative, academic, and
+                  skill-building pursuits.
                 </p>
               </section>
 
@@ -387,9 +499,10 @@ export default function ProfilePage() {
                   2. User Conduct & Safe Exchanges
                 </h4>
                 <p>
-                  All members must treat each other with respect. Harassment, dishonest skill
-                  representation, hate speech, unauthorized commercial solicitations, and academic
-                  integrity breaches are strictly prohibited.
+                  All members must treat each other with respect. Harassment,
+                  dishonest skill representation, hate speech, unauthorized
+                  commercial solicitations, and academic integrity breaches are
+                  strictly prohibited.
                 </p>
               </section>
 
@@ -398,9 +511,10 @@ export default function ProfilePage() {
                   3. Privacy & Data Handling
                 </h4>
                 <p>
-                  We collect your registered name, email address, and declared skills to facilitate
-                  matching, community forum participation, and the leaderboard. Your information is
-                  never sold or shared with outside commercial entities.
+                  We collect your registered name, email address, and declared
+                  skills to facilitate matching, community forum participation,
+                  and the leaderboard. Your information is never sold or shared
+                  with outside commercial entities.
                 </p>
               </section>
 
@@ -409,8 +523,9 @@ export default function ProfilePage() {
                   4. Account Suspension
                 </h4>
                 <p>
-                  Platform administrators reserve the right to review flagged accounts and suspend
-                  or terminate access for violations of these community guidelines.
+                  Platform administrators reserve the right to review flagged
+                  accounts and suspend or terminate access for violations of
+                  these community guidelines.
                 </p>
               </section>
             </div>
@@ -430,9 +545,9 @@ export default function ProfilePage() {
       )}
 
       {/* Website Version */}
-      <div className="fixed bottom-3 right-4 z-40 pointer-events-none select-none text-[11px] font-mono tracking-wider text-slate-400 dark:text-slate-500"> 
-        Knoxite v1.0 
-      </div> 
+      <div className="fixed bottom-3 right-4 z-40 pointer-events-none select-none text-[11px] font-mono tracking-wider text-slate-400 dark:text-slate-500">
+        Knoxite v1.0
+      </div>
     </div>
   );
 }

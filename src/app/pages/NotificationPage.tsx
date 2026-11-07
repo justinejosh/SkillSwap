@@ -1,8 +1,17 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { Button } from "@/app/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/app/components/ui/tabs";
-import { Avatar, AvatarFallback, AvatarImage } from "@/app/components/ui/avatar";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/app/components/ui/tabs";
+import {
+  Avatar,
+  AvatarFallback,
+  AvatarImage,
+} from "@/app/components/ui/avatar";
 import { ArrowLeft, Loader2, Repeat, Check, X, Trash2 } from "lucide-react";
 import { API_BASE_URL } from "@/config";
 
@@ -49,19 +58,22 @@ export default function NotificationPage() {
 
   const handleSwapAction = async (
     swapId: string,
-    status: "ACCEPTED" | "REJECTED"
+    status: "ACCEPTED" | "REJECTED",
   ) => {
     setActionLoading(swapId);
     try {
       const token = localStorage.getItem("knoxite_token");
-      const res = await fetch(`${API_BASE_URL}/swap-requests/${swapId}/status`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+      const res = await fetch(
+        `${API_BASE_URL}/swap-requests/${swapId}/status`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ newStatus: status }),
         },
-        body: JSON.stringify({ newStatus: status }),
-      });
+      );
 
       if (res.ok) {
         const data = await res.json();
@@ -70,6 +82,9 @@ export default function NotificationPage() {
         } else {
           fetchSwaps();
         }
+      } else {
+        const data = await res.json();
+        alert(data.error || "Request could not be updated.");
       }
     } catch (err) {
       console.error("Action Error:", err);
@@ -80,7 +95,7 @@ export default function NotificationPage() {
 
   const handleCancelRequest = async (
     id: string,
-    type: "request" | "history"
+    type: "request" | "history",
   ) => {
     const confirmMsg =
       type === "request"
@@ -111,16 +126,18 @@ export default function NotificationPage() {
   };
 
   const incomingPending = swaps.filter(
-    (s) => s.receiverId === currentUserId && s.status === "PENDING"
+    (s) => s.receiverId === currentUserId && s.status === "PENDING",
   );
   const outgoingRequests = swaps.filter(
-    (s) => s.requesterId === currentUserId && s.status === "PENDING"
+    (s) => s.requesterId === currentUserId && s.status === "PENDING",
   );
   const historicalSwaps = swaps.filter((s) => s.status !== "PENDING");
 
   const renderEmptyState = (message: string) => (
     <div className="py-16 px-6 text-center rounded-3xl border border-dashed border-slate-300 dark:border-slate-800 bg-white/70 dark:bg-slate-900/50 space-y-3">
-      <p className="text-base font-black text-slate-900 dark:text-white">{message}</p>
+      <p className="text-base font-black text-slate-900 dark:text-white">
+        {message}
+      </p>
       <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
         Explore active student listings on KnoxHub to propose new skill swaps.
       </p>
@@ -182,7 +199,8 @@ export default function NotificationPage() {
             Skill Swap Notifications
           </h1>
           <p className="text-sm text-slate-500 dark:text-slate-400">
-            Review incoming handshake requests, monitor sent proposals, and manage exchange history.
+            Review incoming handshake requests, monitor sent proposals, and
+            manage exchange history.
           </p>
         </div>
 
@@ -212,7 +230,9 @@ export default function NotificationPage() {
             {loading ? (
               <div className="flex flex-col items-center justify-center py-20">
                 <Loader2 className="animate-spin text-blue-600 size-8 mb-2" />
-                <span className="text-xs font-bold text-slate-500 dark:text-slate-400">Loading requests...</span>
+                <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
+                  Loading requests...
+                </span>
               </div>
             ) : incomingPending.length === 0 ? (
               renderEmptyState("No new skill swap requests.")
@@ -262,7 +282,7 @@ export default function NotificationPage() {
                   key={swap.id}
                   swap={swap}
                   isReceiver={swap.receiverId === currentUserId}
-                  onCancel={() => handleCancelRequest(swap.id, "history")}
+
                   isLoading={actionLoading === swap.id}
                 />
               ))
@@ -321,8 +341,8 @@ function SwapRequestItem({
             isPending
               ? "bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 border-blue-200/60 dark:border-blue-800/60"
               : swap.status === "ACCEPTED"
-              ? "bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border-emerald-200/60 dark:border-emerald-800/60"
-              : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700"
+                ? "bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border-emerald-200/60 dark:border-emerald-800/60"
+                : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700"
           }`}
         >
           {swap.status}
@@ -335,7 +355,8 @@ function SwapRequestItem({
             {isReceiver ? "They Teach You" : "You Learn"}
           </span>
           <span className="font-bold text-blue-600 dark:text-blue-400 block mt-0.5">
-            {swap.wantedSkill?.name || "Selected Skill"}
+            {(isReceiver ? swap.offeredSkill : swap.wantedSkill)?.name ||
+              "Selected Skill"}
           </span>
         </div>
 
@@ -348,7 +369,8 @@ function SwapRequestItem({
             {isReceiver ? "In Return For" : "You Teach"}
           </span>
           <span className="font-bold text-emerald-700 dark:text-emerald-400 block mt-0.5">
-            {swap.offeredSkill?.name || "Offered Skill"}
+            {(isReceiver ? swap.wantedSkill : swap.offeredSkill)?.name ||
+              "Offered Skill"}
           </span>
         </div>
       </div>
@@ -359,6 +381,14 @@ function SwapRequestItem({
         </p>
       )}
 
+      {swap.status === "ACCEPTED" && swap.linkedSwap?.id && (
+        <a
+          className="text-sm text-blue-700 underline dark:text-blue-300"
+          href={`/swap-agreement/${swap.linkedSwap.id}`}
+        >
+          Review Agreement
+        </a>
+      )}
       <div className="flex flex-wrap items-center gap-2.5 pt-1">
         {isPending && isReceiver && onAction && (
           <>
@@ -386,7 +416,7 @@ function SwapRequestItem({
           </>
         )}
 
-        {onCancel && (
+        {onCancel && isPending && !isReceiver && (
           <Button
             variant="ghost"
             disabled={isLoading}

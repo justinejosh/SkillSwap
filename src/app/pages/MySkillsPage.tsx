@@ -18,12 +18,26 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/app/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/app/components/ui/tabs";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/app/components/ui/tabs";
 import { ArrowLeft, Trash2, Loader2 } from "lucide-react";
-import { API_BASE_URL } from "@/config";
+import { api } from "@/app/lib/api";
+import {
+  AssessmentBadge,
+  AssessmentLegend,
+} from "@/app/components/AssessmentBadge";
+import { AssessmentPrompt } from "@/app/components/AssessmentPrompt";
 
 export default function MySkillsPage() {
   const navigate = useNavigate();
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [prompt, setPrompt] = useState<{ offeringId: string } | null>(null);
   const [isAddSkillOpen, setIsAddSkillOpen] = useState(false);
   const [skillType, setSkillType] = useState<"offer" | "want">("offer");
   const [offeredSkills, setOfferedSkills] = useState<any[]>([]);
@@ -39,73 +53,63 @@ export default function MySkillsPage() {
 
   const fetchMySkills = async () => {
     try {
-      const token = localStorage.getItem("knoxite_token");
-      if (!token) {
-        navigate("/login");
-        return;
-      }
-      const response = await fetch(`${API_BASE_URL}/profile`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "bypass-tunnel-reminder": "true",
-        },
-      });
-      const data = await response.json();
-      if (response.ok) {
-        setOfferedSkills(data.offeredSkills || []);
-        setWantedSkills(data.wantedSkills || []);
-      }
-    } catch (error) {
-      console.error("Failed to fetch skills", error);
+      const data = await api("/profile");
+      setOfferedSkills(data.offeredSkills);
+      setWantedSkills(data.wantedSkills);
+    } catch (e: any) {
+      setError(e.message);
     } finally {
       setIsLoading(false);
     }
   };
-
   const handleAddSkill = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newSkillName.trim()) return;
+    if (!newSkillName.trim() || saving) return;
+    setSaving(true);
+    setError("");
+    setNotice("");
     try {
-      const token = localStorage.getItem("knoxite_token");
-      const endpoint =
-        skillType === "offer"
-          ? `${API_BASE_URL}/profile/skills/offer`
-          : `${API_BASE_URL}/profile/skills/want`;
-
-      const response = await fetch(endpoint, {
+      const saved = await api(`/profile/skills/${skillType}`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-          "bypass-tunnel-reminder": "true",
-        },
-        body: JSON.stringify({ name: newSkillName, category: newSkillCategory }),
+        body: JSON.stringify({
+          name: newSkillName,
+          category: newSkillCategory,
+        }),
       });
-
-      if (response.ok) {
-        fetchMySkills();
-        setIsAddSkillOpen(false);
-        setNewSkillName("");
-      }
-    } catch (error) {
-      console.error("Error adding skill:", error);
+      setIsAddSkillOpen(false);
+      setNewSkillName("");
+      await fetchMySkills();
+      if (
+        skillType === "offer" &&
+        saved.offering?.tier === "NOT_ASSESSED" &&
+        saved.offering.basicAvailable &&
+        !saved.offering.basicPromptDismissed
+      )
+        setPrompt({ offeringId: saved.offering.id });
+      else if (skillType === "offer" && !saved.offering?.basicAvailable)
+        setNotice(
+          "Teaching skill saved. Assessment is unavailable for this skill. You can still teach and participate in swaps.",
+        );
+      else setNotice("Skill saved.");
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setSaving(false);
     }
   };
-
-  const handleDeleteSkill = async (id: number, type: "offer" | "want") => {
-    if (!confirm("Remove this skill?")) return;
+  const handleDeleteSkill = async (id: string, type: "offer" | "want") => {
+    if (
+      !confirm(
+        "Remove this skill? Earned tiers and assessment history will be retained.",
+      )
+    )
+      return;
+    setError("");
     try {
-      const token = localStorage.getItem("knoxite_token");
-      const response = await fetch(`${API_BASE_URL}/profile/skills/${type}/${id}`, {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "bypass-tunnel-reminder": "true",
-        },
-      });
-      if (response.ok) fetchMySkills();
-    } catch (error) {
-      console.error("Delete failed", error);
+      await api(`/profile/skills/${type}/${id}`, { method: "DELETE" });
+      await fetchMySkills();
+    } catch (e: any) {
+      setError(e.message);
     }
   };
 
@@ -116,11 +120,15 @@ export default function MySkillsPage() {
     { value: "language", label: "Language" },
     { value: "lifestyle", label: "Lifestyle" },
     { value: "business", label: "Business" },
+    { value: "academic", label: "Academic" },
+    { value: "other", label: "Other" },
   ];
 
   const renderEmptyState = (message: string, defaultType: "offer" | "want") => (
     <div className="col-span-full py-16 px-6 text-center rounded-3xl border border-dashed border-slate-300 dark:border-slate-800 bg-white/70 dark:bg-slate-900/50 space-y-3">
-      <p className="text-base font-black text-slate-900 dark:text-white">{message}</p>
+      <p className="text-base font-black text-slate-900 dark:text-white">
+        {message}
+      </p>
       <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
         Add skills to your matrix so KnoxHub can pair you with compatible peers.
       </p>
@@ -209,8 +217,12 @@ export default function MySkillsPage() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100">
-                      <SelectItem value="offer">Teaches (Offer a skill)</SelectItem>
-                      <SelectItem value="want">Wants to Learn (Request a skill)</SelectItem>
+                      <SelectItem value="offer">
+                        Teaches (Offer a skill)
+                      </SelectItem>
+                      <SelectItem value="want">
+                        Wants to Learn (Request a skill)
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -249,11 +261,17 @@ export default function MySkillsPage() {
                   </Select>
                 </div>
 
+                {error && (
+                  <p role="alert" className="text-sm text-red-700">
+                    {error}
+                  </p>
+                )}
                 <Button
+                  disabled={saving}
                   type="submit"
                   className="w-full bg-blue-600 hover:bg-blue-700 h-11 font-bold text-xs text-white rounded-xl shadow-md shadow-blue-600/20 mt-2"
                 >
-                  Save Skill
+                  {saving ? "Saving..." : "Save Skill"}
                 </Button>
               </form>
             </DialogContent>
@@ -261,6 +279,16 @@ export default function MySkillsPage() {
         </header>
       </div>
 
+      {prompt && (
+        <AssessmentPrompt
+          offeringId={prompt.offeringId}
+          level="BASIC"
+          onClose={() => {
+            setPrompt(null);
+            void fetchMySkills();
+          }}
+        />
+      )}
       {/* 2. MAIN CONTENT */}
       <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 pt-8 pb-20 space-y-6 relative z-10">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -269,7 +297,8 @@ export default function MySkillsPage() {
               My Skills
             </h1>
             <p className="text-sm text-slate-500 dark:text-slate-400">
-              Manage the topics you can mentor others in and the subjects you want to learn in return.
+              Manage the topics you can mentor others in and the subjects you
+              want to learn in return.
             </p>
           </div>
 
@@ -282,6 +311,20 @@ export default function MySkillsPage() {
         </div>
 
         {/* BOUND TABS STATE */}
+        {error && (
+          <p role="alert" className="text-red-700 dark:text-red-300">
+            {error}
+          </p>
+        )}
+        {notice && (
+          <p
+            role="status"
+            className="rounded-xl border bg-white p-4 dark:bg-slate-900"
+          >
+            {notice}
+          </p>
+        )}
+        <AssessmentLegend />
         <Tabs
           value={activeTab}
           onValueChange={(val: any) => setActiveTab(val)}
@@ -291,7 +334,8 @@ export default function MySkillsPage() {
             <TabsTrigger
               value="offered"
               style={{
-                backgroundColor: activeTab === "offered" ? "#2563EB" : "transparent",
+                backgroundColor:
+                  activeTab === "offered" ? "#2563EB" : "transparent",
                 color: activeTab === "offered" ? "#ffffff" : undefined,
               }}
               className={`rounded-xl font-bold text-xs sm:text-sm transition-all border-0 ring-0 outline-none ${
@@ -306,7 +350,8 @@ export default function MySkillsPage() {
             <TabsTrigger
               value="wanted"
               style={{
-                backgroundColor: activeTab === "wanted" ? "#059669" : "transparent",
+                backgroundColor:
+                  activeTab === "wanted" ? "#059669" : "transparent",
                 color: activeTab === "wanted" ? "#ffffff" : undefined,
               }}
               className={`rounded-xl font-bold text-xs sm:text-sm transition-all border-0 ring-0 outline-none ${
@@ -321,35 +366,37 @@ export default function MySkillsPage() {
 
           <TabsContent value="offered" className="mt-0">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {offeredSkills.length === 0 ? (
-                renderEmptyState("You haven't added any skills to teach yet.", "offer")
-              ) : (
-                offeredSkills.map((skill) => (
-                  <SkillCard
-                    key={skill.id}
-                    skill={skill}
-                    variant="blue"
-                    onDelete={() => handleDeleteSkill(skill.id, "offer")}
-                  />
-                ))
-              )}
+              {offeredSkills.length === 0
+                ? renderEmptyState(
+                    "You haven't added any skills to teach yet.",
+                    "offer",
+                  )
+                : offeredSkills.map((skill) => (
+                    <SkillCard
+                      key={skill.id}
+                      skill={skill}
+                      variant="blue"
+                      onDelete={() => handleDeleteSkill(skill.id, "offer")}
+                    />
+                  ))}
             </div>
           </TabsContent>
 
           <TabsContent value="wanted" className="mt-0">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {wantedSkills.length === 0 ? (
-                renderEmptyState("What skill would you like to learn next?", "want")
-              ) : (
-                wantedSkills.map((skill) => (
-                  <SkillCard
-                    key={skill.id}
-                    skill={skill}
-                    variant="emerald"
-                    onDelete={() => handleDeleteSkill(skill.id, "want")}
-                  />
-                ))
-              )}
+              {wantedSkills.length === 0
+                ? renderEmptyState(
+                    "What skill would you like to learn next?",
+                    "want",
+                  )
+                : wantedSkills.map((skill) => (
+                    <SkillCard
+                      key={skill.id}
+                      skill={skill}
+                      variant="emerald"
+                      onDelete={() => handleDeleteSkill(skill.id, "want")}
+                    />
+                  ))}
             </div>
           </TabsContent>
         </Tabs>
@@ -368,9 +415,10 @@ function SkillCard({
   variant?: "blue" | "emerald";
 }) {
   const isBlue = variant === "blue";
+  const navigate = useNavigate();
 
   return (
-    <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/90 dark:border-slate-800 p-5 shadow-xs hover:shadow-md hover:border-slate-300 dark:hover:border-slate-700 transition-all flex items-center justify-between gap-4">
+    <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/90 dark:border-slate-800 p-5 shadow-xs hover:shadow-md hover:border-slate-300 dark:hover:border-slate-700 transition-all flex flex-wrap items-center justify-between gap-4">
       <div className="min-w-0 space-y-2">
         <div className="flex items-center gap-2">
           <span
@@ -398,6 +446,43 @@ function SkillCard({
         </span>
       </div>
 
+      {isBlue && (
+        <div className="flex min-w-0 flex-col items-start gap-2">
+          <AssessmentBadge tier={skill.tier} />
+          {skill.tier !== "VERIFIED" &&
+          (skill.tier === "AMATEUR"
+            ? skill.advancedAvailable
+            : skill.basicAvailable) ? (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() =>
+                navigate(`/assessments/offerings/${skill.offeringId}`)
+              }
+            >
+              {skill.tier === "AMATEUR"
+                ? "Upgrade to Verified"
+                : "Take Assessment"}
+            </Button>
+          ) : (
+            skill.tier !== "VERIFIED" && (
+              <p className="text-xs text-slate-500 dark:text-slate-300">
+                {skill.tier === "AMATEUR"
+                  ? "Advanced assessment unavailable"
+                  : "Assessment unavailable"}
+              </p>
+            )
+          )}
+          <button
+            className="text-xs text-blue-700 underline dark:text-blue-300"
+            onClick={() =>
+              navigate(`/assessments/offerings/${skill.offeringId}`)
+            }
+          >
+            Assessment history
+          </button>
+        </div>
+      )}
       <Button
         variant="ghost"
         size="icon"

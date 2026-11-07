@@ -3,8 +3,17 @@ import { useNavigate, useParams } from "react-router";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
 import { Label } from "@/app/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/app/components/ui/card";
-import { Avatar, AvatarFallback, AvatarImage } from "@/app/components/ui/avatar";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/app/components/ui/card";
+import {
+  Avatar,
+  AvatarFallback,
+  AvatarImage,
+} from "@/app/components/ui/avatar";
 import { Checkbox } from "@/app/components/ui/checkbox";
 import { ArrowLeft, Check, Loader2, Repeat } from "lucide-react";
 import { API_BASE_URL } from "@/config";
@@ -12,6 +21,8 @@ import { API_BASE_URL } from "@/config";
 export default function SwapAgreementPage() {
   const navigate = useNavigate();
   const { swapId } = useParams();
+  const [agreementVersion, setAgreementVersion] = useState(1);
+  const [approvalNotice, setApprovalNotice] = useState("");
   const [step, setStep] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
   const [debugError, setDebugError] = useState<string | null>(null);
@@ -52,13 +63,25 @@ export default function SwapAgreementPage() {
       if (!response.ok) {
         const errorData = await response.json();
         setDebugError(
-          `Server Error: ${errorData.message || response.statusText}`
+          `Server Error: ${errorData.message || response.statusText}`,
         );
         return;
       }
 
       const data = await response.json();
-
+      setAgreementVersion(data.agreementVersion);
+      const requester = data.requesterId === data.me?.id;
+      setApprovalNotice(
+        data.status === "CONFIRMED"
+          ? "Both students approved this agreement."
+          : `${data.requesterApprovedAt ? "Requester approved" : "Requester approval pending"}; ${data.receiverApprovedAt ? "receiver approved" : "receiver approval pending"}. Changing terms resets approvals.`,
+      );
+      setAgreement((prev) => ({
+        ...prev,
+        sessions: String(data.sessions),
+        duration: String(data.duration),
+        agreedToTerms: false,
+      }));
       setParticipants({
         me: {
           name: data.me?.name || "You",
@@ -74,14 +97,8 @@ export default function SwapAgreementPage() {
 
       setAgreement((prev) => ({
         ...prev,
-        skillA:
-          typeof data.offeredSkill === "object"
-            ? data.offeredSkill.name
-            : data.offeredSkill || "Skill A",
-        skillB:
-          typeof data.wantedSkill === "object"
-            ? data.wantedSkill.name
-            : data.wantedSkill || "Skill B",
+        skillA: requester ? data.offeredSkill.name : data.wantedSkill.name,
+        skillB: requester ? data.wantedSkill.name : data.offeredSkill.name,
       }));
     } catch (err: any) {
       setDebugError(`Network Error: ${err.message}`);
@@ -110,18 +127,23 @@ export default function SwapAgreementPage() {
             "bypass-tunnel-reminder": "true",
           },
           body: JSON.stringify({
-            duration: agreement.duration,
-            sessions: agreement.sessions,
+            duration: Number(agreement.duration),
+            sessions: Number(agreement.sessions),
+            agreementVersion,
             agreedToTerms: true,
           }),
-        }
+        },
       );
 
       if (response.ok) {
+        const result = await response.json();
+        alert(result.message);
         navigate("/dashboard");
       } else {
         const errorData = await response.json();
-        alert(`Failed to sign: ${errorData.message || "Unknown error"}`);
+        alert(
+          `Failed to sign: ${errorData.error || errorData.message || "Unknown error"}`,
+        );
       }
     } catch (error: any) {
       console.error("Submit Error:", error);
@@ -205,21 +227,26 @@ export default function SwapAgreementPage() {
             const isActive = s.num === step;
 
             return (
-              <div key={s.num} className="relative z-10 flex flex-col items-center">
+              <div
+                key={s.num}
+                className="relative z-10 flex flex-col items-center"
+              >
                 <div
                   className={`size-8 rounded-xl flex items-center justify-center text-xs font-bold transition-all shadow-xs ${
                     isCompleted
                       ? "bg-blue-600 text-white"
                       : isActive
-                      ? "bg-blue-600 text-white ring-4 ring-blue-100 dark:ring-blue-900/50"
-                      : "bg-white dark:bg-slate-900 text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-800"
+                        ? "bg-blue-600 text-white ring-4 ring-blue-100 dark:ring-blue-900/50"
+                        : "bg-white dark:bg-slate-900 text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-800"
                   }`}
                 >
                   {isCompleted ? <Check className="size-4" /> : s.num}
                 </div>
                 <span
                   className={`text-[10px] font-bold uppercase tracking-wider mt-1.5 ${
-                    isActive ? "text-blue-600 dark:text-blue-400" : "text-slate-400 dark:text-slate-500"
+                    isActive
+                      ? "text-blue-600 dark:text-blue-400"
+                      : "text-slate-400 dark:text-slate-500"
                   }`}
                 >
                   {s.label}
@@ -237,7 +264,8 @@ export default function SwapAgreementPage() {
                 Exchange Participants
               </CardTitle>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Verify the bilateral counterparties involved in this swap agreement.
+                Verify the bilateral counterparties involved in this swap
+                agreement.
               </p>
             </CardHeader>
             <CardContent className="pt-6 space-y-4">
@@ -303,6 +331,14 @@ export default function SwapAgreementPage() {
           </Card>
         )}
 
+        {approvalNotice && (
+          <p
+            role="status"
+            className="rounded-xl border bg-white p-4 text-sm dark:bg-slate-900"
+          >
+            {approvalNotice}
+          </p>
+        )}
         {/* STEP 2: SWAP LOGISTICS */}
         {step === 2 && (
           <Card className="border-slate-200/90 dark:border-slate-800 shadow-xs rounded-3xl bg-white dark:bg-slate-900">
@@ -342,6 +378,7 @@ export default function SwapAgreementPage() {
                   <Input
                     type="number"
                     min="1"
+                    max="8"
                     value={agreement.duration}
                     onChange={(e) =>
                       setAgreement({ ...agreement, duration: e.target.value })
@@ -356,6 +393,7 @@ export default function SwapAgreementPage() {
                   <Input
                     type="number"
                     min="1"
+                    max="30"
                     value={agreement.sessions}
                     onChange={(e) =>
                       setAgreement({ ...agreement, sessions: e.target.value })
@@ -370,7 +408,8 @@ export default function SwapAgreementPage() {
                   Mutual Time Commitment
                 </p>
                 <p className="text-2xl font-black">
-                  {Number(agreement.sessions) * Number(agreement.duration)} Hours Total
+                  {Number(agreement.sessions) * Number(agreement.duration)}{" "}
+                  Hours Total
                 </p>
               </div>
             </CardContent>
@@ -385,19 +424,23 @@ export default function SwapAgreementPage() {
                 The Knoxite Academic Oath
               </CardTitle>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Honor-code commitment to uphold mutual accountability and fairness.
+                Honor-code commitment to uphold mutual accountability and
+                fairness.
               </p>
             </CardHeader>
             <CardContent className="pt-6 space-y-4">
               <div className="text-xs text-slate-700 dark:text-slate-300 space-y-3 bg-slate-50 dark:bg-slate-800/60 p-4 rounded-2xl border border-slate-200/70 dark:border-slate-800 max-h-48 overflow-y-auto leading-relaxed">
                 <p>
-                  <strong>1. Reliability:</strong> I will arrive at scheduled peer sessions promptly and prepared.
+                  <strong>1. Reliability:</strong> I will arrive at scheduled
+                  peer sessions promptly and prepared.
                 </p>
                 <p>
-                  <strong>2. Reciprocity:</strong> I will provide authentic, high-quality instruction in exchange for learning.
+                  <strong>2. Reciprocity:</strong> I will provide authentic,
+                  high-quality instruction in exchange for learning.
                 </p>
                 <p>
-                  <strong>3. Respect:</strong> I will foster a constructive, safe, and professional academic environment.
+                  <strong>3. Respect:</strong> I will foster a constructive,
+                  safe, and professional academic environment.
                 </p>
               </div>
 
@@ -414,7 +457,8 @@ export default function SwapAgreementPage() {
                   htmlFor="terms"
                   className="text-xs text-slate-700 dark:text-slate-300 leading-snug cursor-pointer select-none font-medium"
                 >
-                  I commit to this bilateral skill exchange and agree to uphold all community accountability guidelines.
+                  I commit to this bilateral skill exchange and agree to uphold
+                  all community accountability guidelines.
                 </Label>
               </div>
             </CardContent>

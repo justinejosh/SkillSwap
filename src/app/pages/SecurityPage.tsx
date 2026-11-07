@@ -1,122 +1,120 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router";
+import { FormEvent, useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router";
+import { api } from "@/app/lib/api";
 import { Button } from "@/app/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app/components/ui/card";
-import { Input } from "@/app/components/ui/input";
-import { Label } from "@/app/components/ui/label";
-import { Switch } from "@/app/components/ui/switch";
-import { Badge } from "@/app/components/ui/badge";
-import { ArrowLeft, Shield, Smartphone, Key, Monitor, CheckCircle2, Clock, Loader2, Lock } from "lucide-react";
-import { API_BASE_URL } from "@/config";
-
 export default function SecurityPage() {
   const navigate = useNavigate();
-  const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
   const [sessions, setSessions] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  // Form States
-  const [passwords, setPasswords] = useState({ current: "", new: "", confirm: "" });
-
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [passwords, setPasswords] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirm: "",
+  });
   useEffect(() => {
-    const fetchSessions = async () => {
-      try {
-        setIsLoading(true);
-        const token = localStorage.getItem("knoxite_token");
-        
-        const res = await fetch(`${API_BASE_URL}/auth/sessions`, {
-          headers: { 
-            "Authorization": `Bearer ${token}`,
-            "bypass-tunnel-reminder": "true" 
-          }
-        });
-        
-        if (res.ok) {
-          const data = await res.json();
-          setSessions(data); // Will be [] if Ashton's DB is empty
-        } else {
-          setSessions([]); // Explicitly empty on error/no-data
-        }
-      } catch (err) {
-        console.error("Security fetch error:", err);
-        setSessions([]);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchSessions();
+    api<any[]>("/auth/sessions")
+      .then(setSessions)
+      .catch((e) => setError(e.message));
   }, []);
-
+  async function change(e: FormEvent) {
+    e.preventDefault();
+    setError("");
+    if (passwords.newPassword !== passwords.confirm) {
+      setError("New passwords do not match.");
+      return;
+    }
+    setBusy(true);
+    try {
+      await api("/auth/password", {
+        method: "POST",
+        body: JSON.stringify({
+          currentPassword: passwords.currentPassword,
+          newPassword: passwords.newPassword,
+        }),
+      });
+      localStorage.removeItem("knoxite_token");
+      localStorage.removeItem("knoxite_user");
+      navigate("/login");
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-100">
-      <header className="bg-white border-b border-blue-100 shadow-sm sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="text-blue-600">
-            <ArrowLeft className="size-6" />
+    <main className="min-h-screen bg-slate-50 p-5 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
+      <div className="mx-auto max-w-2xl space-y-6">
+        <Link
+          to="/profile"
+          className="text-blue-700 underline dark:text-blue-300"
+        >
+          Back to Profile
+        </Link>
+        <h1 className="text-2xl font-bold">Account security</h1>
+        {error && (
+          <p role="alert" className="text-red-700 dark:text-red-300">
+            {error}
+          </p>
+        )}
+        <form
+          onSubmit={change}
+          className="space-y-4 rounded-xl border bg-white p-5 dark:border-slate-700 dark:bg-slate-900"
+        >
+          <h2 className="text-lg font-semibold">Change password</h2>
+          {(["currentPassword", "newPassword", "confirm"] as const).map(
+            (field) => (
+              <label key={field} className="block">
+                {field === "currentPassword"
+                  ? "Current password"
+                  : field === "newPassword"
+                    ? "New password"
+                    : "Confirm new password"}
+                <input
+                  required
+                  minLength={field === "currentPassword" ? undefined : 12}
+                  type="password"
+                  autoComplete={
+                    field === "currentPassword"
+                      ? "current-password"
+                      : "new-password"
+                  }
+                  className="mt-1 w-full rounded border p-2 dark:bg-slate-800"
+                  value={passwords[field]}
+                  onChange={(e) =>
+                    setPasswords((p) => ({ ...p, [field]: e.target.value }))
+                  }
+                />
+              </label>
+            ),
+          )}
+          <p className="text-sm">
+            Use at least 12 characters and at most 72 UTF-8 bytes. Changing your
+            password revokes all active sessions.
+          </p>
+          <Button disabled={busy}>
+            {busy ? "Updating..." : "Update Password"}
           </Button>
-          <div className="flex items-center gap-2">
-            <Shield className="size-6 text-blue-600" />
-            <h1 className="text-xl font-bold text-blue-900">Security Settings</h1>
-          </div>
-        </div>
-      </header>
-
-      <div className="max-w-5xl mx-auto p-4 space-y-6">
-        {/* Change Password Card */}
-        <Card className="bg-white/90 backdrop-blur border-blue-100 shadow-sm">
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <Key className="size-5 text-blue-600" />
-              <CardTitle className="text-blue-900 font-bold">Account Access</CardTitle>
-            </div>
-            <span className="text-sm text-blue-500 mt-1 block font-medium">Manage your password and authentication methods</span>
-          </CardHeader>
-          <CardContent className="space-y-5">
-             {/* ... Password Inputs here ... */}
-             <Button className="bg-blue-600 hover:bg-blue-700 text-white font-bold h-11 px-8">
-              Update Security
-            </Button>
-          </CardContent>
-        </Card>
-
-        {/* Dynamic Login Activity Section */}
-        <Card className="bg-white/90 backdrop-blur border-blue-100 shadow-sm">
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <Monitor className="size-5 text-blue-600" />
-              <CardTitle className="text-blue-900 font-bold">Login Activity</CardTitle>
-            </div>
-            <span className="text-sm text-blue-500 mt-1 block font-medium">Recent login attempts and active sessions</span>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {isLoading ? (
-              <div className="flex flex-col items-center py-16">
-                <Loader2 className="animate-spin text-blue-600 size-10 mb-4" />
-                <span className="text-sm text-blue-400 font-bold tracking-wide">Syncing security data...</span>
-              </div>
-            ) : sessions.length === 0 ? (
-              /* THE "TRUE" EMPTY STATE */
-              <div className="flex flex-col items-center justify-center py-16 px-4 text-center border-2 border-dashed border-blue-50 rounded-2xl bg-blue-50/10">
-                <div className="p-4 bg-white rounded-full shadow-sm mb-4">
-                  <Lock className="size-8 text-blue-200" />
-                </div>
-                <span className="text-lg font-bold text-blue-900 block">
-                  No Active Sessions Found
-                </span>
-                <span className="text-sm text-blue-400 mt-2 block max-w-xs">
-                  Your login history is currently empty. New sessions will appear here as you log in from different devices.
-                </span>
-              </div>
-            ) : (
-              sessions.map((activity) => (
-                /* ... Render Activity Cards ... */
-                <div key={activity.id}>{/* Session Logic */}</div>
-              ))
-            )}
-          </CardContent>
-        </Card>
+        </form>
+        <section className="space-y-3">
+          <h2 className="text-lg font-semibold">Active sessions</h2>
+          {sessions.map((s) => (
+            <article
+              key={s.id}
+              className="rounded-xl border p-4 dark:border-slate-700"
+            >
+              <p className="break-words">
+                {s.userAgent}
+                {s.current ? " (this session)" : ""}
+              </p>
+              <p className="text-sm">
+                Signed in {new Date(s.createdAt).toLocaleString()} · Expires{" "}
+                {new Date(s.expiresAt).toLocaleString()}
+              </p>
+            </article>
+          ))}
+        </section>
       </div>
-    </div>
+    </main>
   );
 }

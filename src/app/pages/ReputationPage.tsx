@@ -22,16 +22,21 @@ export default function ReputationPage() {
       const token = localStorage.getItem("knoxite_token");
       const res = await fetch(`${API_BASE_URL}/reputation/submit`, {
         method: "POST",
-        headers: { 
+        headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}` 
+          Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ swapId, partnerId, rating, comment })
+        body: JSON.stringify({ swapId, partnerId, rating, comment }),
       });
 
       if (res.ok) {
-        alert("Evaluation Submitted! Points added to peer.");
-        navigate("/leaderboard"); // Redirect to see the live update
+        alert(
+          "Your review was saved. Completion requires both students’ reviews.",
+        );
+        navigate("/leaderboard"); // The backend completes the swap after both valid reviews.
+      } else {
+        const data = await res.json();
+        alert(data.error || "Review could not be submitted.");
       }
     } catch (err) {
       console.error(err);
@@ -43,8 +48,12 @@ export default function ReputationPage() {
   return (
     <div className="min-h-screen bg-blue-50 flex items-center justify-center p-4 font-sans">
       <div className="max-w-md w-full bg-white rounded-3xl p-8 shadow-2xl border-b-8 border-blue-600">
-        <h2 className="text-3xl font-black text-blue-900 italic uppercase tracking-tighter mb-2">Final Evaluation</h2>
-        <p className="text-xs text-blue-400 font-bold uppercase tracking-widest mb-8">Close the rotation loop</p>
+        <h2 className="text-3xl font-black text-blue-900 italic uppercase tracking-tighter mb-2">
+          Final Evaluation
+        </h2>
+        <p className="text-xs text-blue-400 font-bold uppercase tracking-widest mb-8">
+          Close the rotation loop
+        </p>
 
         <div className="flex justify-center gap-2 mb-8">
           {[1, 2, 3, 4, 5].map((num) => (
@@ -63,12 +72,16 @@ export default function ReputationPage() {
           onChange={(e) => setComment(e.target.value)}
         />
 
-        <Button 
+        <Button
           className="w-full h-14 bg-blue-600 hover:bg-blue-700 text-white font-black uppercase rounded-2xl shadow-lg"
           onClick={handleSubmit}
           disabled={isSubmitting}
         >
-          {isSubmitting ? <Loader2 className="animate-spin" /> : "Complete Swap"}
+          {isSubmitting ? (
+            <Loader2 className="animate-spin" />
+          ) : (
+            "Complete Swap"
+          )}
         </Button>
       </div>
     </div>

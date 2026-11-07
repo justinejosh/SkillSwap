@@ -1,39 +1,54 @@
+import { api } from "@/app/lib/api";
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router";
 import { Button } from "@/app/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/app/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/app/components/ui/card";
 import { Progress } from "@/app/components/ui/progress";
-import { 
-  ArrowLeft, CheckCircle2, MessageSquare, 
-  Star, Award, Loader2, Send 
+import {
+  ArrowLeft,
+  CheckCircle2,
+  MessageSquare,
+  Star,
+  Award,
+  Loader2,
+  Send,
 } from "lucide-react";
 import { API_BASE_URL } from "@/config";
 
 export default function SwapDetailsPage() {
   const { swapId } = useParams();
   const navigate = useNavigate();
+  const [error, setError] = useState("");
   const [swap, setSwap] = useState<any>(null);
   const [isUpdating, setIsUpdating] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
 
-  useEffect(() => { 
+  useEffect(() => {
     const user = JSON.parse(localStorage.getItem("knoxite_user") || "{}");
     setCurrentUser(user);
-    fetchDetails(); 
+    fetchDetails();
   }, [swapId]);
 
   const fetchDetails = async () => {
     try {
       const token = localStorage.getItem("knoxite_token");
-      const res = await fetch(`${API_BASE_URL}/swaps/${swapId}`, { 
-        headers: { 
-          "Authorization": `Bearer ${token}`,
-          "bypass-tunnel-reminder": "true"
-        } 
+      const res = await fetch(`${API_BASE_URL}/swaps/${swapId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "bypass-tunnel-reminder": "true",
+        },
       });
       if (res.ok) {
         const data = await res.json();
         setSwap(data);
+      } else {
+        const data = await res.json();
+        setError(data.error || "Unable to load swap.");
       }
     } catch (err) {
       console.error("Fetch Error:", err);
@@ -47,13 +62,23 @@ export default function SwapDetailsPage() {
       const token = localStorage.getItem("knoxite_token");
       const res = await fetch(`${API_BASE_URL}/swaps/${swapId}/log-session`, {
         method: "POST",
-        headers: { 
-          "Authorization": `Bearer ${token}`,
-          "bypass-tunnel-reminder": "true"
-        }
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "bypass-tunnel-reminder": "true",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          sessionNumber:
+            (swap.requesterId === currentUser.id
+              ? swap.requesterSessions
+              : swap.receiverSessions) + 1,
+        }),
       });
       if (res.ok) {
         fetchDetails();
+      } else {
+        const data = await res.json();
+        setError(data.error || "Session confirmation failed.");
       }
     } catch (err) {
       console.error("Log Session Error:", err);
@@ -67,7 +92,7 @@ export default function SwapDetailsPage() {
       <div className="flex flex-col h-screen items-center justify-center bg-[#F8FAFC]">
         <Loader2 className="size-8 text-blue-600 animate-spin mb-3" />
         <span className="text-slate-900 font-bold text-xs uppercase tracking-widest">
-          Synchronizing Rotation Data...
+          {error || "Synchronizing Rotation Data..."}
         </span>
       </div>
     );
@@ -75,17 +100,20 @@ export default function SwapDetailsPage() {
 
   // Bilateral Logic Assessment
   const isRequester = swap.requesterId === currentUser.id;
-  const mySessions = isRequester ? swap.requesterSessions : swap.receiverSessions;
-  const partnerSessions = isRequester ? swap.receiverSessions : swap.requesterSessions;
+  const mySessions = isRequester
+    ? swap.requesterSessions
+    : swap.receiverSessions;
+  const partnerSessions = isRequester
+    ? swap.receiverSessions
+    : swap.requesterSessions;
   const isCompleted = swap.status === "COMPLETED";
-  
+
   const iAmDone = mySessions >= swap.sessions;
   const partnerIsDone = partnerSessions >= swap.sessions;
-  const readyToReview = iAmDone && partnerIsDone && !isCompleted;
+  const readyToReview = iAmDone && partnerIsDone && swap.status === "CONFIRMED";
 
   return (
-   <div className="min-h-screen bg-gradient-to-b from-[#E5F2FA] via-[#E5F2FA] via-70% to-[#F8FAFC] dark:bg-none dark:bg-slate-950   text-slate-900 dark:text-slate-100 font-sans flex flex-col relative overflow-x-hidden transition-colors duration-200">
-
+    <div className="min-h-screen bg-gradient-to-b from-[#E5F2FA] via-[#E5F2FA] via-70% to-[#F8FAFC] dark:bg-none dark:bg-slate-950   text-slate-900 dark:text-slate-100 font-sans flex flex-col relative overflow-x-hidden transition-colors duration-200">
       {/* SUBTLE ARCHITECTURAL GRID */}
       <div className="absolute inset-0 bg-[linear-gradient(to_right,#e2e8f080_1px,transparent_1px),linear-gradient(to_bottom,#e2e8f080_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_70%_50%_at_50%_0%,#000_70%,transparent_110%)] pointer-events-none" />
 
@@ -93,10 +121,10 @@ export default function SwapDetailsPage() {
       <div className="sticky top-4 z-30 px-4 sm:px-6">
         <header className="max-w-2xl mx-auto flex items-center justify-between px-4 sm:px-5 py-3.5 rounded-2xl bg-white/85 backdrop-blur-md border border-slate-200/80 shadow-xs">
           <div className="flex items-center gap-2.5">
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              onClick={() => navigate("/dashboard")} 
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => navigate("/dashboard")}
               className="size-9 rounded-xl text-blue-600 hover:bg-blue-50 hover:text-blue-700 transition-colors shrink-0"
               title="Back to Dashboard"
             >
@@ -105,7 +133,7 @@ export default function SwapDetailsPage() {
 
             <div className="h-5 w-[1px] bg-slate-200 mx-0.5 hidden sm:block" />
 
-            <div 
+            <div
               onClick={() => navigate("/dashboard")}
               className="flex items-center gap-2.5 cursor-pointer"
             >
@@ -120,11 +148,13 @@ export default function SwapDetailsPage() {
             </div>
           </div>
 
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             size="sm"
             className="border-slate-200 text-slate-700 hover:bg-slate-50 rounded-xl text-xs font-bold h-9 px-3.5 shadow-2xs"
-            onClick={() => navigate(`/chat?partnerId=${swap?.partner?.id}`)}
+            onClick={() =>
+              navigate(`/chat?partnerId=${swap?.partner?.id}&swapId=${swap.id}`)
+            }
           >
             <MessageSquare className="mr-1.5 size-3.5 text-blue-600" /> Message
           </Button>
@@ -133,6 +163,47 @@ export default function SwapDetailsPage() {
 
       {/* 2. MAIN TRACKING CONTAINER */}
       <main className="flex-1 max-w-2xl mx-auto w-full px-4 pt-8 space-y-6 relative z-10">
+        {swap.status === "CONFIRMED" && (
+          <Button
+            variant="outline"
+            onClick={() => navigate(`/calendar?swapId=${swap.id}`)}
+          >
+            Schedule Sessions
+          </Button>
+        )}
+        {error && (
+          <p role="alert" className="text-red-700">
+            {error}
+          </p>
+        )}
+        {swap.status === "PENDING_AGREEMENT" && (
+          <Button onClick={() => navigate(`/swap-agreement/${swap.id}`)}>
+            Review and Approve Agreement
+          </Button>
+        )}
+        {["PENDING_AGREEMENT", "CONFIRMED"].includes(swap.status) && (
+          <Button
+            variant="outline"
+            onClick={async () => {
+              if (
+                !window.confirm(
+                  "Cancel this exchange? Its history will be retained.",
+                )
+              )
+                return;
+              try {
+                await api(`/swaps/cancel/swap/${swap.id}`, {
+                  method: "DELETE",
+                });
+                await fetchDetails();
+              } catch (e: any) {
+                setError(e.message);
+              }
+            }}
+          >
+            Cancel Exchange
+          </Button>
+        )}
         <Card className="border-slate-200/90 shadow-xs bg-white rounded-3xl overflow-hidden">
           <CardHeader className="bg-white border-b border-slate-100 p-6 sm:p-7">
             <div className="flex justify-between items-center gap-3">
@@ -164,11 +235,13 @@ export default function SwapDetailsPage() {
                       / {swap.sessions}
                     </span>
                   </div>
-                  {iAmDone && <CheckCircle2 className="size-5 text-emerald-600" />}
+                  {iAmDone && (
+                    <CheckCircle2 className="size-5 text-emerald-600" />
+                  )}
                 </div>
-                <Progress 
-                  value={(mySessions / swap.sessions) * 100} 
-                  className="h-2 bg-blue-100 [&>div]:bg-blue-600 rounded-full" 
+                <Progress
+                  value={(mySessions / swap.sessions) * 100}
+                  className="h-2 bg-blue-100 [&>div]:bg-blue-600 rounded-full"
                 />
               </div>
 
@@ -186,11 +259,13 @@ export default function SwapDetailsPage() {
                       / {swap.sessions}
                     </span>
                   </div>
-                  {partnerIsDone && <CheckCircle2 className="size-5 text-emerald-600" />}
+                  {partnerIsDone && (
+                    <CheckCircle2 className="size-5 text-emerald-600" />
+                  )}
                 </div>
-                <Progress 
-                  value={(partnerSessions / swap.sessions) * 100} 
-                  className="h-2 bg-slate-200 [&>div]:bg-emerald-600 rounded-full" 
+                <Progress
+                  value={(partnerSessions / swap.sessions) * 100}
+                  className="h-2 bg-slate-200 [&>div]:bg-emerald-600 rounded-full"
                 />
               </div>
             </div>
@@ -201,11 +276,16 @@ export default function SwapDetailsPage() {
                 <div className="text-center p-6 bg-emerald-50 rounded-2xl border border-emerald-200/70 space-y-3">
                   <Award className="size-10 text-emerald-600 mx-auto" />
                   <div className="space-y-1">
-                    <h3 className="font-bold text-emerald-950 text-base">Rotation Finalized & Verified</h3>
-                    <p className="text-xs text-emerald-700">Both counterparties have completed and validated all agreed swap hours.</p>
+                    <h3 className="font-bold text-emerald-950 text-base">
+                      Exchange Completed
+                    </h3>
+                    <p className="text-xs text-emerald-700">
+                      Both counterparties have completed and validated all
+                      agreed swap hours.
+                    </p>
                   </div>
-                  <Button 
-                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl h-11 text-xs shadow-sm shadow-emerald-600/20" 
+                  <Button
+                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl h-11 text-xs shadow-sm shadow-emerald-600/20"
                     onClick={() => navigate("/dashboard")}
                   >
                     Return Home
@@ -215,12 +295,21 @@ export default function SwapDetailsPage() {
                 <div className="text-center p-6 bg-amber-50 rounded-2xl border border-amber-200/70 space-y-3">
                   <Star className="size-10 text-amber-500 mx-auto fill-amber-500" />
                   <div className="space-y-1">
-                    <h3 className="font-bold text-amber-950 text-base">Mutual Validation Complete</h3>
-                    <p className="text-xs text-amber-700 font-medium">Both peers have confirmed the sessions. Proceed to peer evaluation to conclude the swap.</p>
+                    <h3 className="font-bold text-amber-950 text-base">
+                      Mutual Validation Complete
+                    </h3>
+                    <p className="text-xs text-amber-700 font-medium">
+                      Both peers have confirmed the sessions. Proceed to peer
+                      evaluation to conclude the swap.
+                    </p>
                   </div>
-                  <Button 
-                    className="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold h-11 rounded-xl text-xs shadow-sm shadow-amber-500/20" 
-                    onClick={() => navigate(`/reputation?partnerId=${swap?.partner?.id}&swapId=${swap.id}`)}
+                  <Button
+                    className="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold h-11 rounded-xl text-xs shadow-sm shadow-amber-500/20"
+                    onClick={() =>
+                      navigate(
+                        `/reputation?partnerId=${swap?.partner?.id}&swapId=${swap.id}`,
+                      )
+                    }
                   >
                     Evaluate Peer <Award className="ml-1.5 size-4" />
                   </Button>
@@ -228,19 +317,31 @@ export default function SwapDetailsPage() {
               ) : iAmDone ? (
                 <div className="text-center p-6 bg-blue-50/70 rounded-2xl border border-blue-200/70 space-y-2">
                   <Loader2 className="size-7 text-blue-600 animate-spin mx-auto mb-1" />
-                  <h3 className="font-bold text-blue-950 text-base">Awaiting Partner Validation</h3>
+                  <h3 className="font-bold text-blue-950 text-base">
+                    Awaiting Partner Validation
+                  </h3>
                   <p className="text-xs text-blue-700 font-medium max-w-sm mx-auto">
-                    You have logged all sessions. Waiting for {swap.partner?.name || "your partner"} to confirm their side of the exchange.
+                    You have logged all sessions. Waiting for{" "}
+                    {swap.partner?.name || "your partner"} to confirm their side
+                    of the exchange.
                   </p>
                 </div>
               ) : (
                 <div className="flex flex-col gap-4">
-                  <Button 
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold h-12 rounded-xl text-xs uppercase tracking-wider shadow-md shadow-blue-600/20" 
-                    onClick={logSession} 
-                    disabled={isUpdating}
+                  <Button
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold h-12 rounded-xl text-xs uppercase tracking-wider shadow-md shadow-blue-600/20"
+                    onClick={logSession}
+                    disabled={
+                      isUpdating ||
+                      swap.status !== "CONFIRMED" ||
+                      !swap.integrityVerified
+                    }
                   >
-                    {isUpdating ? <Loader2 className="animate-spin size-4" /> : "Log Completed Session"}
+                    {isUpdating ? (
+                      <Loader2 className="animate-spin size-4" />
+                    ) : (
+                      "Log Completed Session"
+                    )}
                   </Button>
 
                   <div className="p-4 bg-slate-50/80 rounded-2xl border border-dashed border-slate-200 flex items-center justify-between">
@@ -257,10 +358,14 @@ export default function SwapDetailsPage() {
                         </p>
                       </div>
                     </div>
-                    <Button 
-                      variant="ghost" 
+                    <Button
+                      variant="ghost"
                       className="text-blue-600 font-bold text-xs uppercase hover:bg-blue-50 rounded-xl"
-                      onClick={() => navigate(`/chat?partnerId=${swap?.partner?.id}`)}
+                      onClick={() =>
+                        navigate(
+                          `/chat?partnerId=${swap?.partner?.id}&swapId=${swap.id}`,
+                        )
+                      }
                     >
                       Chat Now <Send className="ml-1.5 size-3" />
                     </Button>
