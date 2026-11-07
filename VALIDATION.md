@@ -2,7 +2,33 @@
 
 Date: 2026-11-07 (Asia/Manila). Branch: `dev-justine`. These results describe local validation, not production deployment or a completed student study.
 
-## Reviewed full suite and continuous student journey
+## Partner integrity and provisional academic mapping follow-up
+
+| Check | Result |
+| --- | --- |
+| Backend rule tests, including partner-integrity policies | 26 passed |
+| Actual MySQL API/integrity/student-journey tests | 23 passed, including three parent tests |
+| Desktop/mobile browser workflow coverage | 32 passing scenarios: 30 unaffected cases plus two corrected/retested cases |
+| Passing checks covered by these runs | 81 |
+| Frontend and backend TypeScript; frontend production build | Passed |
+| Schema/migration changes | None; Prisma schema and migration files unchanged |
+| Dependency changes | None; earlier zero-vulnerability audits remain the recorded audit results |
+
+The first browser run passed 30 cases and found two failures in the new administrator disposition control's accessible name. An explicit accessible label corrected the issue. The focused rerun passed that workflow on desktop and mobile; the other 30 cases were not needlessly repeated. No test remains unresolved.
+
+The MySQL run initialized a fresh disposable loopback database from the existing, unchanged `prisma/baseline/empty.sql` snapshot. This created only a synthetic schema and fixtures. No upgrade/migration command, existing student database, production API, or production resource was accessed. The migration suite was deliberately excluded under the current instruction not to execute migrations. Earlier migration-rehearsal results below are historical evidence, not a claim of rerunning them in this follow-up.
+
+The selected backend command, after `npm test` builds the TypeScript tests, was:
+
+```text
+node --test --test-concurrency=1 dist/tests/integration/api.test.js dist/tests/integration/integrity.test.js dist/tests/integration/student-flow.test.js
+```
+
+New checks cover the exact 13-program/nine-college draft, preserved catalog codes/labels and existing assignments, exclusion of provisional mappings from proximity, stale/validated mapping edit protection, repeated five-star exchanges, partner-balanced means/rates, confirmed cancellations, two-partner leaderboard eligibility, distinct-partner activity ordering, unvalidated outcomes, and discoverable/request-capable cold-start users. Administrator review tests cover private signals, concurrent duplicate-open prevention, server-sourced evidence, revision checks, separation from generic reports, neutral dismissal, and unchanged accounts/history/tiers/scoring flags. The continuous journey now verifies all 24 administrative route/method boundaries.
+
+See `docs/PARTNER_INTEGRITY_POLICY.md` for the explicitly reported approvals and metric definitions, and `docs/DEPLOYMENT_READINESS.md` for the newly supplied hosting facts and remaining production restrictions.
+
+## Earlier reviewed full suite and continuous student journey
 
 | Check | Result |
 | --- | --- |

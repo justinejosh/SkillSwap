@@ -17,25 +17,25 @@ Record the confirming office/person, date, source/document identifier, exact rul
 
 ## Program-to-department sign-off
 
-These exact team-supplied labels are already configurable. An institutionally confirmed department ID/name, evidence, reviewer, and date are required for every assignment. Multiple programs may share a department. No student is assigned a department merely because a program label resembles a department name.
+The team supplied the working draft below: all 13 existing program labels across nine colleges. The draft is configurable and is not campus-validated. An institutionally confirmed department ID/name, evidence, reviewer, and date are required before any assignment contributes to WRMR. Multiple programs may share a department. No student is assigned a department merely because a program label resembles a department name.
 
-| Program label | Official department | Approval |
+| Program label | Proposed college/department | Official approval |
 | --- | --- | --- |
-| BSACC | Pending | Not recorded |
-| BSAIS | Pending | Not recorded |
-| BSCRIM | Pending | Not recorded |
-| BSCS | Pending | Not recorded |
-| BSIHM-CA | Pending | Not recorded |
-| BSIHM-HACLO | Pending | Not recorded |
-| BSIT | Pending | Not recorded |
-| BSMLS | Pending | Not recorded |
-| BSN | Pending | Not recorded |
-| BSPT | Pending | Not recorded |
-| BSTom | Pending | Not recorded |
-| BS PHARM | Pending | Not recorded |
-| BS PSYCH | Pending | Not recorded |
+| BSACC | College of Business and Accountancy | Pending campus evidence |
+| BSAIS | College of Business and Accountancy | Pending campus evidence |
+| BSCRIM | College of Criminal Justice | Pending campus evidence |
+| BSCS | College of Computer Studies | Pending campus evidence |
+| BSIHM-CA | College of Hospitality and Institutional Management | Pending campus evidence |
+| BSIHM-HACLO | College of Hospitality and Institutional Management | Pending campus evidence |
+| BSIT | College of Computer Studies | Pending campus evidence |
+| BSMLS | College of Medical Laboratory Science | Pending campus evidence |
+| BSN | College of Nursing | Pending campus evidence |
+| BSPT | College of Physical Therapy | Pending campus evidence |
+| BSTom | College of Hospitality and Institutional Management | Pending campus evidence |
+| BS PHARM | College of Pharmacy | Pending campus evidence |
+| BS PSYCH | College of Arts and Sciences | Pending campus evidence |
 
-Initial years are 1st Year through 4th Year. Record any approved extra years per program through configuration; do not introduce SHS strands or year options. Use `/admin/assessments` to enter an approved department and its mapping evidence only after sign-off. Missing/unvalidated mappings leave proximity unavailable.
+Initial years are 1st Year through 4th Year. Record any approved extra years per program through configuration; do not introduce SHS strands or year options. Use `/admin/assessments` to review or import the provisional draft without overwriting existing assignments. Provisional edits never set validation evidence. Use the separate confirmed-mapping action only after actual campus sign-off. Missing/unvalidated mappings leave proximity unavailable.
 
 ## Question-bank sign-off
 
@@ -47,4 +47,4 @@ Follow `ASSESSMENT_VALIDATION_GUIDE.md`. Import as draft, complete actual subjec
 
 ## Thesis policies already documented
 
-Reciprocal filtering precedes 50/30/20 WRMR ranking; the team-approved proximity cases are 100/80/60/40 for department/year similarities. There is no geographic calculation or assessment contribution. Missing evidence leaves students unranked but eligible to discover reciprocal peers and initiate swaps. An entirely new-student pilot tests that flow; it cannot establish WRMR ranking quality before reliable history exists.
+The team separately reported adviser approval for partner-balanced rating/completion inputs, two completed partners for leaderboard eligibility, and distinct-partner activity ordering; see `PARTNER_INTEGRITY_POLICY.md`. This does not officially validate academic mappings. Reciprocal filtering precedes 50/30/20 WRMR ranking; the team-approved proximity cases are 100/80/60/40 for department/year similarities. There is no geographic calculation or assessment contribution. Missing evidence leaves students unranked but eligible to discover reciprocal peers and initiate swaps. An entirely new-student pilot tests that flow; it cannot establish WRMR ranking quality before reliable history exists.

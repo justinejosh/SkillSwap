@@ -6,7 +6,7 @@ Reviewed 2026-11-07 on `dev-justine`, against the current working tree based on 
 
 | Area | Source | Local evidence |
 | --- | --- | --- |
-| Administrative authorization | `app.ts`, `middleware/authMiddleware.ts`, `routes/admin.ts`, `routes/analytics.ts`, `routes/forum.ts` | All 18 administrative route/method combinations reject anonymous callers with 401 and ordinary students with 403. A signed student token claiming ADMIN still fails; demoting a current administrator immediately removes access. |
+| Administrative authorization | `app.ts`, `middleware/authMiddleware.ts`, `routes/admin.ts`, `routes/analytics.ts`, `routes/forum.ts` | All 24 administrative route/method combinations (including the subsequent draft-mapping and integrity-review routes) reject anonymous callers with 401 and ordinary students with 403. A signed student token claiming ADMIN still fails; demoting a current administrator immediately removes access. |
 | Student eligibility | `lib/config.ts`, `services/academics.ts`, authentication middleware, matches, portfolios, swap requests | Suspended, unverified, outside-domain, and identifier-less campus addresses cannot use a previously issued student session. Such accounts are excluded from public portfolios and both leaderboards. |
 | JWT and session checks | `routes/auth.ts`, authentication middleware | Tokens signed by a different/retired key fail. Session expiration, revocation, database role, and token version are checked; password changes revoke sessions. The production eligibility/verification/HTTPS guard is unit tested. |
 | Sensitive exchange operations | `routes/swaps.ts`, `routes/chat.ts`, `routes/sessions.ts` | Participant checks, partner identity, reciprocal skill ownership, bilateral revision consent, duplicate reviews, session acknowledgements, and cancellation behavior have negative and positive API tests. |
@@ -28,11 +28,11 @@ Current tracked and proposed text files were scanned for private keys, common pr
 
 All 11 deleted files are checked-in generated backend `.js` copies with corresponding TypeScript sources. Their removal is intentional: development uses TypeScript and production runs the compiled `dist/index.js`. Build output, generated clients, dependency directories, browser traces, coverage, local environment files, and test data are excluded from commits. Baseline and additive migration SQL are intentional source-controlled schema artifacts.
 
-Both npm dependency audits report zero known vulnerabilities at review time. Both TypeScript checks and builds, all 17 rule tests, all 20 MySQL API/migration/journey tests (including three parent tests), and all 22 desktop/mobile browser checks pass. See `VALIDATION.md` for boundaries and commands.
+Both npm dependency audits reported zero known vulnerabilities at the initial review; the follow-up adds no dependencies. Both TypeScript checks and builds, all 17 rule tests, all 20 MySQL API/migration/journey tests (including three parent tests), and all 22 desktop/mobile browser checks pass. These are the earlier full-suite counts. See `VALIDATION.md` for current follow-up coverage and commands; upgrade migration tests were not executed during the follow-up.
 
 ## Production containment and secret rotation: not performed
 
-No deployment target, authenticated provider access, or hosting configuration for this repository was available. The deployment details have been requested from the owner. No live secret, deployment, production API, or production database was changed or inspected.
+The team subsequently identified Vercel for the frontend and Render service `skillswap-50cf` for the backend, with automatic deployments from `main`. Dashboard access remains with a developer groupmate; the production database provider, backups, access and migration readiness are unresolved. Current authorization expressly prohibits connecting to production, deploying or merging. No live secret, deployment, production API, or production database was changed or inspected. See `DEPLOYMENT_READINESS.md`.
 
 The hosting owner must treat the historical hardcoded key as compromised. Generate a new cryptographically random key in the deployment's secret-management workflow, replace the running signing key on every instance, restart/redeploy the applicable backend, and ensure tokens signed with the old key are rejected. Do not copy a test key or example placeholder. Never paste the replacement into a chat, commit, command transcript, or review document.
 
