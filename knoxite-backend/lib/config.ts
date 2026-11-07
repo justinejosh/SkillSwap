@@ -6,6 +6,12 @@ export interface AppConfig {
   campusEmailSuffix: string;
   campusRuleConfirmed: boolean;
   publicAppUrl: string;
+  google: {
+    enabled: boolean;
+    clientId: string;
+    hostedDomains: string[];
+    policyVersion: string;
+  };
 }
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   const jwtSecret = env.JWT_SECRET || "";
@@ -61,6 +67,32 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     );
   if (env.NODE_ENV === "production" && url.protocol !== "https:")
     throw new Error("PUBLIC_APP_URL must use HTTPS in production.");
+  const google = {
+    enabled: env.GOOGLE_SIGN_IN_ENABLED === "true",
+    clientId: (env.GOOGLE_CLIENT_ID || "").trim(),
+    hostedDomains: (env.GOOGLE_ALLOWED_HOSTED_DOMAINS || "")
+      .split(",")
+      .map((d) => d.trim().toLowerCase())
+      .filter(Boolean),
+    policyVersion: (env.GOOGLE_ELIGIBILITY_POLICY_VERSION || "").trim(),
+  };
+  if (
+    google.enabled &&
+    (!/^[A-Za-z0-9_-]+\.apps\.googleusercontent\.com$/.test(google.clientId) ||
+      !google.hostedDomains.length ||
+      google.hostedDomains.some((d) => !/^[a-z0-9.-]+\.[a-z]{2,}$/.test(d)) ||
+      !google.policyVersion ||
+      google.policyVersion.length > 191 ||
+      !campusRuleConfirmed ||
+      !verificationRequired ||
+      !institutionDomains.length ||
+      env.GOOGLE_WORKSPACE_ACCESS_CONFIRMED !== "true" ||
+      env.GOOGLE_ELIGIBILITY_RULES_CONFIRMED !== "true" ||
+      env.GOOGLE_SECURITY_REVIEW_CONFIRMED !== "true")
+  )
+    throw new Error(
+      "Google Sign-In requires an approved client, hosted domains, confirmed Workspace/campus/college eligibility policy, ownership verification, and security review. Keep GOOGLE_SIGN_IN_ENABLED=false until approved.",
+    );
   return {
     jwtSecret,
     origins,
@@ -69,6 +101,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     campusEmailSuffix,
     campusRuleConfirmed,
     publicAppUrl: url.origin,
+    google,
   };
 }
 

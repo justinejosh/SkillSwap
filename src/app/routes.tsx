@@ -3,6 +3,8 @@ import PublicProfilePage from "@/app/pages/PublicProfilePage";
 import AssessmentPage from "@/app/pages/AssessmentPage";
 import AssessmentAdminPage from "@/app/pages/AssessmentAdminPage";
 import VerifyEmailPage from "@/app/pages/VerifyEmailPage";
+import AccountRecoveryPage from "@/app/pages/AccountRecoveryPage";
+import ResetPasswordPage from "@/app/pages/ResetPasswordPage";
 import IntegrityAdminPage from "@/app/pages/IntegrityAdminPage";
 import { createBrowserRouter } from "react-router";
 
@@ -47,6 +49,8 @@ export const router = createBrowserRouter([
     ),
   },
   { path: "/verify-email", Component: VerifyEmailPage },
+  { path: "/recover-account", Component: AccountRecoveryPage },
+  { path: "/reset-password", Component: ResetPasswordPage },
   {
     path: "/students/:userId",
     element: (

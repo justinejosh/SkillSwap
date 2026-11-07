@@ -46,6 +46,24 @@ export default function PrivacyPolicyPage() {
           </p>
         </section>
         <section className="space-y-2 rounded-xl border bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
+          <h2 className="text-lg font-semibold">
+            Institutional Google sign-in
+          </h2>
+          <p>
+            When enabled by the project team under approved institutional rules,
+            Google sign-in shares identity information needed to authenticate
+            you. Knoxite stores your linked Google account identifier, verified
+            institutional email, Workspace domain, and verification dates
+            privately. Google sign-in does not give Knoxite access to your Gmail
+            messages or Drive files.
+          </p>
+          <p>
+            Linking Google preserves your Knoxite profile and exchange history.
+            You can manage the link in Account security. Set up a verified
+            email/password fallback before unlinking your only sign-in method.
+          </p>
+        </section>
+        <section className="space-y-2 rounded-xl border bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
           <h2 className="text-lg font-semibold">Protecting your account</h2>
           <p>
             Your sign-in session is stored in this browser. Sign out on shared

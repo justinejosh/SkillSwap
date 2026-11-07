@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "",
   "main": "dist/index.js",
+  "engines": { "node": ">=22" },
   "scripts": {
     "predev": "npm run db:ensure",
     "dev": "node --watch --require ts-node/register index.ts",
@@ -18,7 +19,8 @@
     "db:preflight": "ts-node --prefer-ts-exts scripts/preflight.ts",
     "db:backfill": "ts-node --prefer-ts-exts scripts/backfill.ts",
     "db:bootstrap": "ts-node --prefer-ts-exts scripts/migrate-local.ts bootstrap",
-    "db:upgrade": "ts-node --prefer-ts-exts scripts/migrate-local.ts upgrade"
+    "db:upgrade": "ts-node --prefer-ts-exts scripts/migrate-local.ts upgrade",
+    "db:upgrade:google": "ts-node --prefer-ts-exts scripts/migrate-google.ts"
   },
   "keywords": [],
   "author": "",
@@ -29,6 +31,7 @@
     "cors": "^2.8.6",
     "dotenv": "^17.4.1",
     "express": "^5.2.1",
+    "google-auth-library": "^11.3.3",
     "jsonwebtoken": "^9.0.3"
   },
   "devDependencies": {

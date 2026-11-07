@@ -1,5 +1,6 @@
 import { api } from "@/app/lib/api";
-import { useState, useEffect } from "react";
+import GoogleSignIn from "@/app/components/GoogleSignIn";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
@@ -19,14 +20,33 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [googleOnboarding, setGoogleOnboarding] = useState(false);
+  const [notice, setNotice] = useState("");
+  const [verificationBusy, setVerificationBusy] = useState(false);
+  const [deliveryAvailable, setDeliveryAvailable] = useState<boolean | null>(
+    null,
+  );
+  const signInForm = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
     document.documentElement.classList.remove("dark");
+    let active = true;
+    api<{ emailDeliveryAvailable: boolean }>("/auth/recovery-options")
+      .then((result) => {
+        if (active) setDeliveryAvailable(result.emailDeliveryAvailable);
+      })
+      .catch(() => {
+        /* Individual actions still show request failures. */
+      });
+    return () => {
+      active = false;
+    };
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setNotice("");
     setIsLoading(true);
 
     try {
@@ -85,78 +105,124 @@ export default function LoginPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {error && (
-                <div className="p-3 text-xs md:text-sm text-red-600 bg-red-50 border border-red-200 rounded-md text-center">
-                  {error}
-                </div>
-              )}
-              <div className="space-y-2">
-                <Label htmlFor="email" className="text-blue-900 font-semibold">
-                  Email Address
-                </Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="name@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  className="border-blue-200 focus:ring-2 focus:ring-blue-400 focus:border-transparent"
-                />
-              </div>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
+            <GoogleSignIn onOnboardingChange={setGoogleOnboarding} />
+            {!googleOnboarding && (
+              <form
+                ref={signInForm}
+                onSubmit={handleSubmit}
+                className="space-y-4"
+              >
+                {error && (
+                  <div
+                    role="alert"
+                    className="p-3 text-xs md:text-sm text-red-600 bg-red-50 border border-red-200 rounded-md text-center"
+                  >
+                    {error}
+                  </div>
+                )}
+                {notice && (
+                  <p
+                    role="status"
+                    className="p-3 text-sm text-blue-900 bg-blue-50 rounded-md"
+                  >
+                    {notice}
+                  </p>
+                )}
+                {deliveryAvailable === false && (
+                  <p className="p-3 text-sm text-amber-900 bg-amber-50 rounded-md">
+                    Email delivery is unavailable. Verification links and
+                    emailed password resets cannot be sent. Contact your Knoxite
+                    administrator for help.
+                  </p>
+                )}
+                <div className="space-y-2">
                   <Label
-                    htmlFor="password"
+                    htmlFor="email"
                     className="text-blue-900 font-semibold"
                   >
-                    Password
+                    Email Address
                   </Label>
-                  <button
-                    type="button"
-                    className="text-xs text-blue-600 hover:text-blue-800 font-medium transition-colors"
-                    disabled
-                    title="Contact your institution administrator for account recovery"
-                  >
-                    Account recovery: contact administrator
-                  </button>
+                  <Input
+                    id="email"
+                    name="email"
+                    type="email"
+                    autoComplete="username"
+                    placeholder="name@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    className="border-blue-200 focus:ring-2 focus:ring-blue-400 focus:border-transparent"
+                  />
                 </div>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="........"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  className="border-blue-200 focus:ring-2 focus:ring-blue-400 focus:border-transparent"
-                />
-              </div>
-              <Button
-                type="submit"
-                disabled={isLoading}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-200 py-6 text-lg font-bold transition-all active:scale-[0.98] mt-2"
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label
+                      htmlFor="password"
+                      className="text-blue-900 font-semibold"
+                    >
+                      Password
+                    </Label>
+                    <button
+                      type="button"
+                      className="text-xs text-blue-600 hover:text-blue-800 font-medium transition-colors"
+                      onClick={() =>
+                        navigate("/recover-account", { state: { email } })
+                      }
+                    >
+                      Forgot password?
+                    </button>
+                  </div>
+                  <Input
+                    id="password"
+                    type="password"
+                    autoComplete="current-password"
+                    placeholder="........"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    className="border-blue-200 focus:ring-2 focus:ring-blue-400 focus:border-transparent"
+                  />
+                </div>
+                <Button
+                  type="submit"
+                  disabled={isLoading}
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-200 py-6 text-lg font-bold transition-all active:scale-[0.98] mt-2"
+                >
+                  {isLoading ? "Authenticating..." : "Sign in"}
+                </Button>
+              </form>
+            )}
+            {!googleOnboarding && (
+              <button
+                type="button"
+                className="mt-4 text-sm text-blue-700 underline"
+                disabled={verificationBusy || deliveryAvailable === false}
+                onClick={async () => {
+                  const input = signInForm.current?.elements.namedItem(
+                    "email",
+                  ) as HTMLInputElement | null;
+                  if (!input?.reportValidity()) return;
+                  setError("");
+                  setNotice("");
+                  setVerificationBusy(true);
+                  try {
+                    const result = await api("/auth/request-verification", {
+                      method: "POST",
+                      body: JSON.stringify({ email }),
+                    });
+                    setNotice(result.message);
+                  } catch (e: any) {
+                    setError(e.message);
+                  } finally {
+                    setVerificationBusy(false);
+                  }
+                }}
               >
-                {isLoading ? "Authenticating..." : "Sign in"}
-              </Button>
-            </form>
-            <button
-              type="button"
-              className="mt-4 text-sm text-blue-700 underline"
-              onClick={async () => {
-                try {
-                  const result = await api("/auth/request-verification", {
-                    method: "POST",
-                    body: JSON.stringify({ email }),
-                  });
-                  setError(result.message);
-                } catch (e: any) {
-                  setError(e.message);
-                }
-              }}
-            >
-              Request institutional email verification
-            </button>
+                {verificationBusy
+                  ? "Requesting verification..."
+                  : "Request institutional email verification"}
+              </button>
+            )}
             <div className="mt-8 pt-6 border-t border-blue-50 text-center text-sm text-blue-700">
               Don't have an account?{" "}
               <button

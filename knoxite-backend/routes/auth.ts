@@ -5,12 +5,12 @@ import {
 import { PrismaClient } from "@prisma/client";
 import express, { RequestHandler } from "express";
 import bcrypt from "bcrypt";
-import jwt from "jsonwebtoken";
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, createHmac, randomBytes } from "node:crypto";
 import { AppConfig, studentEmailAllowed } from "../lib/config";
 import { HttpError, onlyKeys, text } from "../lib/http";
 import { actor, authentication } from "../middleware/authMiddleware";
 import { VerificationMailer } from "../services/email";
+import { issueSession, assertAccountAllowed } from "../services/authSessions";
 
 function password(value: unknown): string {
   if (
@@ -30,7 +30,17 @@ function emailAddress(value: unknown): string {
     throw new HttpError(422, "Enter a valid email address.");
   return email;
 }
-function throttle(): RequestHandler {
+function opaqueToken(value: unknown): string {
+  // All issued tokens are 32 random bytes encoded as 43 base64url characters.
+  // Reject altered or prefixed links before looking up any token.
+  if (typeof value !== "string" || !/^[A-Za-z0-9_-]{43}$/.test(value))
+    throw new HttpError(
+      422,
+      "This account link is invalid. Request a new link.",
+    );
+  return value;
+}
+export function throttle(): RequestHandler {
   // Single-process protection; use the deployment's distributed edge limit for multi-instance hosting.
   const windows = new Map<string, { count: number; until: number }>();
   return (req, res, next) => {
@@ -65,6 +75,8 @@ export function authRouter(
         "/request-verification",
         "/verify-email",
         "/password",
+        "/request-password-reset",
+        "/reset-password",
       ].includes(req.path)
     )
       return limit(req, res, next);
@@ -73,6 +85,32 @@ export function authRouter(
   router.get("/academic-options", async (_req, res) => {
     res.json(await academicOptions(db));
   });
+  const emailDeliveryAvailable = () => mailer.isConfigured?.() ?? true;
+  function requireDelivery() {
+    if (!emailDeliveryAvailable())
+      throw new HttpError(
+        503,
+        "Email delivery is not configured. Verification and emailed password recovery are unavailable. Contact the Knoxite administrator.",
+      );
+  }
+  router.get("/recovery-options", (_req, res) => {
+    res.json({ emailDeliveryAvailable: emailDeliveryAvailable() });
+  });
+  // A keyed, purpose-separated hash safely reuses the expiring one-use store.
+  // A recovery token (or prefixed token) cannot become a verification preimage,
+  // even for a verification consumer from an older deployment revision.
+  // Existing verification hashes and links retain their previous format.
+  const resetTokenHash = (token: string) =>
+    createHmac("sha256", config.jwtSecret)
+      .update(`knoxite:password-reset:v1:${token}`)
+      .digest("hex");
+  const recoverable = (user: {
+    isSuspended: boolean;
+    role: string;
+    email: string;
+  }) =>
+    !user.isSuspended &&
+    (user.role === "ADMIN" || studentEmailAllowed(user.email, config));
   async function sendVerification(user: { id: string; email: string }) {
     const token = randomBytes(32).toString("base64url");
     const saved = await db.emailVerificationToken.create({
@@ -135,18 +173,17 @@ export function authRouter(
     } catch {
       /* The account remains unverified and can request delivery again. */
     }
-    res
-      .status(201)
-      .json({
-        message: verificationSent
-          ? "Account created. Verify your institutional email before signing in."
-          : "Account created, but verification delivery is unavailable. Request verification again when delivery is restored.",
-        verificationSent,
-      });
+    res.status(201).json({
+      message: verificationSent
+        ? "Account created. Verify your institutional email before signing in."
+        : "Account created, but verification delivery is unavailable. Request verification again when delivery is restored.",
+      verificationSent,
+    });
   });
   router.post("/request-verification", async (req, res) => {
     onlyKeys(req.body, ["email"]);
     const email = emailAddress(req.body.email);
+    requireDelivery();
     const user = await db.user.findUnique({
       where: { email },
       select: {
@@ -169,17 +206,99 @@ export function authRouter(
         /* Same response for all accounts. */
       }
     }
+    res.status(202).json({
+      message:
+        "If an eligible account exists and email delivery is available, a verification message will be sent.",
+    });
+  });
+  router.post("/request-password-reset", async (req, res) => {
+    onlyKeys(req.body, ["email"]);
+    const email = emailAddress(req.body.email);
+    requireDelivery();
+    const user = await db.user.findUnique({
+      where: { email },
+      select: { id: true, email: true, role: true, isSuspended: true },
+    });
+    if (user && recoverable(user)) {
+      const token = randomBytes(32).toString("base64url");
+      const saved = await db.emailVerificationToken.create({
+        data: {
+          userId: user.id,
+          tokenHash: resetTokenHash(token),
+          expiresAt: new Date(Date.now() + 15 * 60_000),
+        },
+      });
+      try {
+        await mailer(
+          user.email,
+          `${config.publicAppUrl}/reset-password#token=${token}`,
+          "password-reset",
+        );
+      } catch {
+        await db.emailVerificationToken.update({
+          where: { id: saved.id },
+          data: { usedAt: new Date() },
+        });
+        // Do not disclose whether the address exists or delivery to it failed.
+      }
+    }
     res
       .status(202)
       .json({
         message:
-          "If an eligible account exists and email delivery is available, a verification message will be sent.",
+          "If an eligible account exists, a password reset link will be sent. The link expires after 15 minutes. If no message arrives, contact the Knoxite administrator.",
       });
+  });
+  router.post("/reset-password", async (req, res) => {
+    onlyKeys(req.body, ["token", "newPassword"]);
+    const tokenHash = resetTokenHash(opaqueToken(req.body.token));
+    const newPassword = password(req.body.newPassword);
+    const saved = await db.emailVerificationToken.findUnique({
+      where: { tokenHash },
+    });
+    const invalid = () =>
+      new HttpError(
+        422,
+        "Password reset link is invalid or expired. Request a new link.",
+      );
+    if (!saved || saved.usedAt || saved.expiresAt <= new Date())
+      throw invalid();
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+    await db.$transaction(async (tx) => {
+      // Serialize resets for the same account, including different valid links.
+      await tx.$queryRaw`SELECT id FROM User WHERE id = ${saved.userId} FOR UPDATE`;
+      const user = await tx.user.findUnique({
+        where: { id: saved.userId },
+        select: { email: true, role: true, isSuspended: true },
+      });
+      if (!user || !recoverable(user)) throw invalid();
+      const consumed = await tx.emailVerificationToken.updateMany({
+        where: { id: saved.id, usedAt: null, expiresAt: { gt: new Date() } },
+        data: { usedAt: new Date() },
+      });
+      if (consumed.count !== 1) throw invalid();
+      await tx.user.update({
+        where: { id: saved.userId },
+        data: { passwordHash, tokenVersion: { increment: 1 } },
+      });
+      await tx.authSession.updateMany({
+        where: { userId: saved.userId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+      await tx.emailVerificationToken.updateMany({
+        where: { userId: saved.userId, usedAt: null },
+        data: { usedAt: new Date() },
+      });
+    });
+    res.json({
+      message:
+        "Password reset. Sign in with your new password. Institutional email verification is still required for unverified accounts.",
+    });
   });
   router.post("/verify-email", async (req, res) => {
     onlyKeys(req.body, ["token"]);
     const tokenHash = createHash("sha256")
-      .update(text(req.body.token, "Token", 200))
+      .update(opaqueToken(req.body.token))
       .digest("hex");
     await db.$transaction(async (tx) => {
       const token = await tx.emailVerificationToken.findUnique({
@@ -209,49 +328,26 @@ export function authRouter(
     )
       throw new HttpError(422, "Invalid password input.");
     const user = await db.user.findUnique({ where: { email } });
-    if (!user || !(await bcrypt.compare(req.body.password, user.passwordHash)))
+    if (
+      !user?.passwordHash ||
+      !(await bcrypt.compare(req.body.password, user.passwordHash))
+    )
       throw new HttpError(401, "Invalid email or password.");
-    if (user.role === "USER" && !studentEmailAllowed(user.email, config))
-      throw new HttpError(
-        403,
-        "This student account does not meet the configured Santa Rosa institutional email rule.",
+    const result = await db.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM User WHERE id = ${user.id} FOR UPDATE`;
+      const current = await tx.user.findUniqueOrThrow({
+        where: { id: user.id },
+      });
+      if (current.passwordHash !== user.passwordHash)
+        throw new HttpError(401, "Credentials changed. Please sign in again.");
+      return issueSession(
+        tx,
+        config,
+        current,
+        req.get("User-Agent") || "Unknown device",
       );
-    if (user.isSuspended)
-      throw new HttpError(403, "This account is suspended.");
-    if (config.verificationRequired && !user.emailVerifiedAt)
-      throw new HttpError(
-        403,
-        "Verify your institutional email before signing in.",
-      );
-    const session = await db.authSession.create({
-      data: {
-        userId: user.id,
-        userAgent: (req.get("User-Agent") || "Unknown device").slice(0, 191),
-        expiresAt: new Date(Date.now() + 7 * 86400_000),
-      },
     });
-    const token = jwt.sign(
-      { tokenVersion: user.tokenVersion },
-      config.jwtSecret,
-      {
-        subject: user.id,
-        jwtid: session.id,
-        expiresIn: "7d",
-        algorithm: "HS256",
-        issuer: "knoxite-api",
-        audience: "knoxite",
-      },
-    );
-    res.json({
-      token,
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        avatarUrl: user.avatarUrl,
-      },
-    });
+    res.json(result);
   });
   router.get("/sessions", auth, async (req, res) => {
     const sessions = await db.authSession.findMany({
@@ -276,10 +372,31 @@ export function authRouter(
     if (typeof req.body.currentPassword !== "string")
       throw new HttpError(422, "Current password is required.");
     const user = await db.user.findUniqueOrThrow({ where: { id: actor(req) } });
-    if (!(await bcrypt.compare(req.body.currentPassword, user.passwordHash)))
+    if (!user.passwordHash)
+      throw new HttpError(
+        422,
+        "Set up your email/password fallback through an emailed password reset link first.",
+      );
+    if (
+      Buffer.byteLength(req.body.currentPassword) > 72 ||
+      !(await bcrypt.compare(req.body.currentPassword, user.passwordHash))
+    )
       throw new HttpError(403, "Current password is incorrect.");
     const passwordHash = await bcrypt.hash(password(req.body.newPassword), 12);
     await db.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM User WHERE id = ${user.id} FOR UPDATE`;
+      const current = await tx.user.findUniqueOrThrow({
+        where: { id: user.id },
+      });
+      assertAccountAllowed(current, config);
+      if (
+        current.passwordHash !== user.passwordHash ||
+        current.tokenVersion !== user.tokenVersion
+      )
+        throw new HttpError(
+          409,
+          "Your credentials changed. Sign in again before changing your password.",
+        );
       await tx.user.update({
         where: { id: user.id },
         data: { passwordHash, tokenVersion: { increment: 1 } },
@@ -287,6 +404,10 @@ export function authRouter(
       await tx.authSession.updateMany({
         where: { userId: user.id, revokedAt: null },
         data: { revokedAt: new Date() },
+      });
+      await tx.emailVerificationToken.updateMany({
+        where: { userId: user.id, usedAt: null },
+        data: { usedAt: new Date() },
       });
     });
     res.json({ message: "Password updated. Sign in again on all devices." });

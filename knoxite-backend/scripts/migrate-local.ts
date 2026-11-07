@@ -12,8 +12,11 @@ import {
   requireMigrationDatabase,
 } from "./localRecoverySafety";
 import { localDatabaseMaintenance } from "../lib/localMaintenance";
+import { applyGoogleMigration } from "./migrate-google";
 async function main() {
   const mode = process.argv[2];
+  if (mode === "upgrade-existing-local")
+    throw new Error("This revision permits Google schema changes only in isolated _test/_dev/_clone databases. The existing knoxite database is not authorized for this upgrade.");
   const approvalFile =
     mode === "upgrade-existing-local"
       ? process.env.KNOXITE_LOCAL_UPGRADE_APPROVAL_FILE
@@ -82,6 +85,7 @@ async function main() {
         );
     }
     await seedAcademicCatalog(db);
+    await applyGoogleMigration(db);
     // Historical migrations are preserved. A verified baseline avoids replaying their incomplete chain.
     const exists = await db.$queryRaw<
       Array<{ count: bigint }>

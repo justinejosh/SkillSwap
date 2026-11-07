@@ -7,6 +7,8 @@ import { AppConfig } from "./lib/config";
 import { errorHandler, HttpError } from "./lib/http";
 import { actor, authentication } from "./middleware/authMiddleware";
 import { authRouter } from "./routes/auth";
+import { googleRouter } from "./routes/google";
+import { googleVerifier, GoogleVerifier } from "./services/googleIdentity";
 import { profileRouter } from "./routes/profile";
 import { matchesRouter } from "./routes/matches";
 import { swapRouters } from "./routes/swaps";
@@ -34,6 +36,7 @@ export function createApp(
   config: AppConfig,
   mailer: VerificationMailer = configuredMailer(),
   maintenance: () => boolean = () => false,
+  verifyGoogle: GoogleVerifier = googleVerifier(),
 ) {
   const app = express();
   app.disable("x-powered-by");
@@ -61,18 +64,17 @@ export function createApp(
   });
   app.use((_req, res, next) => {
     if (maintenance()) {
-      res
-        .status(503)
-        .json({
-          error:
-            "Knoxite is temporarily unavailable for maintenance. Please try again later.",
-          maintenance: true,
-        });
+      res.status(503).json({
+        error:
+          "Knoxite is temporarily unavailable for maintenance. Please try again later.",
+        maintenance: true,
+      });
       return;
     }
     next();
   });
   app.use("/api/auth", authRouter(db, config, mailer));
+  app.use("/api/auth", googleRouter(db, config, verifyGoogle));
   app.use("/api", authentication(db, config));
   app.get("/api/academic-options", async (_req, res) => {
     res.json(await academicOptions(db));

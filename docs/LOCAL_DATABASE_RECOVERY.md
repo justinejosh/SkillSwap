@@ -2,6 +2,12 @@
 
 ## Completed local recovery
 
+**Current Google implementation boundary:** the historical recovery below is
+complete. The new Google migration is authorized only for isolated disposable or
+sanitized databases. `upgrade-existing-local` is blocked in the current revision;
+its old proof cannot authorize changes to the existing `knoxite` database. See
+`GOOGLE_SIGN_IN.md` before planning any future upgrade.
+
 The user explicitly authorized the backed-up local upgrade after reviewing this plan. It completed on 2026-11-07. The original `localhost:3306/knoxite` connection was retained; production was not accessed.
 
 The local application was placed in a controlled maintenance window. A backup outside OneDrive/Git was restricted to the current Windows user and SYSTEM. Restoration into a private database on the same MariaDB 10.4.32 server exactly matched every original row fingerprint. The clone's personal fields/content were sanitized, the additive upgrade was rehearsed, and its historical-data preservation and final schema were verified before the original database was upgraded.

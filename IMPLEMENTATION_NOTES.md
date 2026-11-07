@@ -64,6 +64,37 @@ Leaderboards require reliable completed outcomes with at least two distinct part
 
 Historical outcomes migrate as unvalidated. Unreviewed concluded exchanges make completion metrics unavailable. Historical agreements that cannot satisfy the new integrity checks remain readable but require reconciliation before further progress; no old consent, completion date, or review legitimacy is invented. The team must review actual legacy records before releasing the upgrade. Monthly analytics use actual stored completion/cancellation dates and do not synthesize historical phases.
 
+## Authentication and account recovery follow-up
+
+Google Identity Services/OpenID Connect is now implemented behind a default-off
+backend flag. Explicit institutional Workspace, college/campus eligibility, and
+security approvals are required in every environment. The frontend does not load
+Google's SDK while disabled. Backend verification uses the official Google auth
+library; expiring browser-bound challenges protect login, linking, and onboarding.
+Existing email collisions never auto-link. Fresh password/session checks are
+required for explicit linking and unlinking; Google-only accounts must establish
+a verified email/password fallback before unlinking. Shared Knoxite sessions and
+authorization remain in use. No Google access/refresh tokens or extra Google API
+permissions are introduced.
+
+The Google migration adds two tables and nullable password hashes, preserving
+all existing IDs and data. Only isolated `_test`/`_dev`/`_clone` migration paths are
+authorized; the previous original-database upgrade mode is blocked. The existing
+`knoxite` database and actual environment credentials were not changed. See
+`docs/GOOGLE_SIGN_IN.md` for configuration/approval gates, migration and rollback
+limits, and `docs/EMAIL_DELIVERY_SETUP.md` for the existing HTTPS mail contract.
+Actual institutional Google login and mail delivery remain untested externally.
+
+The formerly disabled recovery control now opens an emailed password-reset flow.
+Verification requests validate the email field and display accepted requests as
+status notices. Missing mail configuration is reported explicitly. Recovery uses
+short-lived, one-use, purpose-separated tokens, backend password validation, and
+transactional password/session revocation; it never verifies an email or changes
+an account role. Existing expiring token storage is reused without a migration.
+Keyed recovery hashes and strict token-format checks prevent cross-purpose use. See
+`docs/ACCOUNT_RECOVERY.md` for endpoints, security boundaries, and the two mail
+templates the operator must configure. Actual mail delivery remains unresolved.
+
 ## Assessments and portfolios
 
 - Tier belongs to `UserOfferedSkill`, unique by student and offered skill. Removing a skill deactivates the record and preserves attempts, dismissals, and earned tiers.

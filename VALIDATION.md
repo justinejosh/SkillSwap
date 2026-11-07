@@ -2,6 +2,109 @@
 
 Date: 2026-11-07 (Asia/Manila). Branch: `dev-justine`. These results describe local validation, not production deployment or a completed student study.
 
+## Disabled-by-default Google Sign-In implementation
+
+| Check | Result |
+| --- | --- |
+| Backend rule/API-boundary tests | 41 passed |
+| Isolated MySQL API, authentication, migration and student-journey coverage | 47 unique runner-reported tests passed, including parent tests |
+| Desktop/mobile browser coverage | 62 passed: 36 existing workflows, 10 account recovery, 16 Google authentication |
+| Total distinct runner-reported checks | 150 passed; no unresolved failures |
+| Frontend TypeScript/build and backend build | Passed |
+| Actual localhost capabilities | `google.enabled: false`; `emailDeliveryAvailable: false` |
+| Existing `localhost:3306/knoxite` database | No migration or mutation performed for this implementation |
+
+Results combine the complete existing backend/integration/browser suites with
+focused runs after corrections and additions. Repeated executions are not added
+to the total. The final Google integration run passed 12 tests; the standalone
+Google migration preservation test passed separately. Earlier integration cases
+unaffected by those additions remain covered by the full regression run.
+
+The official Google library verified generated RSA signatures offline using a
+mocked trusted certificate source. Tests rejected invalid signatures, wrong
+issuer/audience, expired tokens, unknown keys, missing Workspace membership,
+unverified email, consumer accounts, and invalid campus/domain claims; an updated
+trusted key was accepted. No real Google account or institutional credential was
+used. API tests injected a verified-claims provider at the application factory,
+not through a route/environment bypass. They cover default-off behavior before
+database access, mandatory approval gates, browser proofs, nonces, purpose and
+policy binding, changed eligibility during pending onboarding, CSRF/Origin/JSON
+checks, replay, expiry, duplicate/concurrent onboarding, explicit linking,
+cross-account attempts, stale sessions, suspension, identity changes, password
+fallback, unlink safeguards, session revocation, and rate limits.
+
+Migration tests used a disposable MySQL 8.4 container bound to loopback port 3308.
+A populated prior-schema fixture included users/hashes/profiles, both skill join
+tables, offered-skill tiers, requests, swaps, reviews, messages, and sessions.
+The new application successfully performed password login and read authenticated
+method availability **before** Google tables existed. Every pre-existing row in
+every prior table fingerprint-matched after the Google migration. No identity was
+automatically backfilled. Constraints rejected duplicate identities and preserved
+case-sensitive subject distinctions; unresolved failed migration history blocks
+before schema mutation, and repeated/partial upgrade attempts stop.
+The final fresh-container rehearsal initially reached MySQL during startup; the
+check passed after the disposable server reported ready for connections.
+The legacy migration rehearsal also continued to preserve its original records.
+This does not establish compatibility with an unrehearsed MariaDB/production
+engine or authorize upgrades of existing databases.
+
+Browser tests used mock APIs and a stubbed GIS script, blocking unrelated hosts.
+They cover no SDK load when disabled, successful session exchange without Google
+token storage, onboarding, program/year/terms requirements, cancellation back to
+preserved password-registration inputs, email collisions, explicit password
+reauthentication for linking, fallback-before-unlinking, and blocked SDK behavior.
+The first run identified a select accessible-name issue and recovery mocks that
+did not yet recognize the new capabilities GET. Explicit select labels and
+updated mock capabilities corrected them; subsequent targeted runs passed.
+
+The local backend watcher was briefly restarted to regenerate the Prisma client;
+generation changes client files only, not database schema. No actual `.env`,
+cloud credential, or university approval was changed. One backend runtime
+dependency, `google-auth-library`, was added with its lockfile; Node >=22 is now
+declared. The temporary formatter was not added as a project dependency.
+
+Outstanding external validation: approved Google client/origins/consent and
+Workspace authorization, sufficient college/campus eligibility evidence, security
+review, real institutional pilot, actual mail delivery, exact-engine migration
+rehearsal, and release authorization. See `docs/GOOGLE_SIGN_IN.md` and
+`docs/EMAIL_DELIVERY_SETUP.md`. Existing production security/deployment gates
+remain outstanding. No push, merge, deployment, or production access occurred.
+
+## Account recovery and verification feedback follow-up
+
+| Check | Result |
+| --- | --- |
+| Backend build and rule/API-boundary tests | 38 passed |
+| Isolated MySQL recovery, existing API, and student-journey tests | 24 passed, including parent tests |
+| New desktop/mobile recovery browser scenarios | 10 passed across the initial unaffected cases and corrected focused rerun |
+| Frontend TypeScript and build | Passed |
+| Actual local recovery-options endpoint | HTTP 200, `emailDeliveryAvailable: false` |
+| Whitespace check | `git diff --check` passed |
+
+The first browser run passed eight scenarios and identified two verification
+failures: the shared React 18 Input component does not forward refs. Referencing
+the native form's email control fixed the issue. The focused desktop/mobile
+rerun passed both previously failing scenarios. No failure remains unresolved.
+Browser tests use synthetic intercepted responses. The separate API tests use a
+disposable MySQL 8.4 database on loopback port 3308, with injected mail capture;
+they send no real email. The existing local `knoxite` schema was not migrated or
+used for integration fixtures.
+
+Recovery tests cover generic request responses, unavailable mail before account
+lookup, distinct mail templates, rate limiting, cross-purpose tokens (including
+namespace substitution), expiry, suspension, forbidden target fields, replay,
+simultaneous requests using the same/different links, bcrypt password replacement,
+session revocation, pending-link invalidation, and unchanged verification/profile
+fields. Existing verification links, registration, reciprocal matching,
+assessments, exchange completion, analytics, and administrative boundaries passed
+their API/student-journey regressions.
+
+The user-selected local password form is a separate, temporary developer recovery
+tool outside the repository. Preparing it does not reset a password. It requires
+the user's private submission and does not bypass institutional verification.
+Actual email delivery, production deployment, and production key rotation were
+not performed. Source changes remain on `dev-justine` for review.
+
 ## Academic-options recovery and authorized local upgrade
 
 | Check | Result |

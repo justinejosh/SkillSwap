@@ -1,4 +1,5 @@
 import { api } from "@/app/lib/api";
+import GoogleSignIn from "@/app/components/GoogleSignIn";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router";
 import { Button } from "@/app/components/ui/button";
@@ -35,6 +36,7 @@ export default function SignupPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [googleOnboarding, setGoogleOnboarding] = useState(false);
   const [optionsLoading, setOptionsLoading] = useState(true);
   const [optionsError, setOptionsError] = useState("");
   const optionsRequest = useRef<AbortController | null>(null);
@@ -159,224 +161,229 @@ export default function SignupPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form noValidate onSubmit={handleSubmit} className="space-y-4">
-              {optionsLoading && (
-                <p role="status" className="text-sm text-slate-600">
-                  Loading college programs and year levels...
-                </p>
-              )}
-              {optionsError && (
-                <div
-                  role="alert"
-                  className="space-y-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700"
-                >
-                  <p>{optionsError}</p>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => void loadAcademicOptions()}
-                  >
-                    Retry Academic Options
-                  </Button>
-                </div>
-              )}
-              {error && (
-                <div className="p-3 text-xs font-bold text-red-600 bg-red-50 border border-red-100 rounded-xl text-center animate-in fade-in zoom-in duration-300">
-                  {error}
-                </div>
-              )}
-
-              <div className="space-y-1.5">
-                <Label
-                  htmlFor="name"
-                  className="text-[11px] uppercase tracking-wider font-bold text-blue-400 ml-1"
-                >
-                  Full Name
-                </Label>
-                <Input
-                  id="name"
-                  type="text"
-                  placeholder="e.g. Steven Rivera"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  required
-                  className="h-12 border-blue-100 bg-blue-50/30 focus:ring-blue-600 rounded-xl"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label
-                  htmlFor="email"
-                  className="text-[11px] uppercase tracking-wider font-bold text-blue-400 ml-1"
-                >
-                  Email Address
-                </Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="alex@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  className="h-12 border-blue-100 bg-blue-50/30 focus:ring-blue-600 rounded-xl"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label
-                  htmlFor="password"
-                  className="text-[11px] uppercase tracking-wider font-bold text-blue-400 ml-1"
-                >
-                  Password
-                </Label>
-                <div className="relative">
-                  <Input
-                    id="password"
-                    type={showPassword ? "text" : "password"}
-                    placeholder="At least 12 characters"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    className="h-12 border-blue-100 bg-blue-50/30 focus:ring-blue-600 rounded-xl pr-10"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-blue-300 hover:text-blue-600 transition-colors"
-                  >
-                    {showPassword ? (
-                      <EyeOff className="size-5" />
-                    ) : (
-                      <Eye className="size-5" />
-                    )}
-                  </button>
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <Label
-                  htmlFor="confirmPassword"
-                  className="text-[11px] uppercase tracking-wider font-bold text-blue-400 ml-1"
-                >
-                  Confirm Password
-                </Label>
-                <Input
-                  id="confirmPassword"
-                  type={showPassword ? "text" : "password"}
-                  placeholder="Repeat your password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  required
-                  className="h-12 border-blue-100 bg-blue-50/30 focus:ring-blue-600 rounded-xl"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="signup-program">College program</Label>
-                <select
-                  required
-                  id="signup-program"
-                  disabled={
-                    optionsLoading || !!optionsError || !options.programs.length
-                  }
-                  value={programId}
-                  onChange={(e) => {
-                    setProgramId(e.target.value);
-                    setYearLevelId("");
-                  }}
-                  className="w-full rounded-xl border border-blue-100 p-3 text-sm"
-                >
-                  <option value="">Choose your program</option>
-                  {options.programs.map((program) => (
-                    <option key={program.id} value={program.id}>
-                      {program.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="signup-year">Year level</Label>
-                <select
-                  required
-                  id="signup-year"
-                  disabled={optionsLoading || !!optionsError || !programId}
-                  value={yearLevelId}
-                  onChange={(e) => setYearLevelId(e.target.value)}
-                  className="w-full rounded-xl border border-blue-100 p-3 text-sm"
-                >
-                  <option value="">Choose your year level</option>
-                  {(
-                    options.programs.find((p) => p.id === programId)
-                      ?.yearLevels || []
-                  ).map((year: any) => (
-                    <option key={year.id} value={year.id}>
-                      {year.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <p className="text-xs text-slate-600">
-                Use your institutional email. Campus eligibility follows the
-                configured Santa Rosa email rule and email ownership
-                verification.
-              </p>
-              {/* Terms of Service & Privacy Policy Checkbox */}
-              <div className="flex items-start gap-2.5 pt-1">
-                <input
-                  type="checkbox"
-                  id="terms"
-                  checked={agreedToTerms}
-                  onChange={(e) => {
-                    const isChecked = e.target.checked;
-                    setAgreedToTerms(isChecked);
-                    if (isChecked) setError("");
-                  }}
-                  required
-                  className="mt-1 size-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer accent-blue-600"
-                />
-                <label
-                  htmlFor="terms"
-                  className="text-xs text-blue-900/80 leading-snug cursor-pointer select-none"
-                >
-                  I agree to the{" "}
-                  <button
-                    type="button"
-                    onClick={() => setShowTermsModal(true)}
-                    className="text-blue-600 font-semibold underline hover:text-blue-700"
-                  >
-                    Terms of Service
-                  </button>{" "}
-                  and{" "}
-                  <button
-                    type="button"
-                    onClick={() => setShowTermsModal(true)}
-                    className="text-blue-600 font-semibold underline hover:text-blue-700"
-                  >
-                    Privacy Policy
-                  </button>
-                </label>
-              </div>
-
-              <Button
-                type="submit"
-                disabled={
-                  isLoading ||
-                  optionsLoading ||
-                  !!optionsError ||
-                  !options.programs.length
-                }
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white h-12 rounded-xl shadow-lg shadow-blue-100 mt-2 text-base font-bold transition-all active:scale-[0.98]"
-              >
-                {isLoading ? (
-                  <div className="flex items-center gap-2">
-                    <Loader2 className="animate-spin size-5" />
-                    <span>Creating account...</span>
-                  </div>
-                ) : (
-                  "Create Account"
+            <GoogleSignIn onOnboardingChange={setGoogleOnboarding} />
+            {!googleOnboarding && (
+              <form noValidate onSubmit={handleSubmit} className="space-y-4">
+                {optionsLoading && (
+                  <p role="status" className="text-sm text-slate-600">
+                    Loading college programs and year levels...
+                  </p>
                 )}
-              </Button>
-            </form>
+                {optionsError && (
+                  <div
+                    role="alert"
+                    className="space-y-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700"
+                  >
+                    <p>{optionsError}</p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => void loadAcademicOptions()}
+                    >
+                      Retry Academic Options
+                    </Button>
+                  </div>
+                )}
+                {error && (
+                  <div className="p-3 text-xs font-bold text-red-600 bg-red-50 border border-red-100 rounded-xl text-center animate-in fade-in zoom-in duration-300">
+                    {error}
+                  </div>
+                )}
+
+                <div className="space-y-1.5">
+                  <Label
+                    htmlFor="name"
+                    className="text-[11px] uppercase tracking-wider font-bold text-blue-400 ml-1"
+                  >
+                    Full Name
+                  </Label>
+                  <Input
+                    id="name"
+                    type="text"
+                    placeholder="e.g. Steven Rivera"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    required
+                    className="h-12 border-blue-100 bg-blue-50/30 focus:ring-blue-600 rounded-xl"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label
+                    htmlFor="email"
+                    className="text-[11px] uppercase tracking-wider font-bold text-blue-400 ml-1"
+                  >
+                    Email Address
+                  </Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="alex@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    className="h-12 border-blue-100 bg-blue-50/30 focus:ring-blue-600 rounded-xl"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label
+                    htmlFor="password"
+                    className="text-[11px] uppercase tracking-wider font-bold text-blue-400 ml-1"
+                  >
+                    Password
+                  </Label>
+                  <div className="relative">
+                    <Input
+                      id="password"
+                      type={showPassword ? "text" : "password"}
+                      placeholder="At least 12 characters"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                      className="h-12 border-blue-100 bg-blue-50/30 focus:ring-blue-600 rounded-xl pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-blue-300 hover:text-blue-600 transition-colors"
+                    >
+                      {showPassword ? (
+                        <EyeOff className="size-5" />
+                      ) : (
+                        <Eye className="size-5" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label
+                    htmlFor="confirmPassword"
+                    className="text-[11px] uppercase tracking-wider font-bold text-blue-400 ml-1"
+                  >
+                    Confirm Password
+                  </Label>
+                  <Input
+                    id="confirmPassword"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Repeat your password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    required
+                    className="h-12 border-blue-100 bg-blue-50/30 focus:ring-blue-600 rounded-xl"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="signup-program">College program</Label>
+                  <select
+                    required
+                    id="signup-program"
+                    disabled={
+                      optionsLoading ||
+                      !!optionsError ||
+                      !options.programs.length
+                    }
+                    value={programId}
+                    onChange={(e) => {
+                      setProgramId(e.target.value);
+                      setYearLevelId("");
+                    }}
+                    className="w-full rounded-xl border border-blue-100 p-3 text-sm"
+                  >
+                    <option value="">Choose your program</option>
+                    {options.programs.map((program) => (
+                      <option key={program.id} value={program.id}>
+                        {program.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="signup-year">Year level</Label>
+                  <select
+                    required
+                    id="signup-year"
+                    disabled={optionsLoading || !!optionsError || !programId}
+                    value={yearLevelId}
+                    onChange={(e) => setYearLevelId(e.target.value)}
+                    className="w-full rounded-xl border border-blue-100 p-3 text-sm"
+                  >
+                    <option value="">Choose your year level</option>
+                    {(
+                      options.programs.find((p) => p.id === programId)
+                        ?.yearLevels || []
+                    ).map((year: any) => (
+                      <option key={year.id} value={year.id}>
+                        {year.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <p className="text-xs text-slate-600">
+                  Use your institutional email. Campus eligibility follows the
+                  configured Santa Rosa email rule and email ownership
+                  verification.
+                </p>
+                {/* Terms of Service & Privacy Policy Checkbox */}
+                <div className="flex items-start gap-2.5 pt-1">
+                  <input
+                    type="checkbox"
+                    id="terms"
+                    checked={agreedToTerms}
+                    onChange={(e) => {
+                      const isChecked = e.target.checked;
+                      setAgreedToTerms(isChecked);
+                      if (isChecked) setError("");
+                    }}
+                    required
+                    className="mt-1 size-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer accent-blue-600"
+                  />
+                  <label
+                    htmlFor="terms"
+                    className="text-xs text-blue-900/80 leading-snug cursor-pointer select-none"
+                  >
+                    I agree to the{" "}
+                    <button
+                      type="button"
+                      onClick={() => setShowTermsModal(true)}
+                      className="text-blue-600 font-semibold underline hover:text-blue-700"
+                    >
+                      Terms of Service
+                    </button>{" "}
+                    and{" "}
+                    <button
+                      type="button"
+                      onClick={() => setShowTermsModal(true)}
+                      className="text-blue-600 font-semibold underline hover:text-blue-700"
+                    >
+                      Privacy Policy
+                    </button>
+                  </label>
+                </div>
+
+                <Button
+                  type="submit"
+                  disabled={
+                    isLoading ||
+                    optionsLoading ||
+                    !!optionsError ||
+                    !options.programs.length
+                  }
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white h-12 rounded-xl shadow-lg shadow-blue-100 mt-2 text-base font-bold transition-all active:scale-[0.98]"
+                >
+                  {isLoading ? (
+                    <div className="flex items-center gap-2">
+                      <Loader2 className="animate-spin size-5" />
+                      <span>Creating account...</span>
+                    </div>
+                  ) : (
+                    "Create Account"
+                  )}
+                </Button>
+              </form>
+            )}
 
             <div className="mt-6 text-center space-y-2">
               <p className="text-sm text-blue-400">

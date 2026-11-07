@@ -195,6 +195,42 @@ model EmailVerificationToken {
   user      User      @relation(fields: [userId], references: [id], onDelete: Restrict)
 }
 
+model ExternalIdentity {
+  id             String   @id @default(uuid())
+  provider       String   @db.VarChar(16)
+  subject        String   @db.VarChar(255)
+  userId         String
+  verifiedEmail  String   @db.VarChar(191)
+  hostedDomain   String   @db.VarChar(191)
+  policyVersion  String   @db.VarChar(191)
+  linkedAt       DateTime @default(now())
+  lastVerifiedAt DateTime @default(now())
+  user           User     @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([provider, subject])
+  @@unique([userId, provider])
+}
+
+model GoogleAuthChallenge {
+  id               String    @id @default(uuid())
+  purpose          String    @db.VarChar(16)
+  nonceHash        String    @db.Char(64)
+  browserProofHash String    @db.Char(64)
+  policyVersion    String    @db.VarChar(191)
+  userId           String?
+  sessionId        String?
+  tokenVersion     Int?
+  subject          String?   @db.VarChar(255)
+  verifiedEmail    String?   @db.VarChar(191)
+  hostedDomain     String?   @db.VarChar(191)
+  displayName      String?   @db.VarChar(100)
+  expiresAt        DateTime
+  usedAt           DateTime?
+  createdAt        DateTime  @default(now())
+
+  @@index([expiresAt])
+}
+
 model UserReport {
   id           String    @id @default(uuid())
   reporterId   String
@@ -226,7 +262,7 @@ model User {
   id              String    @id @default(uuid())
   name            String
   email           String    @unique
-  passwordHash    String
+  passwordHash    String?
   bio             String?   @db.Text
   gender          String?
   avatarUrl       String?   @db.MediumText
@@ -242,6 +278,7 @@ model User {
   offeringLinks      UserOfferedSkill[]
   authSessions       AuthSession[]
   verificationTokens EmailVerificationToken[]
+  externalIdentities ExternalIdentity[]
   reportsFiled       UserReport[]             @relation("ReportAuthor")
   reportsReceived    UserReport[]             @relation("ReportTarget")
   posts              Post[]                   @relation("UserPosts")
