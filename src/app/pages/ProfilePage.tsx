@@ -353,6 +353,18 @@ export default function ProfilePage() {
                 proximity uses department and year level, never physical
                 distance.
               </p>
+              {academicOptions.programs.find((p) => p.id === programId)
+                ?.proposedDepartment && (
+                <p className="text-xs text-amber-700 dark:text-amber-300">
+                  Proposed college:{" "}
+                  {
+                    academicOptions.programs.find((p) => p.id === programId)
+                      ?.proposedDepartment.name
+                  }
+                  . Campus confirmation is pending; this draft is excluded from
+                  WRMR proximity.
+                </p>
+              )}
               {(!academicOptions.programs.length ||
                 !academicOptions.yearLevels.length) && (
                 <p className="text-xs">

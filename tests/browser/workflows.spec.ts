@@ -4,6 +4,12 @@ import { resolve } from "node:path";
 const catalog = JSON.parse(
   readFileSync(resolve("knoxite-backend/config/academic-catalog.json"), "utf8"),
 );
+const draftDepartments = JSON.parse(
+  readFileSync(
+    resolve("knoxite-backend/config/provisional-departments.json"),
+    "utf8",
+  ),
+);
 async function fixture(page: Page, initialTier = "NOT_ASSESSED") {
   const state = {
     tier: initialTier,
@@ -588,4 +594,279 @@ test("mixed cohorts keep unranked matches in a separate visible group without as
   expect(
     await page.getByRole("article").first().getAttribute("aria-label"),
   ).toBe("Synthetic Peer reciprocal match");
+});
+
+test("leaderboard eligibility explains two distinct partners without restricting matches", async ({
+  page,
+}) => {
+  await fixture(page);
+  await page.route("**/api/leaderboard", (route) =>
+    route.fulfill({
+      json: {
+        topMentors: [],
+        viewer: {
+          eligible: false,
+          reasons: [
+            "Complete exchanges with at least two distinct partners for leaderboard eligibility.",
+          ],
+        },
+      },
+    }),
+  );
+  await page.route("**/api/leaderboard/swaps", (route) =>
+    route.fulfill({ json: [] }),
+  );
+  await page.goto("/leaderboard");
+  await expect(page.getByRole("status")).toContainText("two distinct partners");
+  await expect(page.getByRole("status")).toContainText("request swaps");
+  await expect(page.getByText("No mentors ranked yet.")).toBeVisible();
+  await expect(page.getByText("Your Standing", { exact: true })).toHaveCount(0);
+});
+
+test("activity order follows distinct partners rather than larger raw swap totals", async ({
+  page,
+}) => {
+  await fixture(page);
+  await page.route("**/api/leaderboard", (route) =>
+    route.fulfill({
+      json: { topMentors: [], viewer: { eligible: false, reasons: [] } },
+    }),
+  );
+  await page.route("**/api/leaderboard/swaps", (route) =>
+    route.fulfill({
+      json: [
+        {
+          id: "diverse",
+          name: "Diverse Student",
+          totalSwaps: 3,
+          uniqueCompletedPartners: 3,
+          completionRate: 0.75,
+        },
+        {
+          id: "repeat",
+          name: "Repeat Student",
+          totalSwaps: 100,
+          uniqueCompletedPartners: 2,
+          completionRate: 1,
+        },
+      ],
+    }),
+  );
+  await page.goto("/leaderboard");
+  await page.getByRole("tab", { name: "Most Active", exact: true }).click();
+  const names = page.getByRole("tabpanel").getByRole("heading", { level: 3 });
+  await expect(names).toHaveText(["Diverse Student", "Repeat Student"]);
+  await expect(
+    page.getByText("100 recorded completed swaps", { exact: false }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Raw swap totals are shown as history.", { exact: false }),
+  ).toBeVisible();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+});
+
+test("public portfolios identify provisional colleges without presenting validated proximity", async ({
+  page,
+}) => {
+  await fixture(page);
+  await page.route("**/api/users/peer/profile", (route) =>
+    route.fulfill({
+      json: {
+        id: "peer",
+        name: "Provisional Student",
+        bio: "",
+        avatarUrl: null,
+        program: { id: "p", code: "BSCS", label: "BSCS" },
+        yearLevel: { id: "y", name: "1st Year" },
+        department: null,
+        proposedDepartment: { name: "College of Computer Studies" },
+        offeredSkills: [],
+        wantedSkills: [],
+        metrics: {
+          averageRating: null,
+          ratingCount: 0,
+          uniqueRatingPartners: 0,
+          completedSwaps: 0,
+        },
+      },
+    }),
+  );
+  await page.goto("/students/peer");
+  await expect(
+    page.getByText("Proposed college: College of Computer Studies.", {
+      exact: false,
+    }),
+  ).toContainText("does not contribute to WRMR proximity");
+  await expect(
+    page.getByText("Department unavailable", { exact: false }),
+  ).toBeVisible();
+});
+
+test("administrators import the provisional mapping without assigning official validation", async ({
+  page,
+}) => {
+  await fixture(page);
+  await page.route("**/api/profile", (route) =>
+    route.fulfill({
+      json: { id: "owner", name: "Synthetic Admin", role: "ADMIN" },
+    }),
+  );
+  let imported = false;
+  const mutations: string[] = [];
+  await page.route("**/api/admin/**", async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    if (route.request().method() === "POST") {
+      mutations.push(path);
+      imported = true;
+    }
+    const programs = catalog.programs.map((p: any) => {
+      const department = draftDepartments.departments.find((d: any) =>
+        d.programCodes.includes(p.code),
+      );
+      return {
+        ...p,
+        id: p.code,
+        yearLevels: [],
+        mappingVersion: imported ? 1 : 0,
+        mappingValidatedAt: null,
+        department: imported ? department : null,
+      };
+    });
+    await route.fulfill({
+      json: path.endsWith("/academic-programs")
+        ? {
+            programs,
+            departments: draftDepartments.departments.map((d: any) => ({
+              ...d,
+              id: d.code,
+            })),
+            yearLevels: [],
+            provisionalDraft: draftDepartments,
+          }
+        : [],
+    });
+  });
+  await page.goto("/admin/assessments");
+  await page
+    .getByText("Review the team's provisional mapping", { exact: true })
+    .click();
+  await expect(
+    page.getByText("College of Computer Studies: BSCS, BSIT", { exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Import Provisional Mapping", exact: true })
+    .click();
+  await expect(page.getByRole("status")).toContainText(
+    "no official validation",
+  );
+  await expect(
+    page.getByText("College of Nursing (provisional; excluded from WRMR)", {
+      exact: false,
+    }),
+  ).toBeVisible();
+  expect(mutations).toEqual([
+    "/api/admin/academic-programs/provisional-mapping",
+  ]);
+});
+
+test("private administrator review records a neutral disposition without account penalties", async ({
+  page,
+}) => {
+  await fixture(page);
+  await page.route("**/api/profile", (route) =>
+    route.fulfill({
+      json: { id: "owner", name: "Synthetic Admin", role: "ADMIN" },
+    }),
+  );
+  let opened = false,
+    closed = false;
+  const mutations: string[] = [];
+  await page.route("**/api/admin/integrity/**", async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    const method = route.request().method();
+    if (method !== "GET") {
+      mutations.push(`${method} ${path}`);
+      if (method === "POST") opened = true;
+      if (method === "PATCH") closed = true;
+    }
+    let response: any = { message: "Saved" };
+    if (method === "GET" && path.endsWith("/signals"))
+      response = {
+        users: [
+          { id: "a", name: "Student A" },
+          { id: "b", name: "Student B" },
+        ],
+        signals: [
+          {
+            userIds: ["a", "b"],
+            completedExchanges: 20,
+            reciprocalFiveStarExchanges: 20,
+            fastestGapMs: 60000,
+            medianGapMs: 120000,
+            firstCompletedAt: "2026-11-01",
+            lastCompletedAt: "2026-11-07",
+          },
+        ],
+      };
+    if (method === "GET" && path.endsWith("/reviews"))
+      response = opened
+        ? [
+            {
+              id: "review",
+              status: closed ? "DISMISSED" : "PENDING",
+              details: {
+                revision: 1,
+                userIds: ["a", "b"],
+                events: [
+                  {
+                    at: "2026-11-07",
+                    action: "OPENED",
+                    notes: "Independent evidence needed",
+                  },
+                ],
+              },
+            },
+          ]
+        : [];
+    await route.fulfill({ json: response });
+  });
+  await page.goto("/admin/integrity");
+  await expect(
+    page.getByText("not findings of misconduct", { exact: false }),
+  ).toBeVisible();
+  await page
+    .getByLabel("Review context and evidence needed")
+    .fill("Independent evidence needed");
+  await page
+    .getByRole("button", { name: "Open Private Review", exact: true })
+    .click();
+  await expect(page.getByRole("status")).toContainText("No account");
+  await page
+    .getByLabel("Disposition", { exact: true })
+    .selectOption("NO_ACTION");
+  await page
+    .getByLabel("Evidence and disposition notes")
+    .fill("Legitimate repeated learning; no action.");
+  await page
+    .getByRole("button", { name: "Record Disposition", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", {
+      name: "Student A and Student B · DISMISSED",
+      exact: true,
+    }),
+  ).toBeVisible();
+  expect(mutations).toEqual([
+    "POST /api/admin/integrity/reviews",
+    "PATCH /api/admin/integrity/reviews/review",
+  ]);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
 });

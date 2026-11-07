@@ -1,4 +1,5 @@
 import { MatchCard, PeerMatch } from "./MatchCard";
+import { MetricPolicyNotice } from "./MetricPolicyNotice";
 
 export function MatchResults({
   matches,
@@ -15,6 +16,7 @@ export function MatchResults({
   // a null score is never treated as zero or compared with a calculated score.
   return (
     <div className="space-y-6">
+      <MetricPolicyNotice />
       <p className="text-sm text-slate-600 dark:text-slate-300">
         Every listed student meets your reciprocal skill requirements. A missing
         score means there is not enough validated evidence to calculate WRMR.

@@ -18,6 +18,10 @@ export default function AssessmentAdminPage() {
     programs: any[];
     departments: any[];
     yearLevels: any[];
+    provisionalDraft?: {
+      source: string;
+      departments: { code: string; name: string; programCodes: string[] }[];
+    };
   }>({ programs: [], departments: [], yearLevels: [] });
   const [mapping, setMapping] = useState({
     programId: "",
@@ -97,6 +101,12 @@ export default function AssessmentAdminPage() {
         <h1 className="text-2xl font-bold">
           Assessment and trust administration
         </h1>
+        <Link
+          to="/admin/integrity"
+          className="text-blue-700 underline dark:text-blue-300"
+        >
+          Review repeated-partner evidence
+        </Link>
         {error && (
           <p
             role="alert"
@@ -362,6 +372,52 @@ export default function AssessmentAdminPage() {
           <h2 className="text-xl font-semibold">
             College programs and department mapping
           </h2>
+          <p className="text-sm">
+            The team supplied a provisional mapping for all 13 programs across
+            nine colleges. Drafts are excluded from WRMR until campus-specific
+            evidence is recorded.
+          </p>
+          {academicData.provisionalDraft && (
+            <details>
+              <summary className="cursor-pointer font-semibold">
+                Review the team's provisional mapping
+              </summary>
+              <p className="my-2 text-sm">
+                {academicData.provisionalDraft.source}
+              </p>
+              <ul className="space-y-2 text-sm">
+                {academicData.provisionalDraft.departments.map((d) => (
+                  <li key={d.code}>
+                    {d.name}:{" "}
+                    {d.programCodes
+                      .map(
+                        (code) =>
+                          academicData.programs.find((p) => p.code === code)
+                            ?.label ?? code,
+                      )
+                      .join(", ")}
+                  </li>
+                ))}
+              </ul>
+              <Button
+                type="button"
+                disabled={busy}
+                className="mt-3"
+                onClick={() =>
+                  void action(
+                    () =>
+                      api("/admin/academic-programs/provisional-mapping", {
+                        method: "POST",
+                        body: "{}",
+                      }),
+                    "Provisional mapping imported for unassigned programs. Existing mappings were retained; no official validation was assigned.",
+                  )
+                }
+              >
+                Import Provisional Mapping
+              </Button>
+            </details>
+          )}
           <Button
             disabled={busy}
             variant="outline"
@@ -384,7 +440,9 @@ export default function AssessmentAdminPage() {
                 {p.label} · {p.yearLevels.map((y: any) => y.name).join(", ")} ·{" "}
                 {p.mappingValidatedAt
                   ? p.department?.name
-                  : "Department mapping pending"}
+                  : p.department
+                    ? `${p.department.name} (provisional; excluded from WRMR)`
+                    : "Department mapping pending"}
               </li>
             ))}
           </ul>
@@ -472,6 +530,37 @@ export default function AssessmentAdminPage() {
               source.
             </label>
             <Button disabled={busy}>Save Confirmed Mapping</Button>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={
+                busy ||
+                !mapping.programId ||
+                !mapping.departmentId ||
+                !mapping.validationNotes.trim()
+              }
+              onClick={() =>
+                void action(
+                  () =>
+                    api(
+                      `/admin/academic-programs/${mapping.programId}/department-draft`,
+                      {
+                        method: "PATCH",
+                        body: JSON.stringify({
+                          departmentId: mapping.departmentId,
+                          proposalNotes: mapping.validationNotes,
+                          mappingVersion: academicData.programs.find(
+                            (p) => p.id === mapping.programId,
+                          )?.mappingVersion,
+                        }),
+                      },
+                    ),
+                  "Provisional mapping saved without official validation.",
+                )
+              }
+            >
+              Save as Provisional
+            </Button>
           </form>
           <form
             className="space-y-3 border-t pt-4"

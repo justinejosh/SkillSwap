@@ -13,12 +13,15 @@ import {
   TabsTrigger,
 } from "@/app/components/ui/tabs";
 import { ArrowLeft, Loader2 } from "lucide-react";
-import { API_BASE_URL } from "@/config";
+import { api } from "@/app/lib/api";
+import { MetricPolicyNotice } from "@/app/components/MetricPolicyNotice";
 
 export default function LeaderboardPage() {
   const navigate = useNavigate();
   const [mentors, setMentors] = useState<any[]>([]);
   const [myStats, setMyStats] = useState<any>(null);
+  const [viewer, setViewer] = useState<any>(null);
+  const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [swappers, setSwappers] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState("mentors");
@@ -26,41 +29,16 @@ export default function LeaderboardPage() {
   useEffect(() => {
     const fetchRankings = async () => {
       try {
-        const token = localStorage.getItem("knoxite_token");
-        if (!token) {
-          navigate("/");
-          return;
-        }
-
-        const [leaderboardRes, swapsRes] = await Promise.all([
-          fetch(`${API_BASE_URL}/leaderboard`, {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "bypass-tunnel-reminder": "true",
-            },
-          }),
-          fetch(`${API_BASE_URL}/leaderboard/swaps`, {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "bypass-tunnel-reminder": "true",
-            },
-          }),
+        const [data, swaps] = await Promise.all([
+          api<any>("/leaderboard"),
+          api<any[]>("/leaderboard/swaps"),
         ]);
-
-        if (leaderboardRes.ok) {
-          const data = await leaderboardRes.json();
-          const sortedMentors = [...(data.topMentors || [])].sort(
-            (a, b) => b.rating - a.rating,
-          );
-          setMentors(sortedMentors);
-          setMyStats(data.currentUserStats || null);
-        }
-
-        if (swapsRes.ok) {
-          setSwappers(await swapsRes.json());
-        }
-      } catch (error) {
-        console.error("System synchronization error:", error);
+        setMentors(data.topMentors);
+        setMyStats(data.topMentors.find((m: any) => m.isCurrentUser) ?? null);
+        setViewer(data.viewer);
+        setSwappers(swaps);
+      } catch (e: any) {
+        setError(e.message);
       } finally {
         setIsLoading(false);
       }
@@ -142,6 +120,22 @@ export default function LeaderboardPage() {
           </p>
         </div>
 
+        <MetricPolicyNotice leaderboard />
+        {error && (
+          <p
+            role="alert"
+            className="rounded border border-red-400 p-3 text-red-700 dark:text-red-300"
+          >
+            {error}
+          </p>
+        )}
+        {viewer && !viewer.eligible && (
+          <p role="status" className="rounded border p-3 text-sm">
+            Your leaderboard entry is awaiting eligibility:{" "}
+            {viewer.reasons.join(" ")} You can still discover reciprocal matches
+            and request swaps.
+          </p>
+        )}
         <Tabs
           value={activeTab}
           onValueChange={(val: any) => setActiveTab(val)}
@@ -188,8 +182,8 @@ export default function LeaderboardPage() {
                   Top Mentors
                 </h2>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Ranked by average 5-star quality rating and validated student
-                  reviews.
+                  Ranked by partner-balanced peer rating from validated
+                  exchanges.
                 </p>
               </div>
 
@@ -247,7 +241,8 @@ export default function LeaderboardPage() {
                           </span>
                         </div>
                         <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">
-                          {mentor.reviews || 0} Validated Reviews
+                          {mentor.reviews} reviews from{" "}
+                          {mentor.uniqueRatingPartners} distinct partners
                         </span>
                       </div>
                     </div>
@@ -265,8 +260,9 @@ export default function LeaderboardPage() {
                   Most Active Swappers
                 </h2>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Ranked strictly by the total number of completed bilateral
-                  skill swaps.
+                  Ranked by distinct completed-exchange partners, then
+                  partner-balanced completion rate. Raw swap totals are shown as
+                  history.
                 </p>
               </div>
 
@@ -316,7 +312,7 @@ export default function LeaderboardPage() {
                         <span className="inline-block text-xs font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-100/80 dark:bg-emerald-950/60 px-3 py-1 rounded-lg border border-emerald-200/60 dark:border-emerald-800/60">
                           {swapper.totalSwaps == null
                             ? "Awaiting historical validation"
-                            : `${swapper.totalSwaps} Total Swaps`}
+                            : `${swapper.totalSwaps} recorded completed swaps · ${swapper.uniqueCompletedPartners} distinct partners · ${(swapper.completionRate * 100).toFixed(1)}% completion`}
                         </span>
                       </div>
                     </div>

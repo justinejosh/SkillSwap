@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router";
 import { api } from "@/app/lib/api";
+import { MetricPolicyNotice } from "@/app/components/MetricPolicyNotice";
 import {
   AssessmentBadge,
   AssessmentLegend,
@@ -14,6 +15,7 @@ export interface PublicProfile {
   program: { id: string; label: string; code: string } | null;
   yearLevel: { id: string; name: string } | null;
   department: { id: string; name: string } | null;
+  proposedDepartment?: { name: string } | null;
   offeredSkills: {
     id: string;
     name: string;
@@ -24,12 +26,21 @@ export interface PublicProfile {
   metrics: {
     averageRating: number | null;
     ratingCount: number;
+    uniqueRatingPartners?: number;
     completedSwaps: number | null;
   };
 }
 export function PortfolioContent({ profile }: { profile: PublicProfile }) {
   return (
     <div className="space-y-7">
+      <MetricPolicyNotice />
+      {!profile.department && profile.proposedDepartment && (
+        <p className="rounded-lg border border-amber-300 p-3 text-sm">
+          Proposed college: {profile.proposedDepartment.name}. Campus
+          confirmation is pending; this draft does not contribute to WRMR
+          proximity.
+        </p>
+      )}
       <div className="flex flex-wrap items-center gap-4">
         {profile.avatarUrl ? (
           <img
@@ -62,6 +73,12 @@ export function PortfolioContent({ profile }: { profile: PublicProfile }) {
           : " · Department unavailable"}
       </p>
       <div className="flex flex-wrap gap-5 text-sm">
+        {profile.metrics.uniqueRatingPartners !== undefined && (
+          <p>
+            Feedback from {profile.metrics.uniqueRatingPartners} distinct
+            partners
+          </p>
+        )}
         <p>
           {profile.metrics.averageRating === null
             ? "No reviews yet"

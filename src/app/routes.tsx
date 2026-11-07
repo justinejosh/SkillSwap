@@ -3,6 +3,7 @@ import PublicProfilePage from "@/app/pages/PublicProfilePage";
 import AssessmentPage from "@/app/pages/AssessmentPage";
 import AssessmentAdminPage from "@/app/pages/AssessmentAdminPage";
 import VerifyEmailPage from "@/app/pages/VerifyEmailPage";
+import IntegrityAdminPage from "@/app/pages/IntegrityAdminPage";
 import { createBrowserRouter } from "react-router";
 
 import PreviewPage from "@/app/pages/PreviewPage";
@@ -37,6 +38,14 @@ const StudentRoute = ({ children }: { children: React.ReactNode }) => (
 );
 
 export const router = createBrowserRouter([
+  {
+    path: "/admin/integrity",
+    element: (
+      <AdminRoute>
+        <IntegrityAdminPage />
+      </AdminRoute>
+    ),
+  },
   { path: "/verify-email", Component: VerifyEmailPage },
   {
     path: "/students/:userId",

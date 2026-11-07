@@ -11,6 +11,7 @@ export interface PeerMatch {
   matchDetails: {
     averageRating: number | null;
     ratingCount: number;
+    uniqueRatingPartners?: number;
     completionRate: number | null;
     proximity: { value: number | null; reason: string };
     missing: string[];
@@ -29,6 +30,12 @@ export function MatchCard({
       aria-label={`${peer.name} reciprocal match`}
       className="flex flex-col justify-between gap-5 rounded-3xl border border-slate-200 bg-white p-5 text-slate-900 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
     >
+      {detail.uniqueRatingPartners !== undefined && (
+        <p className="text-xs text-slate-500 dark:text-slate-300">
+          Peer feedback from {detail.uniqueRatingPartners} distinct{" "}
+          {detail.uniqueRatingPartners === 1 ? "partner" : "partners"}
+        </p>
+      )}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           {peer.avatarUrl ? (
