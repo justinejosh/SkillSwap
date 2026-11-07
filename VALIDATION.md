@@ -2,6 +2,12 @@
 
 Date: 2026-11-07 (Asia/Manila). Branch: `dev-justine`. These results describe local validation, not production deployment or a completed student study.
 
+## Development startup recovery
+
+Reproduced the reported `TS7006` failures with an ungenerated `.prisma/client` placeholder declaring `PrismaClient` as `any`. Added automatic generation before development, builds, and type checking. From that failing local state, `npm run typecheck`, the actual `ts-node/register` application loader, the backend build, and all 26 rule tests passed after generation.
+
+Verified the exact `npm run dev` path on isolated loopback port 5019; `/api/health` returned `{"status":"ok"}`. The smoke process used a dummy loopback database URL on port 1, so no student or production database was accessed. No schema, migration, or dependency version changed. The absent local JWT key was generated into the ignored backend `.env` without displaying or committing it; this was not production key rotation. The temporary smoke server was stopped after verification.
+
 ## Partner integrity and provisional academic mapping follow-up
 
 | Check | Result |

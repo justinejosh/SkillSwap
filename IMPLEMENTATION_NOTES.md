@@ -27,6 +27,7 @@ The original Prisma User model has no program, department, year-level, or SHS fi
 - Request acceptance creates one explicitly linked agreement. Both parties approve the same revision before confirmation. Session acknowledgements are idempotent per participant/session number. Cancellation and suspension retain history.
 - Login sessions, logout, password change with session revocation, reports, administrator dispositions, and session scheduling use real APIs.
 - Removed checked-in JavaScript copies. Development uses Node watch with ts-node; production starts `dist/index.js`. TypeScript never emits over source.
+- `predev`, `prebuild`, and `pretypecheck` generate Prisma Client from the checked-in schema before those commands run. Fresh dependency installations may otherwise expose Prisma's placeholder `PrismaClient: any`, causing implicit-any and missing-model errors. Generation writes the local client and types; it does not migrate a database. Keep strict TypeScript checks enabled rather than annotating affected callbacks as `any`.
 - Dependency audit fixes retain Prisma 6. A development-only `deepmerge-ts` override addresses its advisory; Prisma generation, schema diff, baseline resolution, and migration paths are validated with that override. Nodemon was removed in favor of Node's built-in watcher.
 
 **Deployment operator action:** rotate the previously exposed JWT signing secret and replace old running artifacts. Removing it from current source does not revoke tokens served by an old deployment. No production secret or deployment was changed here.
