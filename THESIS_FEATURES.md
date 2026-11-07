@@ -1,84 +1,39 @@
-# Community Skill Swap Platform (Knoxite Hub) - Thesis Features Documentation
+# Knoxite thesis feature status
 
-## Overview
-A comprehensive peer-to-peer skill exchange platform demonstrating advanced concepts in recommendation systems, full-stack web development, community management, and educational technology.
+Knoxite supports OLFU Santa Rosa college students. Its primary objectives remain student profiling and skill management, reciprocal WRMR matching, and analytics for successful exchanges, performance, and progress. This document describes the implemented code, not a production deployment or completed research evaluation.
 
-## Total Features: 24+ Complete Pages
+## Implemented core
 
-### Core Authentication & User Management
-1. **Login Page** (`/`) - Secure JWT user authentication
-2. **Signup Page** (`/signup`) - New user registration with encrypted passwords
-3. **Profile Page** (`/profile`) - User profile management with **Sign Out functionality**
-4. **Dashboard** (`/dashboard`) - Main hub with navigation and real-time active swap tracking
-5. **My Skills** (`/my-skills`) - Comprehensive skill management system synced to the database
+| Objective | Implementation | Validation |
+| --- | --- | --- |
+| Student profiling | Authenticated settings, standardized college program/year selections, biography/avatar, complete offered/wanted skill portfolios | API privacy and browser portfolio/registration tests |
+| Skill management and trust | Explicit per-user offered skills; Not Assessed → Amateur → Verified; backend grading; versioned curated banks; prerequisites, cooldowns, and persistent skip decisions | Grading, concurrency, authorization, lifecycle, and UI tests |
+| Reciprocal matching | Two-way skill eligibility before 50% rating, 30% completion rate, and 20% academic proximity ranking | Four proximity cases, formula fixtures, reciprocal selection, data-gap, and API tests |
+| Exchange analytics | Shared validated user metrics, bilateral completion outcomes, actual dated activity, per-skill assessment progress | Aggregate rules, exchange lifecycle, migration, and API tests |
 
-### Skill Exchange Features
-6. **Marketplace/KnoxHub** (`/knox-hub`) - Browse available skill offerings
-7. **Skill Radar** (`/dashboard`) - See and respond to skill requests
-8. **Swap Agreements** (`/swap-agreement`) - Formalize skill exchange contracts with session limits
-9. **Swap Details** (`/swap-details`) - Active session tracking and completion logging
-10. **Calendar** (`/calendar`) - Schedule and track sessions ## soon to come ##
-11. **Chat System** (`/chat`) - Messaging between matched users
+Departments derive from an officially validated, configurable program-to-department mapping. Different programs may share a department. Missing or unconfirmed data is not inferred, and proximity never measures physical distance. Candidates without required evidence remain reciprocal matches with an explicit unranked result. Assessment tiers do not enter WRMR.
 
-### Trust & Safety Systems
-12. **Reputation System** (`/reputation`) - User ratings and bilateral feedback logic
-15. **Security Settings** (`/security`) - Privacy and account security ## soon to come ##
-16. **User Reporting** (`/report`) - Report inappropriate behavior ## soon to come ##
-17. **Privacy Policy** (`/privacy`) - Terms and data handling ## soon to come ##
+Cold-start handling deliberately preserves discovery and requests without inventing rating or completion history. Dashboard and KnoxHub separate unranked candidates from candidates with calculated scores. A new-student cohort can evaluate reciprocal discovery and the exchange workflow, but cannot establish ranking effectiveness while everyone lacks evidence. The continuous local journey verifies that students can begin unranked, complete an exchange, and subsequently receive scores from reliable stored outcomes.
 
-### Engagement & Gamification
-18. **Leaderboard** (`/leaderboard`) - Live database aggregation ranking top mentors and highest volume swappers
+## Supporting workflows
 
-### Analytics & Insights
-21. **Notification Center** (`/notification`) - Smart notification system tracking pending swap requests
-22. **Admin Analytics Dashboard** (`/analytics`) - insights featuring learning progress and activity patterns
+- Password authentication with institutional email ownership verification, revocable sessions, account suspension, and password change.
+- Database-backed marketplace matches, reciprocal requests, separate bilateral agreement approvals, version checks, session acknowledgements, and unique participant reviews.
+- Participant-scoped chat and session scheduling/calendar.
+- Notifications from actual request states, history-preserving withdrawals/cancellations, and completed-exchange leaderboards.
+- Persisted reports and administrator dispositions, protected forum moderation, and protected administrative metrics.
+- Public student portfolios are available to authenticated eligible users; account and assessment internals remain private.
 
-### Community Features
-23. **Community Forum** (`/community-forum`) - Live discussion boards with categorized threads and comments
-24. **Admin Dashboard** (`/admin-dashboard`) - Secure platform management for users with 'ADMIN' roles
+## Deliberate limits and release gates
 
-## Key Academic Concepts Demonstrated
+- The email domain and `lag` campus suffix are configurable proposals. Production activation requires official confirmation; proving mailbox ownership alone is not a claim of current college enrollment.
+- The initial program labels and years are team-supplied configurable records. Official department mapping remains unassigned until validated.
+- No real student question banks are invented or seeded. Administrators must curate, validate, and publish content.
+- Advanced assessments initially support applied scenario choices with predefined rubrics. Arbitrary code/SQL execution, subjective free-text grading, and unsupported performance formats are unavailable.
+- Verified therefore describes a passing result in scenario-based reasoning for the version's stated outcomes. It does not demonstrate independently writing/executing a program or observed hands-on performance. The interface and content-validation guide make this distinction explicit.
+- Assessment badges describe Knoxite assessment results, not professional certifications.
+- Legacy outcomes remain unvalidated until a sanitized record audit and explicit reconciliation. No historical consent or completion date is fabricated.
+- Google OAuth is a documented feasibility review only. Two-factor authentication, automatic institutional-directory enrollment checks, and external certification verification are not claimed as implemented.
+- Automated testing does not replace adviser review, participant usability evaluation, or validation of question-bank quality.
 
-### 1. Context-Aware Recommendation System
-- **Match Percentage Algorithm**: Calculates compatibility based on exact relational matches between offered and wanted skills.
-- **Smart Suggestions**: Queries the database to exclude users already in an active rotation.
-
-### 2. Peer-to-Peer Communication Module
-- **Notification System**: Checks database status to trigger unread request alerts.
-- **Activity Timeline**: Complete history of user interactions.
-
-### 3. Trust & Verification Framework
-- **Bilateral Review Logic**: Swaps are only marked "COMPLETED" when both parties submit a review.
-- **Reputation Algorithm**: Weighted average scoring calculated dynamically from the database.
-
-### 4. Full-Stack Data Aggregation
-- **Live Leaderboards**: Utilizes Prisma `_count` aggregations to rank users securely on the backend without overloading the frontend.
-
-## Technical Implementation Highlights
-
-### Backend Architecture (The Engine)
-- **Node.js & Express**: Robust RESTful API architecture
-- **Prisma ORM**: Type-safe database schema management and querying
-- **MySQL Database**: Relational data storage for users, swaps, skills, and forums
-- **JWT Authentication**: Secure token-based route protection (`authenticateToken` middleware)
-
-### Frontend Architecture (The Client)
-- **React** with TypeScript
-- **React Router** for protected and admin-level routing
-- **Component-based** architecture using Tailwind CSS and Lucide Icons
-- **Dynamic State Management**: Fetch API calls synced with React `useEffect` and `useState`
-
-### Key User Flows
-1. **The Core Loop**: Sign Up → Add Skills → View Skill Radar → Send Request → Partner Accepts in Notifications → Finalize Swap Agreement → Log Sessions → Submit Review → Earn Rating.
-2. **Community Interaction**: Open Forum → Select Category → Start Thread → Receive Comments from Peers.
-
-## Future Enhancement Possibilities
-1. **Real-time WebSockets**: Upgrade standard API polling to WebSocket integration for live chat.
-2. **Payment Integration**: Premium features or system credits.
-3. **Mobile Apps**: Native iOS/Android applications.
-4. **AI Matching**: Machine learning algorithms for advanced skill compatibility.
-
-## Code Statistics
-- **24+ Pages**: Complete, production-ready interfaces
-- **Secure Backend API**: Dozens of protected endpoints handling business logic
-- **100% TypeScript**: Type-safe development across the entire stack
+See [IMPLEMENTATION_NOTES.md](IMPLEMENTATION_NOTES.md) for file architecture, APIs, policies, migration safeguards, local configuration, and validation commands. See [MY_SKILLS_FEATURE.md](MY_SKILLS_FEATURE.md) for the assessment user flow and [Google OAuth feasibility](docs/GOOGLE_OAUTH_FEASIBILITY.md) for the deferred option.

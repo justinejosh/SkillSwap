@@ -1,54 +1,13 @@
-## Guidelines to Run the Program Locally
+# Safe local development
 
-### 1. Backend Setup
-Open your terminal and navigate to the backend folder:
-```bash
-cd knoxite-backend
-```
+Use Node 22 and an isolated local MySQL 8 database. All implementation work belongs on `dev-justine` and requires review before merging into `main`.
 
-Install the required backend dependencies:
-```bash
-npm install
-```
+1. Run `npm ci --ignore-scripts` in the repository root and backend.
+2. Copy the appropriate `.env.example` files into local `.env` files without overwriting existing credentials. Generate a new unpredictable JWT secret of at least 32 characters. Never reuse the exposed historical key.
+3. Set an explicit local `DATABASE_URL` and run `npm run db:generate` in the backend. Development blocks remote databases.
+4. Follow the guarded bootstrap/upgrade procedure in [IMPLEMENTATION_NOTES.md](../IMPLEMENTATION_NOTES.md). Do not use `prisma db push` or reset an existing database. Real-data upgrades require a sanitized clone audit first.
+5. Configure institutional mail delivery. The campus/domain rule remains provisional until officially confirmed. Program labels and years are initialized from the team-approved catalogue; department mappings are not guessed.
+6. Run `npm run dev` in the backend and frontend. The frontend defaults to localhost and never falls back to the deployed API. Production builds require an explicit `VITE_API_BASE_URL`.
+7. Run type checks, builds, backend unit/integration tests, and browser tests before requesting review. Integration tests require an acknowledged isolated `_test` database.
 
-Create a `.env` file inside the `knoxite-backend` folder (if it doesn't exist) and add your local database credentials:
-```env
-PORT=5000
-DATABASE_URL="mysql://root:@localhost:3306/knoxite"
-```
-*(Note: If your local MySQL has a password, put it after `root:`)*
-
-Sync the database and generate the Prisma client:
-```bash
-npx prisma generate
-npx prisma db push
-```
-
-Start the backend server:
-```bash
-npm run dev
-```
-
----
-
-### 2. Frontend Setup
-Leave the backend running and open a **new terminal window**. Navigate to your frontend folder:
-```bash
-# Assuming you are in the root directory
-cd YOUR_FRONTEND_FOLDER_NAME
-```
-
-Install the frontend dependencies:
-```bash
-npm install
-```
-
-Update your API Configuration:
-* Open `config.ts`
-* Change the API URL to your machine's current local IP address (e.g., `[http://192.168.1.](http://192.168.1.)x:5000/api`). 
-* *⚠️ Please do not commit/push your local IP address changes to GitHub!*
-
-Start the Frontend Application:
-```bash
-npm run dev -- --host
-```
+No real assessment banks are enabled by default. Administrators must import, validate, and publish curated content. OAuth remains deferred pending feasibility and institutional approval.
