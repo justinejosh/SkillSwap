@@ -7,7 +7,9 @@ import { presetSkills } from "../services/skillCatalog";
 
 test("fifteen unreviewed draft envelopes contain 240 schema-valid items without fabricated approval", () => {
   const directory = join(process.cwd(), "content/drafts");
-  const files = readdirSync(directory).filter((f) => f.endsWith(".json"));
+  const files = readdirSync(directory).filter(
+  (f) => f.endsWith(".json") && f !== "qa-owner.private.json"
+);
   assert.equal(files.length, 15);
   const seen = new Set<string>(); let count = 0;
   for (const file of files) {

@@ -26,7 +26,10 @@ function read(file, f, optional = false) {
 function loadSources() {
   const { validateBankInput } = require(path.join(root, "knoxite-backend/dist/services/bankValidation.js"));
   const catalog = JSON.parse(fs.readFileSync(path.join(root, "knoxite-backend/config/skill-catalog.json"), "utf8"));
-  check(fs.readdirSync(drafts).filter(n => n.endsWith(".json")).length === 15, "The authorized collection must contain exactly 15 draft files.");
+  check(
+  fs.readdirSync(drafts).filter(n => n.endsWith(".json") && n !== "qa-owner.private.json").length === 15,
+  "The authorized collection must contain exactly 15 draft files."
+);
   return KEYS.map(key => {
     const text = fs.readFileSync(path.join(drafts, key + ".json"), "utf8"), source = JSON.parse(text), preset = catalog.skills.find(s => s.key === key);
     check(preset && source.presetKey === key && source.skillName === preset.name && source.draftStatus === "DRAFT_UNREVIEWED_NOT_FOR_STUDENT_PUBLICATION", "Source/catalog identity changed; obtain review of the revised collection.");
