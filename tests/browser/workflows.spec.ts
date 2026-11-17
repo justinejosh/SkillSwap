@@ -819,14 +819,19 @@ test("administrators import the provisional mapping without assigning official v
   await page
     .getByRole("button", { name: "Import Provisional Mapping", exact: true })
     .click();
-  await expect(page.getByRole("status")).toContainText(
-    "no official validation",
-  );
   await expect(
-    page.getByText("College of Nursing (provisional; excluded from WRMR)", {
-      exact: false,
-    }),
-  ).toBeVisible();
+  page.getByRole("status").filter({
+    hasText: "Provisional mapping imported",
+  }),
+).toContainText("no official validation");
+  const nursingRow = page
+  .getByRole("table", { name: "Academic program directory" })
+  .getByRole("row")
+  .filter({ has: page.getByRole("cell", { name: "BSN", exact: true }) });
+
+await expect(nursingRow).toContainText("College of Nursing");
+await expect(nursingRow).toContainText("Provisional");
+await expect(nursingRow).toContainText("Excluded from WRMR");
   expect(mutations).toEqual([
     "/api/admin/academic-programs/provisional-mapping",
   ]);
