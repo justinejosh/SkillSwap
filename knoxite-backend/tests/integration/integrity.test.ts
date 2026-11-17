@@ -6,12 +6,12 @@ import jwt from "jsonwebtoken";
 import { PrismaClient } from "@prisma/client";
 import { createApp } from "../../app";
 import { loadConfig } from "../../lib/config";
-import { requireLocalDatabase } from "../../scripts/safeDatabase";
+import { requireOwnedFixtureDatabase } from "./fixtureDatabase";
 import { seedAcademicCatalog } from "../../services/academics";
 import { INTEGRITY_REVIEW_REASON } from "../../services/exchangeIntegrity";
 
 test("isolated partner-balanced ranking, provisional mapping and private integrity review", async (t) => {
-  const url = requireLocalDatabase();
+  const url = requireOwnedFixtureDatabase();
   assert.match(new URL(url).pathname, /_test$/);
   const db = new PrismaClient({ datasources: { db: { url } } });
   const prefix = `integrity-${randomUUID().slice(0, 8)}`;

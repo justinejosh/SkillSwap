@@ -1,5 +1,38 @@
 import { test, expect, Page } from "@playwright/test";
 
+test("login shows server cooldown, prevents duplicate submits, and re-enables after expiry", async ({ page }) => {
+  await page.clock.install();
+  await mockRecovery(page);
+  let requests = 0;
+  await page.route("**/api/auth/login", async (route) => {
+    requests++;
+    await route.fulfill({ status: 429, json: { error: "Too many unsuccessful sign-in attempts.", details: { retryAfterSeconds: 2 } } });
+  });
+  await page.goto("/login");
+  await page.getByLabel("Email Address", { exact: true }).fill("alicelag@fixture.example");
+  await page.getByLabel("Password", { exact: true }).fill("synthetic-fixture-password");
+  await page.locator("form").evaluate((form: HTMLFormElement) => { form.requestSubmit(); form.requestSubmit(); });
+  await expect(page.getByRole("alert")).toContainText("Try again in 0:02");
+  await expect(page.getByRole("button", { name: "Try again in 0:02" })).toBeDisabled();
+  await page.getByLabel("Email Address", { exact: true }).fill("boblag@fixture.example");
+  await page.locator("form").evaluate((form: HTMLFormElement) => form.requestSubmit());
+  expect(requests).toBe(1);
+  await page.clock.fastForward(2000);
+  await expect(page.getByRole("button", { name: "Sign in", exact: true })).toBeEnabled();
+  await expect(page.getByRole("alert")).toHaveCount(0);
+});
+
+test("login accepts Retry-After headers when a gateway omits JSON cooldown details", async ({ page }) => {
+  await page.clock.install();
+  await mockRecovery(page);
+  await page.route("**/api/auth/login", (route) => route.fulfill({ status: 429, headers: { "Retry-After": "3", "Access-Control-Expose-Headers": "Retry-After" }, json: { error: "Please retry later." } }));
+  await page.goto("/login");
+  await page.getByLabel("Email Address", { exact: true }).fill("alicelag@fixture.example");
+  await page.getByLabel("Password", { exact: true }).fill("synthetic-fixture-password");
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await expect(page.getByRole("alert")).toContainText("Try again in 0:03");
+});
+
 async function mockRecovery(page: Page, available = true) {
   const calls: { path: string; body: any }[] = [];
   await page.route("**/*", async (route) => {

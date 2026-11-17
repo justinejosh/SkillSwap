@@ -7,11 +7,11 @@ import jwt from "jsonwebtoken";
 import { PrismaClient } from "@prisma/client";
 import { createApp } from "../../app";
 import { loadConfig } from "../../lib/config";
-import { requireLocalDatabase } from "../../scripts/safeDatabase";
+import { requireOwnedFixtureDatabase } from "./fixtureDatabase";
 import { seedAcademicCatalog } from "../../services/academics";
 
 test("isolated MySQL API, assessment and exchange regression suite", async (t) => {
-  const databaseUrl = requireLocalDatabase();
+  const databaseUrl = requireOwnedFixtureDatabase();
   assert.match(new URL(databaseUrl).pathname, /_test$/);
   const db = new PrismaClient({ datasources: { db: { url: databaseUrl } } });
   const config = loadConfig({
@@ -19,6 +19,8 @@ test("isolated MySQL API, assessment and exchange regression suite", async (t) =
     INSTITUTION_EMAIL_DOMAINS: "fixture.example",
     CAMPUS_EMAIL_SUFFIX: "lag",
     EMAIL_VERIFICATION_REQUIRED: "true",
+    REGISTRATION_CONSENT_ENABLED: "true",
+    REGISTRATION_NOTICE_VERSION: "DRAFT_CI_NOTICE_v1",
   });
   const deliveries: { email: string; link: string }[] = [];
   const server = createApp(db, config, async (email, link) => {
@@ -49,7 +51,7 @@ test("isolated MySQL API, assessment and exchange regression suite", async (t) =
       data: {
         userId,
         userAgent: "Synthetic integration test",
-        expiresAt: new Date(Date.now() + 3600_000),
+        expiresAt: new Date(Date.now() + 2*3600_000),
       },
     });
     return jwt.sign({ tokenVersion: user.tokenVersion }, config.jwtSecret, {
@@ -57,7 +59,7 @@ test("isolated MySQL API, assessment and exchange regression suite", async (t) =
       jwtid: session.id,
       issuer: "knoxite-api",
       audience: "knoxite",
-      expiresIn: "1h",
+      expiresIn: "2h",
       algorithm: "HS256",
     });
   }
@@ -126,35 +128,27 @@ test("isolated MySQL API, assessment and exchange regression suite", async (t) =
       tokenFor(admin.id),
     ]);
     const [skillA, skillB, extra] = await Promise.all(
-      ["a", "b", "extra"].map((s) =>
-        db.skill.create({
-          data: { name: `${prefix}-${s}`, category: "technology" },
-        }),
+      ["Python Programming Fundamentals", "JavaScript Fundamentals", "SQL Fundamentals"].map((name) =>
+        db.skill.upsert({ where: { name }, create: { name, category: "technology" }, update: {} }),
       ),
     );
     await call("POST", "/profile/skills/offer", ta, {
-      name: skillA.name,
-      category: "technology",
+      skillId: skillA.id,
     });
     await call("POST", "/profile/skills/want", ta, {
-      name: skillB.name,
-      category: "technology",
+      skillId: skillB.id,
     });
     await call("POST", "/profile/skills/offer", tb, {
-      name: extra.name,
-      category: "technology",
+      skillId: extra.id,
     });
     await call("POST", "/profile/skills/offer", tb, {
-      name: skillB.name,
-      category: "technology",
+      skillId: skillB.id,
     });
     await call("POST", "/profile/skills/want", tb, {
-      name: extra.name,
-      category: "technology",
+      skillId: extra.id,
     });
     await call("POST", "/profile/skills/want", tb, {
-      name: skillA.name,
-      category: "technology",
+      skillId: skillA.id,
     });
     const offering = await db.userOfferedSkill.findUniqueOrThrow({
       where: { userId_skillId: { userId: a.id, skillId: skillA.id } },
@@ -368,7 +362,7 @@ test("isolated MySQL API, assessment and exchange regression suite", async (t) =
     let swapId = "";
     await t.test(
       "reciprocal requests, bilateral versioned consent, sessions and reviews",
-      async () => {
+      async (step) => {
         assert.equal(
           (
             await call("POST", "/swaps/request", ta, {
@@ -525,17 +519,24 @@ test("isolated MySQL API, assessment and exchange regression suite", async (t) =
           ).status,
           201,
         );
+        assert.equal((await call("POST",`/swaps/${swapId}/log-session`,ta,{sessionNumber:1})).status,409);
+        const scheduledStart=Date.now()+60000;
         assert.equal(
           (
             await call("POST", "/sessions", ta, {
               swapId,
               sessionNumber: 1,
-              scheduledAt: new Date(Date.now() + 86400_000).toISOString(),
+              scheduledAt: new Date(scheduledStart).toISOString(),
               meetingLink: "https://example.invalid/fixture",
             })
           ).status,
           201,
         );
+        assert.equal((await call("POST",`/swaps/${swapId}/log-session`,ta,{sessionNumber:1})).status,409);
+        step.mock.timers.enable({apis:["Date"],now:scheduledStart+3600_000-1});
+        step.after(()=>step.mock.timers.reset());
+        assert.equal((await call("POST",`/swaps/${swapId}/log-session`,ta,{sessionNumber:1})).status,409);
+        step.mock.timers.setTime(scheduledStart+3600_000);
         for (const token of [ta, tb]) {
           const results = await Promise.all([
             call("POST", `/swaps/${swapId}/log-session`, token, {
@@ -813,8 +814,7 @@ test("isolated MySQL API, assessment and exchange regression suite", async (t) =
         );
         await call("DELETE", `/profile/skills/offer/${skillA.id}`, ta);
         const restored = await call("POST", "/profile/skills/offer", ta, {
-          name: skillA.name,
-          category: "technology",
+          skillId: skillA.id,
         });
         assert.equal(restored.data.offering.id, offering.id);
         assert.equal(restored.data.offering.tier, "AMATEUR");
@@ -852,8 +852,7 @@ test("isolated MySQL API, assessment and exchange regression suite", async (t) =
           "VERIFIED",
         );
         const sameSkill = await call("POST", "/profile/skills/offer", tb, {
-          name: skillA.name,
-          category: "technology",
+          skillId: skillA.id,
         });
         assert.equal(sameSkill.data.offering.tier, "NOT_ASSESSED");
         const publicProfile = await call("GET", `/users/${a.id}/profile`, tb);
@@ -875,8 +874,7 @@ test("isolated MySQL API, assessment and exchange regression suite", async (t) =
       "expiry and retake limits cannot be bypassed by new bank versions",
       async () => {
         const saved = await call("POST", "/profile/skills/offer", tc, {
-          name: skillA.name,
-          category: "technology",
+          skillId: skillA.id,
         });
         const id = saved.data.offering.id;
         for (let i = 0; i < 3; i++) {
@@ -969,8 +967,7 @@ test("isolated MySQL API, assessment and exchange regression suite", async (t) =
           0,
         );
         const restored = await call("POST", "/profile/skills/offer", ta, {
-          name: skillA.name,
-          category: "technology",
+          skillId: skillA.id,
         });
         assert.equal(restored.data.offering.tier, "VERIFIED");
         const next = await call("POST", "/swaps/request", ta, {
@@ -1022,14 +1019,22 @@ test("isolated MySQL API, assessment and exchange regression suite", async (t) =
       "institutional verification fallback, reporting and suspension retain records",
       async () => {
         const email = `${prefix}-newlag@fixture.example`;
-        const registration = await call("POST", "/auth/register", undefined, {
+        const input={
           name: "Synthetic registered student",
           email,
           password: "fixture-password-123",
           programId: program.id,
           yearLevelId: year.id,
-        });
+          termsAccepted: true,
+          noticeVersion: config.registrationConsent!.version,
+        };
+        for(const accepted of [undefined,false])assert.equal((await call("POST","/auth/register",undefined,{...input,termsAccepted:accepted})).status,422);
+        assert.equal((await call("POST","/auth/register",undefined,{...input,noticeVersion:"stale-notice"})).status,409);
+        assert.equal(await db.user.count({where:{email}}),0);
+        const registration = await call("POST", "/auth/register", undefined, input);
         assert.equal(registration.status, 201);
+        const consent=await db.$queryRaw<Array<{noticeVersion:string;acceptedAt:Date}>>`SELECT noticeVersion,acceptedAt FROM RegistrationConsent WHERE userId=(SELECT id FROM User WHERE email=${email})`;
+        assert.equal(consent.length,1);assert.equal(consent[0].noticeVersion,config.registrationConsent!.version);assert.ok(Math.abs(Date.now()-consent[0].acceptedAt.getTime())<10000);
         assert.equal(
           (
             await call("POST", "/auth/login", undefined, {
@@ -1068,6 +1073,8 @@ test("isolated MySQL API, assessment and exchange regression suite", async (t) =
               password: "fixture-password-123",
               programId: program.id,
               yearLevelId: year.id,
+              termsAccepted: true,
+              noticeVersion: config.registrationConsent!.version,
             })
           ).status,
           422,

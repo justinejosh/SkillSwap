@@ -24,6 +24,7 @@ export default function SignupPage() {
   const [options, setOptions] = useState<{
     programs: any[];
     yearLevels: any[];
+    registrationPolicy?: {available:boolean;noticeVersion:string|null;approved:boolean};
   }>({ programs: [], yearLevels: [] });
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -47,7 +48,7 @@ export default function SignupPage() {
     setOptionsLoading(true);
     setOptionsError("");
     try {
-      const result = await api<{ programs: any[]; yearLevels: any[] }>(
+      const result = await api<{ programs: any[]; yearLevels: any[]; registrationPolicy?: {available:boolean;noticeVersion:string|null;approved:boolean} }>(
         "/auth/academic-options",
         { signal: controller.signal },
       );
@@ -78,7 +79,6 @@ export default function SignupPage() {
   }, []);
 
   useEffect(() => {
-    document.documentElement.classList.remove("dark");
     void loadAcademicOptions();
     return () => optionsRequest.current?.abort();
   }, [loadAcademicOptions]);
@@ -124,7 +124,7 @@ export default function SignupPage() {
           "Content-Type": "application/json",
           "bypass-tunnel-reminder": "true",
         },
-        body: JSON.stringify({ name, email, password, programId, yearLevelId }),
+        body: JSON.stringify({ name, email, password, programId, yearLevelId, termsAccepted: agreedToTerms, noticeVersion: options.registrationPolicy?.noticeVersion }),
       });
 
       const data = await response.json();
@@ -144,7 +144,7 @@ export default function SignupPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-blue-100 p-6 relative">
-      <div className="w-full max-w-md">
+      <div className="w-full max-w-md sm:max-w-xl">
         <div className="flex justify-center mb-6">
           <div className="bg-blue-600 p-3 rounded-2xl shadow-lg shadow-blue-200">
             <UserPlus className="text-white size-8" />
@@ -160,8 +160,8 @@ export default function SignupPage() {
               For OLFU Santa Rosa college students
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <GoogleSignIn onOnboardingChange={setGoogleOnboarding} />
+          <CardContent className="sm:px-8 sm:pb-8">
+            <GoogleSignIn signup onOnboardingChange={setGoogleOnboarding} />
             {!googleOnboarding && (
               <form noValidate onSubmit={handleSubmit} className="space-y-4">
                 {optionsLoading && (
@@ -193,7 +193,7 @@ export default function SignupPage() {
                 <div className="space-y-1.5">
                   <Label
                     htmlFor="name"
-                    className="text-[11px] uppercase tracking-wider font-bold text-blue-400 ml-1"
+                    className="text-xs uppercase tracking-wider font-bold text-blue-600 ml-1"
                   >
                     Full Name
                   </Label>
@@ -211,14 +211,14 @@ export default function SignupPage() {
                 <div className="space-y-1.5">
                   <Label
                     htmlFor="email"
-                    className="text-[11px] uppercase tracking-wider font-bold text-blue-400 ml-1"
+                    className="text-xs uppercase tracking-wider font-bold text-blue-600 ml-1"
                   >
                     Email Address
                   </Label>
                   <Input
                     id="email"
                     type="email"
-                    placeholder="alex@example.com"
+                    placeholder="Your institutional email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
@@ -229,7 +229,7 @@ export default function SignupPage() {
                 <div className="space-y-1.5">
                   <Label
                     htmlFor="password"
-                    className="text-[11px] uppercase tracking-wider font-bold text-blue-400 ml-1"
+                    className="text-xs uppercase tracking-wider font-bold text-blue-600 ml-1"
                   >
                     Password
                   </Label>
@@ -260,7 +260,7 @@ export default function SignupPage() {
                 <div className="space-y-1.5">
                   <Label
                     htmlFor="confirmPassword"
-                    className="text-[11px] uppercase tracking-wider font-bold text-blue-400 ml-1"
+                    className="text-xs uppercase tracking-wider font-bold text-blue-600 ml-1"
                   >
                     Confirm Password
                   </Label>
@@ -282,6 +282,7 @@ export default function SignupPage() {
                     id="signup-program"
                     disabled={
                       optionsLoading ||
+                    !options.registrationPolicy?.available ||
                       !!optionsError ||
                       !options.programs.length
                     }
@@ -363,11 +364,13 @@ export default function SignupPage() {
                   </label>
                 </div>
 
+                <p className="text-xs text-slate-600 dark:text-slate-300">{options.registrationPolicy?.available ? `Notice: ${options.registrationPolicy.noticeVersion}${options.registrationPolicy.approved ? "" : " — development draft; not approved for real student registration"}` : "New registration is unavailable until the reviewed notice and consent storage are configured. Existing accounts can still sign in."}</p>
                 <Button
                   type="submit"
                   disabled={
                     isLoading ||
                     optionsLoading ||
+                    !options.registrationPolicy?.available ||
                     !!optionsError ||
                     !options.programs.length
                   }

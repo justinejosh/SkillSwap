@@ -1,8 +1,9 @@
 import { PrismaClient, Role } from "@prisma/client";
 import { Request, RequestHandler } from "express";
 import jwt, { JwtPayload } from "jsonwebtoken";
-import { AppConfig, studentEmailAllowed } from "../lib/config";
+import { AppConfig, studentEmailAllowed, pilotSessionAccountAllowed } from "../lib/config";
 import { HttpError } from "../lib/http";
+import { lastInteraction, sessionDeadlines, timeoutsEnabled, SESSION_POLICY } from "../services/sessionPolicy";
 
 declare global {
   namespace Express {
@@ -10,6 +11,9 @@ declare global {
       userId?: string;
       userRole?: Role;
       sessionId?: string;
+      sessionTokenVersion?: number;
+      sessionIssuedRole?: Role;
+      sessionTiming?: ReturnType<typeof sessionDeadlines>;
     }
   }
 }
@@ -56,6 +60,8 @@ export function authentication(
       },
       select: {
         id: true,
+        createdAt: true,
+        expiresAt: true,
         user: {
           select: {
             id: true,
@@ -70,6 +76,15 @@ export function authentication(
     });
     if (!session || session.user.tokenVersion !== claims.tokenVersion)
       throw new HttpError(401, "Session has been revoked.");
+    if (timeoutsEnabled(config) && claims.sessionPolicy === SESSION_POLICY && claims.sessionRole !== session.user.role) {
+      await db.authSession.updateMany({ where: { id: session.id, revokedAt: null }, data: { revokedAt: new Date() } });
+      throw new HttpError(401, "Your account role changed. Please sign in again.");
+    }
+    if (timeoutsEnabled(config))
+      req.sessionTiming = sessionDeadlines(session, session.user.role, claims,
+        await lastInteraction(db, session.id));
+    if (!pilotSessionAccountAllowed(session.user, config))
+      throw new HttpError(403, "This account is not authorized for the local OAuth pilot.");
     if (
       session.user.role === "USER" &&
       !studentEmailAllowed(session.user.email, config)
@@ -88,6 +103,8 @@ export function authentication(
     req.userId = session.user.id;
     req.userRole = session.user.role;
     req.sessionId = session.id;
+    req.sessionTokenVersion = claims.tokenVersion;
+    req.sessionIssuedRole = claims.sessionRole as Role | undefined;
     next();
   };
 }

@@ -1,3 +1,4 @@
+import { authenticatedFetch } from "@/app/lib/api";
 import { api } from "@/app/lib/api";
 import { PortfolioContent } from "@/app/pages/PublicProfilePage";
 import { useState, useEffect, useRef } from "react";
@@ -44,6 +45,7 @@ export default function ProfilePage() {
     yearLevels: any[];
   }>({ programs: [], yearLevels: [] });
   const [profileError, setProfileError] = useState("");
+  const [profileNotice, setProfileNotice] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -61,7 +63,7 @@ export default function ProfilePage() {
         return;
       }
 
-      const response = await fetch(`${API_BASE_URL}/profile/`, {
+      const response = await authenticatedFetch(`${API_BASE_URL}/profile/`, {
         headers: {
           Authorization: `Bearer ${token}`,
           "bypass-tunnel-reminder": "true",
@@ -95,7 +97,7 @@ export default function ProfilePage() {
     if (!file) return;
 
     if (file.size > 5 * 1024 * 1024) {
-      alert("Please select an image smaller than 5MB.");
+      setProfileError("Please select an image smaller than 5MB.");
       return;
     }
 
@@ -137,12 +139,13 @@ export default function ProfilePage() {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setProfileError("");
+    setProfileNotice("");
     setIsSaving(true);
     try {
       const token = localStorage.getItem("knoxite_token");
       const url = `${API_BASE_URL}/profile/update`;
 
-      const response = await fetch(url, {
+      const response = await authenticatedFetch(url, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -160,15 +163,14 @@ export default function ProfilePage() {
       });
 
       if (response.ok) {
-        alert("Profile updated successfully!");
+        setProfileNotice("Profile updated.");
         fetchUserProfile();
       } else {
         const data = await response.json();
         setProfileError(data.error || "Profile update failed.");
       }
     } catch (error) {
-      console.error("Save failed", error);
-      alert("A system error occurred.");
+      setProfileError(error instanceof Error ? error.message : "Unable to save your profile. Please retry.");
     } finally {
       setIsSaving(false);
     }
@@ -176,19 +178,18 @@ export default function ProfilePage() {
 
   if (isLoading) {
     return (
-      <div className="flex flex-col justify-center items-center min-h-screen bg-[#F8FAFC] dark:bg-slate-950">
+      <div className="flex flex-col justify-center items-center min-h-screen knoxite-surface">
         <Loader2 className="animate-spin size-8 text-blue-600 mb-3" />
         <span className="text-slate-900 dark:text-slate-200 font-bold text-xs uppercase tracking-widest">
-          Synchronizing Profile Data...
+          Loading your profile...
         </span>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#E5F2FA] via-[#E5F2FA] via-70% to-[#F8FAFC] dark:bg-none dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans flex flex-col relative overflow-x-hidden transition-colors duration-200">
+    <div className="min-h-screen knoxite-surface text-slate-900 dark:text-slate-100 font-sans flex flex-col relative overflow-x-hidden transition-colors duration-200">
       {/* SUBTLE ARCHITECTURAL GRID */}
-      <div className="absolute inset-0 bg-[linear-gradient(to_right,#e2e8f080_1px,transparent_1px),linear-gradient(to_bottom,#e2e8f080_1px,transparent_1px)] dark:bg-[linear-gradient(to_right,#1e293b50_1px,transparent_1px),linear-gradient(to_bottom,#1e293b50_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_70%_50%_at_50%_0%,#000_70%,transparent_110%)] pointer-events-none" />
 
       {/* 1. FLOATING GLASS HEADER */}
       <div className="sticky top-3 z-30 px-4 sm:px-6">
@@ -301,9 +302,10 @@ export default function ProfilePage() {
             </div>
 
             {/* Profile Update Form */}
-            <form onSubmit={handleSave} className="space-y-4 max-w-sm mx-auto">
+            <form onSubmit={handleSave} className="space-y-4 max-w-2xl mx-auto">
+              {profileNotice && <p role="status" className="text-sm text-green-800 dark:text-green-300">{profileNotice}</p>}
               {profileError && (
-                <p role="alert" className="text-sm text-red-700">
+                <p role="alert" className="text-sm text-red-700 dark:text-red-300">
                   {profileError}
                 </p>
               )}
@@ -350,7 +352,7 @@ export default function ProfilePage() {
               <p className="text-xs text-slate-500 dark:text-slate-300">
                 Program and year level are self-reported. Department is derived
                 from your program after official mapping confirmation. Academic
-                proximity uses department and year level, never physical
+                similarity compares department and year level, never physical
                 distance.
               </p>
               {academicOptions.programs.find((p) => p.id === programId)
@@ -362,7 +364,7 @@ export default function ProfilePage() {
                       ?.proposedDepartment.name
                   }
                   . Campus confirmation is pending; this draft is excluded from
-                  WRMR proximity.
+                  academic similarity in match scores.
                 </p>
               )}
               {(!academicOptions.programs.length ||
@@ -455,7 +457,7 @@ export default function ProfilePage() {
         </Card>
         {profile && profile.role !== "ADMIN" && (
           <div className="mx-auto mt-6 max-w-4xl rounded-2xl border bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
-            <h2 className="mb-4 text-lg font-bold">Your student portfolio</h2>
+            <h2 className="mb-4 text-lg font-bold">My Skill Portfolio</h2>
             <PortfolioContent profile={profile} />
             <Button
               className="mt-4"

@@ -1,3 +1,4 @@
+import { authenticatedFetch } from "@/app/lib/api";
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { Button } from "@/app/components/ui/button";
@@ -31,6 +32,8 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<any[]>([]);
   const [messageInput, setMessageInput] = useState("");
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const currentUser = JSON.parse(localStorage.getItem("knoxite_user") || "{}");
@@ -46,18 +49,26 @@ export default function ChatPage() {
   };
 
   useEffect(() => {
+    let live = true;
+    setLoading(true);
+    setLoadError("");
     const fetchConversations = async () => {
       try {
         const token = localStorage.getItem("knoxite_token");
-        const res = await fetch(`${API_BASE_URL}/swaps`, {
+        const res = await authenticatedFetch(`${API_BASE_URL}/swaps`, {
           headers: {
             Authorization: `Bearer ${token}`,
             "bypass-tunnel-reminder": "true",
           },
         });
 
-        if (res.ok) {
+        if (!res.ok) {
+          const problem = await res.json().catch(() => null);
+          throw new Error(problem?.error || "Unable to load conversations. Please try again.");
+        }
+        if (live) {
           const data = await res.json();
+          if (!live) return;
           const activeStatuses = ["ACCEPTED", "CONFIRMED", "PENDING_AGREEMENT"];
           const activeSwaps = data.filter((s: any) =>
             activeStatuses.includes(s.status),
@@ -89,13 +100,14 @@ export default function ChatPage() {
           }
         }
       } catch (err) {
-        console.error("Error fetching conversations", err);
+        if (live) setLoadError(err instanceof Error ? err.message : "Unable to load conversations. Please try again.");
       } finally {
-        setLoading(false);
+        if (live) setLoading(false);
       }
     };
     fetchConversations();
-  }, [urlPartnerId, urlSwapId]);
+    return () => { live = false; };
+  }, [urlPartnerId, urlSwapId, loadAttempt]);
 
   useEffect(() => {
     if (!selectedPartner) return;
@@ -103,7 +115,7 @@ export default function ChatPage() {
     const fetchMessages = async () => {
       try {
         const token = localStorage.getItem("knoxite_token");
-        const res = await fetch(
+        const res = await authenticatedFetch(
           `${API_BASE_URL}/chat/conversation/${selectedPartner.id}?swapId=${selectedPartner.swapId}`,
           {
             headers: {
@@ -138,7 +150,7 @@ export default function ChatPage() {
 
     try {
       const token = localStorage.getItem("knoxite_token");
-      const res = await fetch(`${API_BASE_URL}/chat/send`, {
+      const res = await authenticatedFetch(`${API_BASE_URL}/chat/send`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -164,32 +176,34 @@ export default function ChatPage() {
 
   if (loading) {
     return (
-      <div className="h-screen bg-gradient-to-b from-[#E5F2FA] via-[#E5F2FA] via-70% to-[#F8FAFC] dark:bg-none dark:bg-slate-950">
-        <Loader2 className="size-8 text-blue-600 animate-spin mb-3" />
-        <p className="text-slate-900 dark:text-slate-200 font-bold text-xs uppercase tracking-widest">
-          Syncing Messages...
-        </p>
+      <div className="min-h-dvh flex items-center justify-center p-6 text-center knoxite-surface">
+        <div role="status" className="flex flex-col items-center gap-3">
+          <Loader2 aria-hidden="true" className="size-8 text-blue-600 animate-spin" />
+          <p className="text-slate-900 dark:text-slate-200 font-semibold text-sm">
+            Loading conversations...
+          </p>
+        </div>
       </div>
     );
   }
 
-  if (conversations.length === 0) {
+  if (loadError || conversations.length === 0) {
     return (
-      <div className="h-screen bg-gradient-to-b from-[#E5F2FA] via-[#E5F2FA] via-70% to-[#F8FAFC] dark:bg-none dark:bg-slate-950">
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#e2e8f080_1px,transparent_1px),linear-gradient(to_bottom,#e2e8f080_1px,transparent_1px)] dark:bg-[linear-gradient(to_right,#1e293b50_1px,transparent_1px),linear-gradient(to_bottom,#1e293b50_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_70%_50%_at_50%_0%,#000_70%,transparent_110%)] pointer-events-none" />
-        <div className="relative z-10 max-w-sm space-y-4">
+      <div className="relative min-h-dvh flex items-center justify-center p-6 text-center knoxite-surface">
+
+        <div className="relative z-10 w-full max-w-sm space-y-4">
           <div className="size-16 rounded-3xl bg-blue-50 dark:bg-slate-900 text-blue-600 dark:text-blue-400 flex items-center justify-center mx-auto shadow-xs border border-blue-100 dark:border-slate-800">
-            <MessageSquare className="size-8" />
+            <MessageSquare aria-hidden="true" className="size-8" />
           </div>
           <div className="space-y-1.5">
             <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
-              No Active Swaps Yet
+              {loadError ? "Unable to load conversations" : "No Active Swaps Yet"}
             </h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-              Accept or initiate a bilateral swap to open direct workspace
-              communications.
+            <p role={loadError ? "alert" : undefined} className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+              {loadError || "Start or accept a skill swap to chat with your partner."}
             </p>
           </div>
+          {loadError && <Button variant="outline" className="mr-2" onClick={() => setLoadAttempt(n => n + 1)}>Try again</Button>}
           <Button
             onClick={() => navigate("/dashboard")}
             className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-6 h-11 text-xs font-bold shadow-md shadow-blue-600/20"
@@ -202,8 +216,7 @@ export default function ChatPage() {
   }
 
   return (
-    <div className="h-screen max-h-screen bg-gradient-to-b from-[#E5F2FA] via-[#E5F2FA] via-70% to-[#F8FAFC] dark:bg-none dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col overflow-hidden font-sans relative transition-colors duration-200">
-      <div className="absolute inset-0 bg-[linear-gradient(to_right,#e2e8f080_1px,transparent_1px),linear-gradient(to_bottom,#e2e8f080_1px,transparent_1px)] dark:bg-[linear-gradient(to_right,#1e293b50_1px,transparent_1px),linear-gradient(to_bottom,#1e293b50_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_70%_50%_at_50%_0%,#000_70%,transparent_110%)] pointer-events-none" />
+    <div className="h-screen max-h-screen knoxite-surface text-slate-900 dark:text-slate-100 flex flex-col overflow-hidden font-sans relative transition-colors duration-200">
 
       {/* FLOATING GLASS HEADER */}
       <div className="flex-none pt-4 px-4 sm:px-6 z-30">
@@ -355,7 +368,7 @@ export default function ChatPage() {
                       className="border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 text-[10px] md:text-xs gap-1.5 rounded-xl h-8 px-3.5 shrink-0 font-bold"
                     >
                       <FileCheck className="size-3.5 text-blue-600 dark:text-blue-400" />
-                      View Deal
+                      View Exchange
                     </Button>
                   </div>
                 </CardHeader>

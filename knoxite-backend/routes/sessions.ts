@@ -1,9 +1,11 @@
 import express from "express";
+import { confirmationEligibility } from "../services/sessionConfirmationEligibility";
 import { PrismaClient } from "@prisma/client";
 import { actor, requireStudent } from "../middleware/authMiddleware";
 import { HttpError, integer, onlyKeys, text } from "../lib/http";
 import { assertParticipant } from "./swaps";
 import { lockSwap, transaction } from "../lib/transaction";
+import { assertScheduleTime, parseScheduledAt } from "../lib/scheduling";
 export function sessionsRouter(db: PrismaClient) {
   const router = express.Router();
   router.use(requireStudent);
@@ -19,6 +21,8 @@ export function sessionsRouter(db: PrismaClient) {
             status: true,
             requesterId: true,
             receiverId: true,
+            integrityVerified: true, agreementVersion: true, duration: true, sessions: true,
+            requesterSessions: true, receiverSessions: true, requesterApprovedAt: true, receiverApprovedAt: true,
             requester: { select: { id: true, name: true } },
             receiver: { select: { id: true, name: true } },
             sessionLogs: {
@@ -36,6 +40,7 @@ export function sessionsRouter(db: PrismaClient) {
         sessionNumber: row.sessionNumber,
         scheduledAt: row.scheduledAt,
         meetingLink: row.meetingLink,
+        confirmationEligibility: confirmationEligibility(row.swap, actor(req), row.sessionNumber, row),
         partner:
           row.swap.requesterId === actor(req)
             ? row.swap.receiver
@@ -68,15 +73,9 @@ export function sessionsRouter(db: PrismaClient) {
       1,
       30,
     );
-    const scheduledAt = new Date(
+    const scheduledAt = parseScheduledAt(
       text(req.body.scheduledAt, "Scheduled date", 50),
     );
-    if (
-      !Number.isFinite(scheduledAt.getTime()) ||
-      scheduledAt <= new Date() ||
-      scheduledAt.getTime() > Date.now() + 366 * 86400_000
-    )
-      throw new HttpError(422, "Choose a future date within one year.");
     const meetingLink = text(
       req.body.meetingLink ?? "",
       "Meeting link",
@@ -114,6 +113,8 @@ export function sessionsRouter(db: PrismaClient) {
           409,
           "A session already acknowledged by a participant cannot be rescheduled.",
         );
+      // Recheck time after acquiring the exchange lock, not at form-open time.
+      assertScheduleTime(scheduledAt, swap.requesterApprovedAt, swap.receiverApprovedAt);
       return tx.swapSession.upsert({
         where: { swapId_sessionNumber: { swapId, sessionNumber } },
         create: {

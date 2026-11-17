@@ -1,6 +1,8 @@
 @import './fonts.css';
 @import './tailwind.css';
 @import './theme.css';
+@import './student-surface.css';
+@import './admin.css';
 @import "driver.js/dist/driver.css";
 
 @keyframes fadeInHint {

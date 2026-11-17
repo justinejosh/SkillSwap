@@ -1,4 +1,5 @@
 import { HttpError } from "../lib/http";
+import { resendMailer } from "./resendEmail";
 export type MailPurpose = "verification" | "password-reset";
 export type VerificationMailer = ((
   email: string,
@@ -7,6 +8,14 @@ export type VerificationMailer = ((
 ) => Promise<void>) & { isConfigured?: () => boolean };
 // A configured institutional delivery service sends the message. Tokens are never logged.
 export function configuredMailer(): VerificationMailer {
+  if (process.env.EMAIL_PROVIDER === "resend") return resendMailer();
+  if (process.env.EMAIL_PROVIDER && process.env.EMAIL_PROVIDER !== "webhook") {
+    const unavailable: VerificationMailer = async () => {
+      throw new HttpError(503, "Email provider is not configured.");
+    };
+    unavailable.isConfigured = () => false;
+    return unavailable;
+  }
   const mailer: VerificationMailer = async (
     email,
     link,

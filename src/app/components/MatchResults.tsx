@@ -19,7 +19,7 @@ export function MatchResults({
       <MetricPolicyNotice />
       <p className="text-sm text-slate-600 dark:text-slate-300">
         Every listed student meets your reciprocal skill requirements. A missing
-        score means there is not enough validated evidence to calculate WRMR.
+        score means there is not enough validated evidence to calculate a match score.
         You can still request a swap.
       </p>
       <nav aria-label="Match groups" className="flex flex-wrap gap-3 text-sm">
@@ -36,7 +36,7 @@ export function MatchResults({
             className="rounded-lg border border-slate-300 px-3 py-2 text-blue-700 underline dark:border-slate-700 dark:text-blue-300"
             href={`#${idPrefix}-scored`}
           >
-            With WRMR scores ({scored.length})
+            Ranked Matches ({scored.length})
           </a>
         )}
       </nav>
@@ -70,12 +70,12 @@ export function MatchResults({
             id={`${idPrefix}-scored`}
             className="scroll-mt-28 text-lg font-bold"
           >
-            Matches with WRMR scores ({scored.length})
+            Ranked Matches ({scored.length})
           </h3>
-          <p className="text-xs text-slate-600 dark:text-slate-300">
-            Ordered by the backend's 50% rating, 30% completion, and 20%
-            academic proximity calculation.
-          </p>
+          <details className="text-sm text-slate-600 dark:text-slate-300">
+            <summary className="cursor-pointer rounded focus-visible:outline-2 focus-visible:outline-blue-600">How match scores work</summary>
+            <p className="mt-2">Match scores combine peer ratings (50%), completion (30%), and academic similarity (20%). Ratings and completion are averaged per partner first, then equally across partners. The percentage shows how much of the maximum 100-point ranking score is reached. It summarizes available evidence and is not a probability of swap success. Assessment badges do not affect scores.</p>
+          </details>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {scored.map((peer) => (
               <MatchCard

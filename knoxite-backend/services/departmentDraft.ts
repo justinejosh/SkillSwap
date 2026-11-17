@@ -2,6 +2,8 @@ import { PrismaClient } from "@prisma/client";
 import catalog from "../config/academic-catalog.json";
 import draft from "../config/provisional-departments.json";
 import { HttpError } from "../lib/http";
+import { transaction } from "../lib/transaction";
+import { existingDraftDepartment } from "./departmentNames";
 
 export function reviewedDepartmentDraft() {
   const programs = draft.departments.flatMap((d) => d.programCodes);
@@ -26,7 +28,7 @@ export function proposedDepartment(programCode: string) {
 }
 export async function importDepartmentDraft(db: PrismaClient) {
   const draft = reviewedDepartmentDraft();
-  return db.$transaction(async (tx) => {
+  return transaction(db, async (tx) => {
     const programs = await tx.program.findMany({
       where: { code: { in: draft.departments.flatMap((d) => d.programCodes) } },
     });
@@ -35,22 +37,16 @@ export async function importDepartmentDraft(db: PrismaClient) {
         409,
         "Initialize the configured programs before importing the draft.",
       );
-    for (const row of draft.departments) {
-      const existing = await tx.department.findUnique({
-        where: { code: row.code },
-      });
-      if (existing && (existing.name !== row.name || !existing.isActive))
-        throw new HttpError(
-          409,
-          "An existing department conflicts with the draft. Review it manually.",
-        );
-    }
+    const departments = await tx.department.findMany();
+    // Resolve all conflicts before making changes; a different legacy code is
+    // safe to reuse only when the college name identifies one active record.
+    const resolved = draft.departments.map((row) => ({
+      row, existing: existingDraftDepartment(departments, row.code, row.name),
+    }));
     let imported = 0;
-    for (const row of draft.departments) {
-      const department = await tx.department.upsert({
-        where: { code: row.code },
-        create: { code: row.code, name: row.name },
-        update: {},
+    for (const { row, existing } of resolved) {
+      const department = existing ?? await tx.department.create({
+        data: { code: row.code, name: row.name },
       });
       const result = await tx.program.updateMany({
         where: {

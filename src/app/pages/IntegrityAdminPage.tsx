@@ -1,3 +1,5 @@
+import { AdminStatus } from "@/app/components/admin/AdminUI";
+import { AdminShell } from "@/app/components/admin/AdminShell";
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import { api } from "@/app/lib/api";
@@ -10,13 +12,11 @@ export default function IntegrityAdminPage() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
+  const [loading,setLoading]=useState(true),[search,setSearch]=useState(""),[status,setStatus]=useState("");
   async function load() {
-    const [signals, cases] = await Promise.all([
-      api("/admin/integrity/signals"),
-      api<any[]>("/admin/integrity/reviews"),
-    ]);
-    setData(signals);
-    setReviews(cases);
+    setLoading(true);
+    try {const [signals,cases]=await Promise.all([api("/admin/integrity/signals"),api<any[]>("/admin/integrity/reviews")]);setData(signals);setReviews(cases);setError("");}
+    finally {setLoading(false);}
   }
   useEffect(() => {
     void load().catch((e) => setError(e.message));
@@ -42,15 +42,9 @@ export default function IntegrityAdminPage() {
       .map((id) => data.users.find((u: any) => u.id === id)?.name ?? id)
       .join(" and ");
   return (
-    <main className="min-h-screen bg-slate-50 p-5 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
-      <div className="mx-auto max-w-5xl space-y-6">
-        <Link
-          to="/admin/assessments"
-          className="text-blue-700 underline dark:text-blue-300"
-        >
-          Back to trust administration
-        </Link>
-        <h1 className="text-2xl font-bold">Repeated-partner evidence review</h1>
+    <AdminShell title="Integrity Review">
+      <div className="space-y-5">
+        <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="text-lg font-bold">Repeated-partner evidence review</h2><Button variant="outline" disabled={loading||busy} onClick={()=>void load().catch(e=>setError(e.message))}>Refresh evidence</Button></div>
         <p className="text-sm">
           Repeated exchanges and mutual five-star reviews can be legitimate.
           These signals support human review and are not findings of misconduct.
@@ -68,17 +62,19 @@ export default function IntegrityAdminPage() {
             {notice}
           </p>
         )}
+        <div className="admin-filters"><label>Search student pairs<input type="search" value={search} onChange={e=>setSearch(e.target.value)}/></label><label>Review case status<select value={status} onChange={e=>setStatus(e.target.value)}><option value="">All statuses</option><option>PENDING</option><option>RESOLVED</option><option>DISMISSED</option></select></label></div>
+        {loading&&<p role="status">Loading integrity evidence...</p>}
         <section className="space-y-4" aria-label="Observed partner patterns">
           <h2 className="text-xl font-semibold">Observed partner patterns</h2>
-          {!data.signals.length && (
+          {!loading && !error && !data.signals.length && (
             <p>No repeated-partner signals are available.</p>
           )}
-          {data.signals.map((signal: any) => {
+          {data.signals.filter((signal:any)=>names(signal.userIds).toLowerCase().includes(search.toLowerCase())).map((signal: any) => {
             const key = JSON.stringify(signal.userIds);
             return (
               <article
                 key={key}
-                className="space-y-3 rounded-xl border bg-white p-4 dark:border-slate-700 dark:bg-slate-900"
+                className="admin-panel space-y-3"
               >
                 <h3 className="font-semibold">{names(signal.userIds)}</h3>
                 <p className="text-sm">
@@ -88,8 +84,8 @@ export default function IntegrityAdminPage() {
                 </p>
                 <p className="text-sm">
                   Shortest interval between completions:{" "}
-                  {(signal.fastestGapMs / 60000).toFixed(2)} minutes. Median
-                  interval: {(signal.medianGapMs / 60000).toFixed(2)} minutes.
+                  {(typeof signal.fastestGapMs === "number" ? (signal.fastestGapMs / 60000).toFixed(2) : "Not available")} minutes. Median
+                  interval: {(typeof signal.medianGapMs === "number" ? (signal.medianGapMs / 60000).toFixed(2) : "Not available")} minutes.
                 </p>
                 <p className="text-xs">
                   {signal.firstCompletedAt} to {signal.lastCompletedAt}
@@ -129,22 +125,24 @@ export default function IntegrityAdminPage() {
         </section>
         <section className="space-y-4" aria-label="Private review history">
           <h2 className="text-xl font-semibold">Private review history</h2>
-          {reviews.map((review) => (
+          {!loading&&!error&&!reviews.length&&<p>No private review cases.</p>}
+          {reviews.filter(review=>(!status||review.status===status)&&(!review.details||names(review.details.userIds).toLowerCase().includes(search.toLowerCase()))).map((review) => (
             <article
               key={review.id}
-              className="space-y-3 rounded-xl border bg-white p-4 dark:border-slate-700 dark:bg-slate-900"
+              className="admin-panel space-y-3"
             >
               <h3 className="font-semibold">
                 {review.details
                   ? names(review.details.userIds)
                   : "Review record"}{" "}
-                · {review.status}
+                · <AdminStatus status={review.status}/>
               </h3>
               {review.details?.events.map((event: any, index: number) => (
                 <p key={index} className="break-words text-sm">
-                  {event.at} · {event.action}: {event.notes}
+                  {event.at} · {event.action} · Administrator {event.administratorId}: {event.notes}
                 </p>
               ))}
+              {review.details?.evidence&&<details><summary className="cursor-pointer text-sm font-semibold">Recorded case evidence</summary><pre className="mt-3 rounded-xl bg-slate-100 p-3 text-xs dark:bg-slate-800">{JSON.stringify(review.details.evidence,null,2)}</pre></details>}
               {review.status === "PENDING" && review.details && (
                 <form
                   className="space-y-2"
@@ -191,6 +189,6 @@ export default function IntegrityAdminPage() {
           ))}
         </section>
       </div>
-    </main>
+    </AdminShell>
   );
 }

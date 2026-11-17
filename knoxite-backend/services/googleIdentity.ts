@@ -1,5 +1,5 @@
 import { OAuth2Client, TokenPayload } from "google-auth-library";
-import { AppConfig, studentEmailAllowed } from "../lib/config";
+import { AppConfig, studentEmailAllowed, pilotAccountAllowed } from "../lib/config";
 import { HttpError } from "../lib/http";
 
 export type GoogleVerifier = (
@@ -55,6 +55,9 @@ export function eligibleGoogleIdentity(
       "Use an eligible institutional Google Workspace account under the approved Santa Rosa college-student policy.",
     );
   }
+  // Called only after the backend verifier accepted the signed Google token.
+  if (!pilotAccountAllowed(email, config))
+    throw new HttpError(403, "This account is not authorized for the local OAuth pilot.");
   return {
     subject: payload.sub,
     email,

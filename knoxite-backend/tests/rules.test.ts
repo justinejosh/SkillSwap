@@ -17,7 +17,7 @@ const me = { departmentId: "department-a", yearLevelId: "year-1" };
 test("campus domain and suffix are separate configurable rules", () => {
   const config = loadConfig({ JWT_SECRET: "x".repeat(40) });
   assert.equal(
-    studentEmailAllowed("student123lag@student.fatima.edu.ph", config),
+    studentEmailAllowed("student1234lag@student.fatima.edu.ph", config),
     true,
   );
   for (const email of [
@@ -302,9 +302,11 @@ test("production activation requires confirmed eligibility, ownership verificati
   const proposed = {
     JWT_SECRET: "synthetic-config-test-secret-".repeat(2),
     NODE_ENV: "production",
+    SESSION_TIMEOUTS_ENABLED:"true",REGISTRATION_CONSENT_ENABLED:"true",REGISTRATION_NOTICE_APPROVED:"true",REGISTRATION_NOTICE_VERSION:"TEST_NOTICE_v1",
     INSTITUTION_EMAIL_DOMAINS: "student.fatima.edu.ph",
     CAMPUS_EMAIL_SUFFIX: "lag",
     PUBLIC_APP_URL: "https://example.invalid",
+    CORS_ORIGINS: "https://example.invalid",
   };
   assert.throws(() => loadConfig(proposed), /Officially confirm/);
   assert.throws(

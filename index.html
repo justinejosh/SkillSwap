@@ -7,19 +7,12 @@
     <script>
       try {
         const user = JSON.parse(localStorage.getItem("knoxite_user") || "{}");
-        const themeKey = user && user.id ? `theme_${user.id}` : "theme";
-        const savedTheme = localStorage.getItem(themeKey);
-
-        if (
-          savedTheme === "dark" ||
-          (!savedTheme && window.matchMedia("(prefers-color-scheme: dark)").matches)
-        ) {
-          document.documentElement.classList.add("dark");
-        } else {
-          document.documentElement.classList.remove("dark");
-        }
+        const dark = !!(user && user.id && localStorage.getItem(`theme_${user.id}`) === "dark");
+        document.documentElement.classList.toggle("dark", dark);
+        document.documentElement.style.colorScheme = dark ? "dark" : "light";
       } catch (e) {
         document.documentElement.classList.remove("dark");
+        document.documentElement.style.colorScheme = "light";
       }
     </script>
   </head>

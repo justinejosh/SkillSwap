@@ -1,0 +1,32 @@
+/* Gentle full-page tint and repeating waves; no spotlights or animation.
+   Matched edge tangents keep the SVG tile seamless across long pages. */
+.knoxite-surface {
+  --surface-base: #f7faff;
+  --surface-blue: rgb(59 130 246 / 3.5%);
+  --surface-cyan: rgb(6 182 212 / 2.5%);
+  --surface-contour: rgb(96 165 250 / 7%);
+  position: relative;
+  isolation: isolate;
+  background-color: var(--surface-base);
+  background-image:
+    linear-gradient(135deg, var(--surface-blue), transparent 55%),
+    linear-gradient(30deg, transparent 20%, var(--surface-cyan) 70%, transparent);
+}
+.dark .knoxite-surface {
+  --surface-base: #111c2e;
+  --surface-blue: rgb(59 130 246 / 5%);
+  --surface-cyan: rgb(6 182 212 / 2.5%);
+  --surface-contour: rgb(96 165 250 / 6%);
+}
+.knoxite-surface::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-color: var(--surface-contour);
+  mask-image: url("data:image/svg+xml,%3Csvg%20xmlns='http%3A//www.w3.org/2000/svg'%20width='1200'%20height='800'%20viewBox='0%200%201200%20800'%3E%3Cg%20fill='none'%20stroke='black'%20stroke-width='1'%3E%3Cpath%20d='M0%200C100%20-30%20200%20-30%20300%200S500%2030%20600%200S800%20-30%20900%200S1100%2030%201200%200%20M0%20100C100%2058%20200%2058%20300%20100S500%20142%20600%20100S800%2058%20900%20100S1100%20142%201200%20100%20M0%20200C100%20164%20200%20164%20300%20200S500%20236%20600%20200S800%20164%20900%20200S1100%20236%201200%20200%20M0%20300C100%20276%20200%20276%20300%20300S500%20324%20600%20300S800%20276%20900%20300S1100%20324%201200%20300%20M0%20400C100%20370%20200%20370%20300%20400S500%20430%20600%20400S800%20370%20900%20400S1100%20430%201200%20400%20M0%20500C100%20458%20200%20458%20300%20500S500%20542%20600%20500S800%20458%20900%20500S1100%20542%201200%20500%20M0%20600C100%20564%20200%20564%20300%20600S500%20636%20600%20600S800%20564%20900%20600S1100%20636%201200%20600%20M0%20700C100%20676%20200%20676%20300%20700S500%20724%20600%20700S800%20676%20900%20700S1100%20724%201200%20700%20M0%20800C100%20770%20200%20770%20300%20800S500%20830%20600%20800S800%20770%20900%20800S1100%20830%201200%20800'/%3E%3C/g%3E%3C/svg%3E");
+  mask-size: 1200px 800px;
+  mask-position: center top;
+  mask-repeat: repeat;
+}

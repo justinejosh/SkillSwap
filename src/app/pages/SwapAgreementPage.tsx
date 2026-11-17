@@ -1,3 +1,6 @@
+import { ExchangeSummary } from "@/app/components/ExchangeSummary";
+import { api } from "@/app/lib/api";
+import { useLiveSwap } from "@/app/lib/useLiveSwap";
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router";
 import { Button } from "@/app/components/ui/button";
@@ -16,144 +19,52 @@ import {
 } from "@/app/components/ui/avatar";
 import { Checkbox } from "@/app/components/ui/checkbox";
 import { ArrowLeft, Check, Loader2, Repeat } from "lucide-react";
-import { API_BASE_URL } from "@/config";
 
 export default function SwapAgreementPage() {
   const navigate = useNavigate();
   const { swapId } = useParams();
-  const [agreementVersion, setAgreementVersion] = useState(1);
-  const [approvalNotice, setApprovalNotice] = useState("");
+  const { swap, loading: isLoading, error: syncError, refresh } = useLiveSwap(swapId);
   const [step, setStep] = useState(1);
-  const [isLoading, setIsLoading] = useState(true);
   const [debugError, setDebugError] = useState<string | null>(null);
-
-  const [participants, setParticipants] = useState<any>({
-    me: { name: "You", headline: "Student/Teacher", avatarUrl: "" },
-    partner: { name: "Partner", headline: "Student/Teacher", avatarUrl: "" },
-  });
-
-  const [agreement, setAgreement] = useState({
-    skillA: "",
-    skillB: "",
-    duration: "1",
-    sessions: "4",
-    agreedToTerms: false,
-  });
-
+  const [notice, setNotice] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [agreement, setAgreement] = useState({skillA:"",skillB:"",duration:"1",sessions:"4",agreedToTerms:false});
+  const agreementVersion = swap?.agreementVersion;
+  const requester = swap?.requesterId === swap?.me?.id;
+  const participants = { me: swap?.me || {}, partner: swap?.partner || {} };
+  const myApproval = requester ? swap?.requesterApprovedAt : swap?.receiverApprovedAt;
+  const theirApproval = requester ? swap?.receiverApprovedAt : swap?.requesterApprovedAt;
+  const approvalNotice = myApproval
+    ? "Your approval is saved. Waiting for your partner to approve these terms."
+    : theirApproval ? "Your partner approved these terms. Review them before adding your approval."
+    : "Both students must approve the same terms. Changing pending terms clears earlier approvals.";
   useEffect(() => {
-    if (swapId) fetchSwapDetails();
-  }, [swapId]);
-
-  const fetchSwapDetails = async () => {
-    setIsLoading(true);
-    setDebugError(null);
-    const token =
-      localStorage.getItem("knoxite_token") || localStorage.getItem("token");
-
-    try {
-      const response = await fetch(`${API_BASE_URL}/swaps/${swapId}`, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-          "bypass-tunnel-reminder": "true",
-        },
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        setDebugError(
-          `Server Error: ${errorData.message || response.statusText}`,
-        );
-        return;
-      }
-
-      const data = await response.json();
-      setAgreementVersion(data.agreementVersion);
-      const requester = data.requesterId === data.me?.id;
-      setApprovalNotice(
-        data.status === "CONFIRMED"
-          ? "Both students approved this agreement."
-          : `${data.requesterApprovedAt ? "Requester approved" : "Requester approval pending"}; ${data.receiverApprovedAt ? "receiver approved" : "receiver approval pending"}. Changing terms resets approvals.`,
-      );
-      setAgreement((prev) => ({
-        ...prev,
-        sessions: String(data.sessions),
-        duration: String(data.duration),
-        agreedToTerms: false,
-      }));
-      setParticipants({
-        me: {
-          name: data.me?.name || "You",
-          headline: data.me?.bio || "Student / Peer Mentor",
-          avatarUrl: data.me?.avatarUrl || "",
-        },
-        partner: {
-          name: data.partner?.name || "Partner",
-          headline: data.partner?.bio || "Student / Peer Mentor",
-          avatarUrl: data.partner?.avatarUrl || "",
-        },
-      });
-
-      setAgreement((prev) => ({
-        ...prev,
-        skillA: requester ? data.offeredSkill.name : data.wantedSkill.name,
-        skillB: requester ? data.wantedSkill.name : data.offeredSkill.name,
-      }));
-    } catch (err: any) {
-      setDebugError(`Network Error: ${err.message}`);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
+    if (!swap) return;
+    setAgreement({duration:String(swap.duration),sessions:String(swap.sessions),agreedToTerms:false,
+      skillA:requester?swap.offeredSkill.name:swap.wantedSkill.name,
+      skillB:requester?swap.wantedSkill.name:swap.offeredSkill.name});
+  }, [swap?.id, swap?.agreementVersion, swap?.status]);
+  const canEdit = swap?.status === "PENDING_AGREEMENT" && swap.integrityVerified === true && !syncError;
   const handleSubmit = async () => {
-    if (!agreement.agreedToTerms) {
-      alert("Please agree to the Knoxite Oath first.");
-      return;
-    }
-
+    if (isSubmitting) return;
+    setDebugError(null); setNotice("");
+    if (!canEdit || !agreement.agreedToTerms) {setDebugError("Review the current agreement and accept the commitment before signing.");return;}
+    const duration=Number(agreement.duration), sessions=Number(agreement.sessions);
+    if (!Number.isInteger(duration)||duration<1||duration>8||!Number.isInteger(sessions)||sessions<1||sessions>30) {setDebugError("Choose 1–8 hours per session and 1–30 sessions.");return;}
+    setIsSubmitting(true);
     try {
-      const token =
-        localStorage.getItem("knoxite_token") || localStorage.getItem("token");
-
-      const response = await fetch(
-        `${API_BASE_URL}/swaps/${swapId}/agreement`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-            "bypass-tunnel-reminder": "true",
-          },
-          body: JSON.stringify({
-            duration: Number(agreement.duration),
-            sessions: Number(agreement.sessions),
-            agreementVersion,
-            agreedToTerms: true,
-          }),
-        },
-      );
-
-      if (response.ok) {
-        const result = await response.json();
-        alert(result.message);
-        navigate("/dashboard");
-      } else {
-        const errorData = await response.json();
-        alert(
-          `Failed to sign: ${errorData.error || errorData.message || "Unknown error"}`,
-        );
-      }
-    } catch (error: any) {
-      console.error("Submit Error:", error);
-      alert(`Network Error: ${error.message}. Check your server connection.`);
-    }
+      const latest=await refresh();
+      if (!latest) {setDebugError("Unable to check the latest terms. Refresh before signing.");return;}
+      if (latest.status!=="PENDING_AGREEMENT" || latest.agreementVersion!==agreementVersion) {setDebugError("This agreement changed. Review its latest status and terms before continuing.");return;}
+      const result=await api(`/swaps/${swapId}/agreement`,{method:"POST",body:JSON.stringify({duration,sessions,agreementVersion,agreedToTerms:true})});
+      setNotice(result.message);await refresh();
+    } catch(e) {setDebugError(e instanceof Error?e.message:"Your approval could not be saved.");await refresh();}
+    finally {setIsSubmitting(false);}
   };
 
   if (isLoading) {
     return (
-      <div className="flex h-screen items-center justify-center bg-[#F8FAFC] dark:bg-slate-950">
+      <div className="flex h-screen items-center justify-center knoxite-surface">
         <Loader2 className="animate-spin text-blue-600 size-8 mb-3" />
         <span className="text-slate-900 dark:text-slate-200 font-bold text-xs uppercase tracking-widest">
           Loading Swap Agreement...
@@ -162,9 +73,35 @@ export default function SwapAgreementPage() {
     );
   }
 
+  if (!swap || !canEdit) {
+    return <main className="knoxite-surface min-h-screen p-4 text-slate-900 dark:text-slate-100 sm:p-6">
+      <div className="mx-auto max-w-[800px] space-y-5 py-3">
+        <Button variant="outline" onClick={()=>navigate(swap ? `/swap-details/${swap.id}` : "/dashboard")}>Back to Swap Tracking</Button>
+        <Card className="overflow-hidden rounded-3xl border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+          <CardHeader className="border-b border-slate-200 dark:border-slate-700"><h1 className="text-2xl font-bold">Skill Swap Agreement</h1><p className="text-sm text-slate-600 dark:text-slate-300">Saved terms and participant approvals</p></CardHeader>
+          <CardContent className="space-y-6 pt-6">
+            {(syncError||debugError)&&<p role="alert" className="text-red-700 dark:text-red-300">{syncError||debugError}</p>}
+            {notice&&<p role="status">{notice}</p>}
+            {swap&&<>
+              <ExchangeSummary swap={swap} />
+              <p role="status" className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-950 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-100">{swap.status==="CONFIRMED" ? "Agreement confirmed. Your exchange is still in progress; these terms are read-only." : swap.status==="COMPLETED" ? "Exchange completed. Your agreement and approvals are kept for your records." : swap.status==="CANCELLED" ? "Exchange cancelled. The saved terms and approvals remain available." : "This agreement is read-only. Contact an administrator if its status needs review."}</p>
+              <section aria-label="Recorded agreement approvals" className="space-y-3">
+                <h2 className="text-lg font-semibold">Participant approvals</h2>
+                <p className="text-sm text-slate-600 dark:text-slate-300">Agreement version {swap.agreementVersion}</p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {[{person:swap.requester,at:swap.requesterApprovedAt},{person:swap.receiver,at:swap.receiverApprovedAt}].map(({person,at},i)=><div key={i} className="min-w-0 rounded-xl border border-slate-200 p-4 dark:border-slate-700"><p className="break-words font-semibold">{person?.name||"Participant"}</p><p className="mt-2 text-sm text-slate-600 dark:text-slate-300">{at?<span>Approved <time dateTime={at}>{new Date(at).toLocaleString()}</time></span>:"Approval not recorded"}</p></div>)}
+                </div>
+              </section>
+            </>}
+            <Button variant="outline" onClick={()=>void refresh()}>Refresh</Button>
+          </CardContent>
+        </Card>
+      </div>
+    </main>;
+  }
+
   return (
-    <div className="min-h-screen bg-[#F8FAFC] dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans pb-20 flex flex-col relative overflow-x-hidden transition-colors duration-200">
-      <div className="absolute inset-0 bg-[linear-gradient(to_right,#e2e8f080_1px,transparent_1px),linear-gradient(to_bottom,#e2e8f080_1px,transparent_1px)] dark:bg-[linear-gradient(to_right,#1e293b50_1px,transparent_1px),linear-gradient(to_bottom,#1e293b50_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_70%_50%_at_50%_0%,#000_70%,transparent_110%)] pointer-events-none" />
+    <div className="min-h-screen knoxite-surface text-slate-900 dark:text-slate-100 font-sans pb-20 flex flex-col relative overflow-x-hidden transition-colors duration-200">
 
       {/* FLOATING GLASS HEADER */}
       <div className="sticky top-4 z-30 px-4 sm:px-6">
@@ -191,7 +128,7 @@ export default function SwapAgreementPage() {
               </div>
               <div className="flex items-baseline gap-2">
                 <span className="text-xl font-black text-slate-900 dark:text-white tracking-tight">
-                  Finalize Swap
+                  Review Agreement
                 </span>
                 <span className="hidden sm:inline-block text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
                   Step {step} of 3
@@ -204,12 +141,13 @@ export default function SwapAgreementPage() {
 
       {/* MAIN CONTAINER */}
       <div className="max-w-xl mx-auto w-full px-4 pt-8 space-y-6 relative z-10">
-        {debugError && (
+        {(debugError || syncError) && (
           <div className="bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 text-rose-800 dark:text-rose-300 p-3.5 rounded-2xl text-xs space-y-1">
-            <strong className="font-bold">Sync Error:</strong> {debugError}
+            <strong className="font-bold">Please check:</strong> {debugError || syncError}
           </div>
         )}
 
+        {notice && <p role="status" className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900 dark:bg-blue-950 dark:text-blue-100">{notice}</p>}
         {/* STEPPER PROGRESS BAR */}
         <div className="relative flex items-center justify-between px-6 py-2">
           <div className="absolute left-10 right-10 top-1/2 -translate-y-1/2 h-0.5 bg-slate-200 dark:bg-slate-800 z-0" />
@@ -221,7 +159,7 @@ export default function SwapAgreementPage() {
           {[
             { num: 1, label: "Parties" },
             { num: 2, label: "Logistics" },
-            { num: 3, label: "Oath" },
+            { num: 3, label: "Commitment" },
           ].map((s) => {
             const isCompleted = s.num < step;
             const isActive = s.num === step;
@@ -264,8 +202,7 @@ export default function SwapAgreementPage() {
                 Exchange Participants
               </CardTitle>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Verify the bilateral counterparties involved in this swap
-                agreement.
+                Check who you will exchange skills with.
               </p>
             </CardHeader>
             <CardContent className="pt-6 space-y-4">
@@ -284,9 +221,9 @@ export default function SwapAgreementPage() {
                 </Avatar>
                 <div className="min-w-0 flex-1">
                   <span className="text-[10px] font-bold uppercase tracking-widest text-blue-600 dark:text-blue-400 block">
-                    You (Initiator/Receiver)
+                    You
                   </span>
-                  <p className="font-bold text-slate-900 dark:text-white text-sm truncate mt-0.5">
+                  <p className="font-bold text-slate-900 dark:text-white text-sm break-words mt-0.5">
                     {participants.me.name}
                   </p>
                   <p className="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">
@@ -319,7 +256,7 @@ export default function SwapAgreementPage() {
                   <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 dark:text-emerald-400 block">
                     Peer Partner
                   </span>
-                  <p className="font-bold text-slate-900 dark:text-white text-sm truncate mt-0.5">
+                  <p className="font-bold text-slate-900 dark:text-white text-sm break-words mt-0.5">
                     {participants.partner.name}
                   </p>
                   <p className="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">
@@ -344,7 +281,7 @@ export default function SwapAgreementPage() {
           <Card className="border-slate-200/90 dark:border-slate-800 shadow-xs rounded-3xl bg-white dark:bg-slate-900">
             <CardHeader className="border-b border-slate-100 dark:border-slate-800 pb-4">
               <CardTitle className="text-slate-900 dark:text-white text-base font-bold">
-                Swap Logistics & Curriculum
+                Session Plan
               </CardTitle>
               <p className="text-xs text-slate-500 dark:text-slate-400">
                 Confirm session duration and target swap commitments.
@@ -372,31 +309,33 @@ export default function SwapAgreementPage() {
 
               <div className="grid grid-cols-2 gap-3 pt-2">
                 <div className="space-y-1.5">
-                  <Label className="text-[11px] font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider">
-                    Hrs Per Session
+                  <Label htmlFor="agreement-duration" className="text-[11px] font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider">
+                    Hours Per Session
                   </Label>
                   <Input
                     type="number"
                     min="1"
                     max="8"
+                    id="agreement-duration"
                     value={agreement.duration}
                     onChange={(e) =>
-                      setAgreement({ ...agreement, duration: e.target.value })
+                      setAgreement({ ...agreement, duration: e.target.value, agreedToTerms: false })
                     }
                     className="h-11 rounded-xl border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm"
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-[11px] font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider">
+                  <Label htmlFor="agreement-sessions" className="text-[11px] font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider">
                     Total Sessions
                   </Label>
                   <Input
                     type="number"
                     min="1"
                     max="30"
+                    id="agreement-sessions"
                     value={agreement.sessions}
                     onChange={(e) =>
-                      setAgreement({ ...agreement, sessions: e.target.value })
+                      setAgreement({ ...agreement, sessions: e.target.value, agreedToTerms: false })
                     }
                     className="h-11 rounded-xl border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm"
                   />
@@ -421,7 +360,7 @@ export default function SwapAgreementPage() {
           <Card className="border-slate-200/90 dark:border-slate-800 shadow-xs rounded-3xl bg-white dark:bg-slate-900">
             <CardHeader className="border-b border-slate-100 dark:border-slate-800 pb-4">
               <CardTitle className="text-slate-900 dark:text-white text-base font-bold">
-                The Knoxite Academic Oath
+                Your Swap Commitment
               </CardTitle>
               <p className="text-xs text-slate-500 dark:text-slate-400">
                 Honor-code commitment to uphold mutual accountability and
@@ -478,10 +417,10 @@ export default function SwapAgreementPage() {
           )}
           <Button
             onClick={step === 3 ? handleSubmit : () => setStep(step + 1)}
-            disabled={step === 3 && !agreement.agreedToTerms}
+            disabled={isSubmitting || (step === 3 && !agreement.agreedToTerms)}
             className="flex-[2] h-12 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md shadow-blue-600/20"
           >
-            {step === 3 ? "Sign Bilateral Agreement" : "Continue"}
+            {isSubmitting ? "Saving approval..." : step === 3 ? "Sign Bilateral Agreement" : "Continue"}
           </Button>
         </div>
       </div>

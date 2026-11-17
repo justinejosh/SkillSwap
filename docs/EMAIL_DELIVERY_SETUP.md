@@ -1,5 +1,65 @@
 # Institutional verification and recovery email delivery
 
+## Prepared provider option: Resend
+
+The backend now supports either the original webhook (default) or a direct
+Resend adapter, reusing the same verification/reset token workflows. No provider
+credentials, domain approvals, sending accounts, or real deliveries were created.
+The development sandbox captures messages separately; it is not a real provider
+and cannot be selected through the normal production mail configuration.
+
+Resend is a suitable candidate because its HTTPS API supports transactional
+messages and scoped sending keys without adding an SDK dependency. Its use is
+still subject to the team's institutional/privacy and provider-account approval.
+Do not purchase or configure an account automatically based on this recommendation.
+
+Supply these values privately in the authorized backend environment when approved:
+
+```dotenv
+EMAIL_PROVIDER=resend
+RESEND_API_KEY=<private sending-only key scoped to the approved domain>
+EMAIL_FROM=<plain sender email at your verified approved sending domain>
+EMAIL_SENDER_APPROVED=false
+PUBLIC_APP_URL=<intended approved frontend origin>
+EMAIL_VERIFICATION_REQUIRED=true
+GOOGLE_SIGN_IN_ENABLED=false
+```
+
+Set sender approval true **only after** the accountable sender/domain owner
+authorizes it. The sender domain may be a project-owned domain approved by the
+team; owning an OLFU student mailbox does not grant control of OLFU DNS or
+permission to send as the university. Do not use an institutional From address
+without that authority. You need provider access, a verified domain/subdomain,
+the provider-specified DNS authentication records, an approved From address,
+and a sending-only API key restricted to that domain. Configure a valid monitored
+support channel and agree handling of bounces, retention, and provider privacy.
+
+Resend's API requires a verified sending domain for normal recipients. Its
+limited onboarding/test sender is not evidence that arbitrary institutional
+students can receive mail. Verify the provider's current account restrictions
+and limits before a pilot; no free-tier quota or pricing is assumed here.
+
+The direct adapter sends fixed text/HTML templates via
+`https://api.resend.com/emails`, validates link origin/path/token format, disables
+redirects, applies a ten-second timeout and a hashed idempotency key, and exposes
+only generic failures. It does not log provider error bodies or credentials.
+Configure open/click tracking off for account links, preserve URL fragments, and
+test institutional inbox/spam/bounce results. An accepted provider message ID
+does not prove delivery; the backend does not mark email verified until the user
+successfully consumes the verification link. Sender configuration is reported
+as availability only, not a live delivery guarantee.
+
+To keep the original adapter, use `EMAIL_PROVIDER=webhook` (or omit the selector)
+and the existing `EMAIL_DELIVERY_URL`/`EMAIL_DELIVERY_TOKEN`. Unknown selectors fail
+closed. Never put either adapter's credentials in a frontend `VITE_` variable.
+The custom webhook contract below is unchanged; Resend's API URL is **not** a
+drop-in value for `EMAIL_DELIVERY_URL` because it expects a different request body.
+
+Primary provider documentation:
+[sending email](https://resend.com/docs/api-reference/emails/send-email),
+[verified domains](https://resend.com/docs/dashboard/domains/introduction),
+[scoped API keys](https://resend.com/docs/api-reference/api-keys/create-api-key).
+
 ## Confirmed local diagnosis
 
 The inspected local environment has neither `EMAIL_DELIVERY_URL` nor

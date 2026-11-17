@@ -1,14 +1,10 @@
 import { useNavigate } from "react-router";
 import { Button } from "@/app/components/ui/button";
 import { Repeat } from "lucide-react";
-import { useEffect } from "react";
 
 export default function PreviewPage() {
   const navigate = useNavigate();
 
-  useEffect(() => {
-    document.documentElement.classList.remove("dark");
-  }, []);
 
   const scrollToSection = (id: string) => {
     const el = document.getElementById(id);
@@ -85,7 +81,7 @@ export default function PreviewPage() {
 
             <p className="text-lg sm:text-xl text-slate-600 max-w-xl leading-relaxed font-normal">
               A peer-to-peer skill exchange site where students swap knowledge 1-on-1. 
-              Teach what you're good at, learn what you need — zero fees, 
+              Teach what you're good at, learn what you need — zero fees,
               pure collaboration.
             </p>
 

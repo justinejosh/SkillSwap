@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router";
 import { api } from "@/app/lib/api";
 import { MetricPolicyNotice } from "@/app/components/MetricPolicyNotice";
+import { currentAccountId } from "@/app/lib/theme";
 import {
   AssessmentBadge,
   AssessmentLegend,
@@ -37,8 +38,8 @@ export function PortfolioContent({ profile }: { profile: PublicProfile }) {
       {!profile.department && profile.proposedDepartment && (
         <p className="rounded-lg border border-amber-300 p-3 text-sm">
           Proposed college: {profile.proposedDepartment.name}. Campus
-          confirmation is pending; this draft does not contribute to WRMR
-          proximity.
+          confirmation is pending; this draft does not contribute to academic
+          similarity in match scores.
         </p>
       )}
       <div className="flex flex-wrap items-center gap-4">
@@ -57,8 +58,8 @@ export function PortfolioContent({ profile }: { profile: PublicProfile }) {
             {profile.name[0]}
           </span>
         )}
-        <div>
-          <h1 className="text-2xl font-bold">{profile.name}</h1>
+        <div className="min-w-0 flex-1">
+          <h1 className="break-words text-2xl font-bold">{profile.name}</h1>
           <p className="mt-2 whitespace-pre-wrap break-words">
             {profile.bio || "No biography provided."}
           </p>
@@ -163,7 +164,7 @@ export default function PublicProfilePage() {
     };
   }, [userId]);
   return (
-    <main className="min-h-screen bg-slate-50 p-4 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
+    <main className="min-h-screen knoxite-surface p-4 text-slate-900 dark:text-slate-100">
       <div className="mx-auto max-w-4xl space-y-5">
         <Link
           to="/knox-hub"
@@ -180,7 +181,7 @@ export default function PublicProfilePage() {
             <p role="status">Loading student portfolio...</p>
           )}
         </div>
-        {profile && (
+        {profile && profile.id !== currentAccountId() && (
           <Link
             to={`/report?userId=${encodeURIComponent(profile.id)}`}
             className="inline-block text-sm text-red-700 underline dark:text-red-300"

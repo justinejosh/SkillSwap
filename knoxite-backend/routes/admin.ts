@@ -3,6 +3,8 @@ import { PrismaClient } from "@prisma/client";
 import { actor, requireAdmin } from "../middleware/authMiddleware";
 import { HttpError, integer, onlyKeys, text } from "../lib/http";
 import { transaction } from "../lib/transaction";
+import { departmentNameKey } from "../services/departmentNames";
+import { ensureSkillCatalog } from "../services/skillCatalog";
 import { validateBankInput } from "../services/bankValidation";
 import { seedAcademicCatalog } from "../services/academics";
 import {
@@ -14,6 +16,23 @@ import { INTEGRITY_REVIEW_REASON } from "../services/exchangeIntegrity";
 export function adminRouter(db: PrismaClient) {
   const router = express.Router();
   router.use(requireAdmin);
+  router.get("/users", async (req, res) => {
+    const page = integer(Number(req.query.page ?? 1), "Page", 1, 100000);
+    const pageSize = integer(Number(req.query.pageSize ?? 20), "Page size", 1, 50);
+    const search = text(req.query.search ?? "", "Search", 100, true);
+    const role = req.query.role, status = req.query.status;
+    if (role && role !== "USER" && role !== "ADMIN") throw new HttpError(422, "Unsupported account role.");
+    if (status && status !== "ACTIVE" && status !== "SUSPENDED") throw new HttpError(422, "Unsupported account status.");
+    const where = { ...(search ? { OR: [{ name: { contains: search } }, { email: { contains: search } }] } : {}),
+      ...(role ? { role: role as "USER" | "ADMIN" } : {}), ...(status ? { isSuspended: status === "SUSPENDED" } : {}) };
+    const [total, users] = await Promise.all([db.user.count({ where }), db.user.findMany({ where, skip: (page - 1) * pageSize, take: pageSize,
+      orderBy: [{ createdAt: "desc" }, { id: "asc" }], select: { id: true, name: true, email: true, role: true, isSuspended: true, createdAt: true } })]);
+    res.json({ users, total, page, pageSize });
+  });
+  router.post("/skill-catalog/initialize", async (req, res) => {
+    onlyKeys(req.body, []);
+    res.json(await ensureSkillCatalog(db));
+  });
   router.use("/integrity", integrityRouter(db));
   router.post("/academic-programs/provisional-mapping", async (req, res) => {
     onlyKeys(req.body, []);
@@ -229,10 +248,15 @@ export function adminRouter(db: PrismaClient) {
     const name = text(req.body.name, "Name", 150);
     if (!/^[A-Z0-9_-]+$/.test(code))
       throw new HttpError(422, "Use a stable institutional code.");
-    if (req.body.type === "department")
-      res
-        .status(201)
-        .json(await db.department.create({ data: { code, name } }));
+    if (req.body.type === "department") {
+      const saved = await transaction(db, async (tx) => {
+        const departments = await tx.department.findMany();
+        if (departments.some((d) => departmentNameKey(d.name) === departmentNameKey(name)))
+          throw new HttpError(409, "A college with this name already exists. Select the existing department instead of adding another copy.");
+        return tx.department.create({ data: { code, name } });
+      });
+      res.status(201).json(saved);
+    }
     else if (req.body.type === "yearLevel")
       res.status(201).json(
         await db.yearLevel.create({

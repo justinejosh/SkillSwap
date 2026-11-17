@@ -58,19 +58,18 @@ export default function LeaderboardPage() {
 
   if (isLoading) {
     return (
-      <div className="h-screen flex flex-col items-center justify-center bg-[#F8FAFC] dark:bg-slate-950">
+      <div className="h-screen flex flex-col items-center justify-center knoxite-surface">
         <Loader2 className="animate-spin size-8 text-blue-600 mb-3" />
         <p className="text-slate-900 dark:text-slate-200 font-bold text-xs uppercase tracking-widest">
-          Synchronizing Leaderboard...
+          Loading leaderboard...
         </p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#E5F2FA] via-[#E5F2FA] via-70% to-[#F8FAFC] dark:bg-none dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans flex flex-col relative overflow-x-hidden transition-colors duration-200">
+    <div className="min-h-screen knoxite-surface text-slate-900 dark:text-slate-100 font-sans flex flex-col relative overflow-x-hidden transition-colors duration-200">
       {/* SUBTLE ARCHITECTURAL GRID */}
-      <div className="absolute inset-0 bg-[linear-gradient(to_right,#e2e8f080_1px,transparent_1px),linear-gradient(to_bottom,#e2e8f080_1px,transparent_1px)] dark:bg-[linear-gradient(to_right,#1e293b50_1px,transparent_1px),linear-gradient(to_bottom,#1e293b50_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_70%_50%_at_50%_0%,#000_70%,transparent_110%)] pointer-events-none" />
 
       {/* 1. FLOATING GLASS HEADER */}
       <div className="sticky top-4 z-30 px-4 sm:px-6">
@@ -131,8 +130,10 @@ export default function LeaderboardPage() {
         )}
         {viewer && !viewer.eligible && (
           <p role="status" className="rounded border p-3 text-sm">
-            Your leaderboard entry is awaiting eligibility:{" "}
-            {viewer.reasons.join(" ")} You can still discover reciprocal matches
+            {viewer.reasons?.length
+              ? [...new Set<string>(viewer.reasons)].join(" ")
+              : "Complete exchanges with two different students to join the leaderboard."}{" "}
+            You can still discover reciprocal matches
             and request swaps.
           </p>
         )}

@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router";
 import { api } from "@/app/lib/api";
 import { Button } from "@/app/components/ui/button";
+import { currentAccountId } from "@/app/lib/theme";
 export default function ReportUserPage() {
   const [params] = useSearchParams();
   const [targetId, setTargetId] = useState(params.get("userId") || "");
@@ -11,12 +12,14 @@ export default function ReportUserPage() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
+  const isSelf = targetId.trim().toLowerCase() === currentAccountId()?.toLowerCase();
   const load = () => api<any[]>("/reports").then(setReports);
   useEffect(() => {
     void load().catch((e) => setError(e.message));
   }, []);
   async function submit(e: FormEvent) {
     e.preventDefault();
+    if (isSelf) { setError("You cannot report yourself. Choose another student's profile."); return; }
     setBusy(true);
     setError("");
     setNotice("");
@@ -50,6 +53,7 @@ export default function ReportUserPage() {
           </p>
         )}
         {notice && <p role="status">{notice}</p>}
+        {isSelf && <p role="status">You cannot report your own account. Your earlier reports remain available below.</p>}
         <form
           onSubmit={submit}
           className="space-y-4 rounded-xl border bg-white p-5 dark:border-slate-700 dark:bg-slate-900"
@@ -90,7 +94,7 @@ export default function ReportUserPage() {
               className="mt-1 min-h-32 w-full rounded border p-2 dark:bg-slate-800"
             />
           </label>
-          <Button disabled={busy}>
+          <Button disabled={busy || isSelf}>
             {busy ? "Saving..." : "Submit Report"}
           </Button>
         </form>

@@ -1,0 +1,566 @@
+{
+  "version": 1,
+  "assessmentPlanningNotice": "Advisory content planning only. Availability requires a validated published bank. No skill or group grants a tier or changes WRMR.",
+  "skills": [
+    {
+      "key": "python-programming-fundamentals",
+      "name": "Python Programming Fundamentals",
+      "category": "technology",
+      "assessmentPlanningGroup": "A",
+      "priority": true
+    },
+    {
+      "key": "java-programming-fundamentals",
+      "name": "Java Programming Fundamentals",
+      "category": "technology",
+      "assessmentPlanningGroup": "A",
+      "priority": false
+    },
+    {
+      "key": "javascript-fundamentals",
+      "name": "JavaScript Fundamentals",
+      "category": "technology",
+      "assessmentPlanningGroup": "A",
+      "priority": false
+    },
+    {
+      "key": "html-css-fundamentals",
+      "name": "HTML & CSS Fundamentals",
+      "category": "technology",
+      "assessmentPlanningGroup": "A",
+      "priority": false
+    },
+    {
+      "key": "sql-fundamentals",
+      "name": "SQL Fundamentals",
+      "category": "technology",
+      "assessmentPlanningGroup": "A",
+      "priority": false
+    },
+    {
+      "key": "database-management-basics",
+      "name": "Database Management Basics",
+      "category": "technology",
+      "assessmentPlanningGroup": "A",
+      "priority": false
+    },
+    {
+      "key": "computer-networking-basics",
+      "name": "Computer Networking Basics",
+      "category": "technology",
+      "assessmentPlanningGroup": "A",
+      "priority": false
+    },
+    {
+      "key": "computer-troubleshooting",
+      "name": "Computer Troubleshooting",
+      "category": "technology",
+      "assessmentPlanningGroup": "A",
+      "priority": false
+    },
+    {
+      "key": "git-github-basics",
+      "name": "Git & GitHub Basics",
+      "category": "technology",
+      "assessmentPlanningGroup": "A",
+      "priority": false
+    },
+    {
+      "key": "microsoft-excel-fundamentals",
+      "name": "Microsoft Excel Fundamentals",
+      "category": "technology",
+      "assessmentPlanningGroup": "A",
+      "priority": false
+    },
+    {
+      "key": "graphic-design-basics",
+      "name": "Graphic Design Basics",
+      "category": "creative",
+      "assessmentPlanningGroup": "A",
+      "priority": false
+    },
+    {
+      "key": "digital-illustration",
+      "name": "Digital Illustration",
+      "category": "creative",
+      "assessmentPlanningGroup": "C",
+      "priority": false
+    },
+    {
+      "key": "sketching-and-drawing",
+      "name": "Sketching and Drawing",
+      "category": "creative",
+      "assessmentPlanningGroup": "C",
+      "priority": false
+    },
+    {
+      "key": "photography-fundamentals",
+      "name": "Photography Fundamentals",
+      "category": "creative",
+      "assessmentPlanningGroup": "A",
+      "priority": false
+    },
+    {
+      "key": "photo-editing",
+      "name": "Photo Editing",
+      "category": "creative",
+      "assessmentPlanningGroup": "B",
+      "priority": false
+    },
+    {
+      "key": "video-editing",
+      "name": "Video Editing",
+      "category": "creative",
+      "assessmentPlanningGroup": "B",
+      "priority": false
+    },
+    {
+      "key": "digital-poster-design",
+      "name": "Digital Poster Design",
+      "category": "creative",
+      "assessmentPlanningGroup": "A",
+      "priority": false
+    },
+    {
+      "key": "presentation-design",
+      "name": "Presentation Design",
+      "category": "creative",
+      "assessmentPlanningGroup": "A",
+      "priority": false
+    },
+    {
+      "key": "canva-design",
+      "name": "Canva Design",
+      "category": "creative",
+      "assessmentPlanningGroup": "B",
+      "priority": false
+    },
+    {
+      "key": "creative-writing",
+      "name": "Creative Writing",
+      "category": "creative",
+      "assessmentPlanningGroup": "C",
+      "priority": false
+    },
+    {
+      "key": "acoustic-guitar-basics",
+      "name": "Acoustic Guitar Basics",
+      "category": "music",
+      "assessmentPlanningGroup": "C",
+      "priority": false
+    },
+    {
+      "key": "piano-keyboard-basics",
+      "name": "Piano/Keyboard Basics",
+      "category": "music",
+      "assessmentPlanningGroup": "C",
+      "priority": false
+    },
+    {
+      "key": "ukulele-basics",
+      "name": "Ukulele Basics",
+      "category": "music",
+      "assessmentPlanningGroup": "C",
+      "priority": false
+    },
+    {
+      "key": "music-theory-fundamentals",
+      "name": "Music Theory Fundamentals",
+      "category": "music",
+      "assessmentPlanningGroup": "A",
+      "priority": false
+    },
+    {
+      "key": "reading-musical-notes",
+      "name": "Reading Musical Notes",
+      "category": "music",
+      "assessmentPlanningGroup": "A",
+      "priority": false
+    },
+    {
+      "key": "vocal-techniques-basics",
+      "name": "Vocal Techniques Basics",
+      "category": "music",
+      "assessmentPlanningGroup": "C",
+      "priority": false
+    },
+    {
+      "key": "songwriting-basics",
+      "name": "Songwriting Basics",
+      "category": "music",
+      "assessmentPlanningGroup": "B",
+      "priority": false
+    },
+    {
+      "key": "rhythm-and-timing",
+      "name": "Rhythm and Timing",
+      "category": "music",
+      "assessmentPlanningGroup": "A",
+      "priority": false
+    },
+    {
+      "key": "basic-music-production",
+      "name": "Basic Music Production",
+      "category": "music",
+      "assessmentPlanningGroup": "B",
+      "priority": false
+    },
+    {
+      "key": "music-arrangement-basics",
+      "name": "Music Arrangement Basics",
+      "category": "music",
+      "assessmentPlanningGroup": "A",
+      "priority": false
+    },
+    {
+      "key": "english-conversation",
+      "name": "English Conversation",
+      "category": "language",
+      "assessmentPlanningGroup": "C",
+      "priority": false
+    },
+    {
+      "key": "english-grammar",
+      "name": "English Grammar",
+      "category": "language",
+      "assessmentPlanningGroup": "A",
+      "priority": true
+    },
+    {
+      "key": "academic-english-writing",
+      "name": "Academic English Writing",
+      "category": "language",
+      "assessmentPlanningGroup": "A",
+      "priority": false
+    },
+    {
+      "key": "filipino-communication",
+      "name": "Filipino Communication",
+      "category": "language",
+      "assessmentPlanningGroup": "B",
+      "priority": false
+    },
+    {
+      "key": "filipino-creative-writing",
+      "name": "Filipino Creative Writing",
+      "category": "language",
+      "assessmentPlanningGroup": "C",
+      "priority": false
+    },
+    {
+      "key": "public-speaking",
+      "name": "Public Speaking",
+      "category": "language",
+      "assessmentPlanningGroup": "C",
+      "priority": false
+    },
+    {
+      "key": "basic-spanish-conversation",
+      "name": "Basic Spanish Conversation",
+      "category": "language",
+      "assessmentPlanningGroup": "B",
+      "priority": false
+    },
+    {
+      "key": "basic-japanese-conversation",
+      "name": "Basic Japanese Conversation",
+      "category": "language",
+      "assessmentPlanningGroup": "B",
+      "priority": false
+    },
+    {
+      "key": "basic-korean-conversation",
+      "name": "Basic Korean Conversation",
+      "category": "language",
+      "assessmentPlanningGroup": "B",
+      "priority": false
+    },
+    {
+      "key": "presentation-and-communication-skills",
+      "name": "Presentation and Communication Skills",
+      "category": "language",
+      "assessmentPlanningGroup": "B",
+      "priority": false
+    },
+    {
+      "key": "time-management",
+      "name": "Time Management",
+      "category": "lifestyle",
+      "assessmentPlanningGroup": "B",
+      "priority": false
+    },
+    {
+      "key": "study-techniques",
+      "name": "Study Techniques",
+      "category": "lifestyle",
+      "assessmentPlanningGroup": "B",
+      "priority": false
+    },
+    {
+      "key": "personal-budgeting",
+      "name": "Personal Budgeting",
+      "category": "lifestyle",
+      "assessmentPlanningGroup": "A",
+      "priority": false
+    },
+    {
+      "key": "basic-cooking",
+      "name": "Basic Cooking",
+      "category": "lifestyle",
+      "assessmentPlanningGroup": "C",
+      "priority": false
+    },
+    {
+      "key": "baking-fundamentals",
+      "name": "Baking Fundamentals",
+      "category": "lifestyle",
+      "assessmentPlanningGroup": "C",
+      "priority": false
+    },
+    {
+      "key": "food-safety-and-hygiene",
+      "name": "Food Safety and Hygiene",
+      "category": "lifestyle",
+      "assessmentPlanningGroup": "A",
+      "priority": true
+    },
+    {
+      "key": "meal-planning-basics",
+      "name": "Meal Planning Basics",
+      "category": "lifestyle",
+      "assessmentPlanningGroup": "A",
+      "priority": false
+    },
+    {
+      "key": "stress-management-techniques",
+      "name": "Stress Management Techniques",
+      "category": "lifestyle",
+      "assessmentPlanningGroup": "B",
+      "priority": false
+    },
+    {
+      "key": "personal-organization",
+      "name": "Personal Organization",
+      "category": "lifestyle",
+      "assessmentPlanningGroup": "B",
+      "priority": false
+    },
+    {
+      "key": "healthy-habit-planning",
+      "name": "Healthy Habit Planning",
+      "category": "lifestyle",
+      "assessmentPlanningGroup": "B",
+      "priority": false
+    },
+    {
+      "key": "bookkeeping-fundamentals",
+      "name": "Bookkeeping Fundamentals",
+      "category": "business",
+      "assessmentPlanningGroup": "A",
+      "priority": true
+    },
+    {
+      "key": "financial-accounting-basics",
+      "name": "Financial Accounting Basics",
+      "category": "business",
+      "assessmentPlanningGroup": "A",
+      "priority": false
+    },
+    {
+      "key": "cost-accounting-basics",
+      "name": "Cost Accounting Basics",
+      "category": "business",
+      "assessmentPlanningGroup": "A",
+      "priority": false
+    },
+    {
+      "key": "financial-statement-interpretation",
+      "name": "Financial Statement Interpretation",
+      "category": "business",
+      "assessmentPlanningGroup": "A",
+      "priority": false
+    },
+    {
+      "key": "accounting-information-systems-basics",
+      "name": "Accounting Information Systems Basics",
+      "category": "business",
+      "assessmentPlanningGroup": "A",
+      "priority": false
+    },
+    {
+      "key": "entrepreneurship-fundamentals",
+      "name": "Entrepreneurship Fundamentals",
+      "category": "business",
+      "assessmentPlanningGroup": "A",
+      "priority": false
+    },
+    {
+      "key": "marketing-fundamentals",
+      "name": "Marketing Fundamentals",
+      "category": "business",
+      "assessmentPlanningGroup": "A",
+      "priority": false
+    },
+    {
+      "key": "inventory-management-basics",
+      "name": "Inventory Management Basics",
+      "category": "business",
+      "assessmentPlanningGroup": "A",
+      "priority": false
+    },
+    {
+      "key": "customer-service-fundamentals",
+      "name": "Customer Service Fundamentals",
+      "category": "business",
+      "assessmentPlanningGroup": "B",
+      "priority": false
+    },
+    {
+      "key": "tourism-and-hospitality-operations-basics",
+      "name": "Tourism and Hospitality Operations Basics",
+      "category": "business",
+      "assessmentPlanningGroup": "A",
+      "priority": false
+    },
+    {
+      "key": "college-algebra",
+      "name": "College Algebra",
+      "category": "academic",
+      "assessmentPlanningGroup": "A",
+      "priority": false
+    },
+    {
+      "key": "introductory-statistics",
+      "name": "Introductory Statistics",
+      "category": "academic",
+      "assessmentPlanningGroup": "A",
+      "priority": true
+    },
+    {
+      "key": "general-biology",
+      "name": "General Biology",
+      "category": "academic",
+      "assessmentPlanningGroup": "A",
+      "priority": false
+    },
+    {
+      "key": "general-chemistry",
+      "name": "General Chemistry",
+      "category": "academic",
+      "assessmentPlanningGroup": "A",
+      "priority": false
+    },
+    {
+      "key": "anatomy-and-physiology-fundamentals",
+      "name": "Anatomy and Physiology Fundamentals",
+      "category": "academic",
+      "assessmentPlanningGroup": "A",
+      "priority": false
+    },
+    {
+      "key": "microbiology-concepts",
+      "name": "Microbiology Concepts",
+      "category": "academic",
+      "assessmentPlanningGroup": "A",
+      "priority": false
+    },
+    {
+      "key": "psychology-fundamentals",
+      "name": "Psychology Fundamentals",
+      "category": "academic",
+      "assessmentPlanningGroup": "A",
+      "priority": false
+    },
+    {
+      "key": "criminal-justice-system-fundamentals",
+      "name": "Criminal Justice System Fundamentals",
+      "category": "academic",
+      "assessmentPlanningGroup": "A",
+      "priority": false
+    },
+    {
+      "key": "human-movement-science-basics",
+      "name": "Human Movement Science Basics",
+      "category": "academic",
+      "assessmentPlanningGroup": "A",
+      "priority": false
+    },
+    {
+      "key": "pharmaceutical-science-fundamentals",
+      "name": "Pharmaceutical Science Fundamentals",
+      "category": "academic",
+      "assessmentPlanningGroup": "A",
+      "priority": false
+    },
+    {
+      "key": "chess-fundamentals",
+      "name": "Chess Fundamentals",
+      "category": "other",
+      "assessmentPlanningGroup": "A",
+      "priority": true
+    },
+    {
+      "key": "debate-fundamentals",
+      "name": "Debate Fundamentals",
+      "category": "other",
+      "assessmentPlanningGroup": "C",
+      "priority": false
+    },
+    {
+      "key": "peer-mentoring-basics",
+      "name": "Peer Mentoring Basics",
+      "category": "other",
+      "assessmentPlanningGroup": "B",
+      "priority": false
+    },
+    {
+      "key": "teamwork-and-collaboration",
+      "name": "Teamwork and Collaboration",
+      "category": "other",
+      "assessmentPlanningGroup": "B",
+      "priority": false
+    },
+    {
+      "key": "project-planning-basics",
+      "name": "Project Planning Basics",
+      "category": "other",
+      "assessmentPlanningGroup": "A",
+      "priority": false
+    },
+    {
+      "key": "community-event-organizing",
+      "name": "Community Event Organizing",
+      "category": "other",
+      "assessmentPlanningGroup": "B",
+      "priority": false
+    },
+    {
+      "key": "leadership-fundamentals",
+      "name": "Leadership Fundamentals",
+      "category": "other",
+      "assessmentPlanningGroup": "B",
+      "priority": false
+    },
+    {
+      "key": "interview-preparation",
+      "name": "Interview Preparation",
+      "category": "other",
+      "assessmentPlanningGroup": "C",
+      "priority": false
+    },
+    {
+      "key": "resume-and-portfolio-building",
+      "name": "Resume and Portfolio Building",
+      "category": "other",
+      "assessmentPlanningGroup": "B",
+      "priority": false
+    },
+    {
+      "key": "problem-solving-techniques",
+      "name": "Problem-Solving Techniques",
+      "category": "other",
+      "assessmentPlanningGroup": "A",
+      "priority": false
+    }
+  ]
+}

@@ -13,7 +13,7 @@
     "pretypecheck": "npm run db:ensure",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "npm run build && node --test --test-concurrency=1 dist/tests/*.test.js",
-    "test:integration": "npm run build && node --test --test-concurrency=1 dist/tests/integration/*.test.js",
+    "test:integration": "npm run build && node development/ciIntegration.cjs",
     "db:generate": "prisma generate",
     "db:ensure": "node scripts/ensure-prisma-client.cjs",
     "db:preflight": "ts-node --prefer-ts-exts scripts/preflight.ts",

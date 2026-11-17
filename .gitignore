@@ -9,3 +9,19 @@ coverage
 
 test-results
 playwright-report
+
+# Private deployment/operator state and local assessment content stay on disk.
+.vercel/
+*.private.json
+*.private.env
+*.private.log
+**/pilot-account.json
+/knoxite-backend/content/drafts/*.json
+/docs/assessment-review/
+*.pem
+*.p12
+*.pfx
+*.key
+*.dump
+*.sql.gz
+*.bak

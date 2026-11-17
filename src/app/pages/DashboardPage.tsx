@@ -1,5 +1,7 @@
+import { useAccountTheme } from "@/app/lib/theme";
+import { authenticatedFetch } from "@/app/lib/api";
 import { MatchResults } from "@/app/components/MatchResults";
-import { api } from "@/app/lib/api";
+import { logoutSession } from "@/app/lib/api";
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router";
 import { Button } from "@/app/components/ui/button";
@@ -48,12 +50,7 @@ export default function DashboardPage() {
   const profileMenuRef = useRef<HTMLDivElement>(null);
   const { startTour } = useOnboardingTour();
 
-  const [isDarkMode, setIsDarkMode] = useState(() => {
-    const user = JSON.parse(localStorage.getItem("knoxite_user") || "{}");
-    return user.id
-      ? localStorage.getItem(`theme_${user.id}`) === "dark"
-      : false;
-  });
+  const [isDarkMode, toggleDarkMode] = useAccountTheme();
 
   // Modal State
   const [selectedMatch, setSelectedMatch] = useState<any | null>(null);
@@ -63,13 +60,7 @@ export default function DashboardPage() {
   const [isRequesting, setIsRequesting] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
 
-  useEffect(() => {
-    if (isDarkMode) {
-      document.documentElement.classList.add("dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-    }
-  }, [isDarkMode]);
+
 
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem("knoxite_user") || "{}");
@@ -121,9 +112,9 @@ export default function DashboardPage() {
       };
 
       const [sRes, mRes, reqRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/swaps`, { headers }),
-        fetch(`${API_BASE_URL}/matches`, { headers }),
-        fetch(`${API_BASE_URL}/swap-requests`, { headers }),
+        authenticatedFetch(`${API_BASE_URL}/swaps`, { headers }),
+        authenticatedFetch(`${API_BASE_URL}/matches`, { headers }),
+        authenticatedFetch(`${API_BASE_URL}/swap-requests`, { headers }),
       ]);
 
       if (sRes.ok) setSwaps(await sRes.json());
@@ -156,11 +147,13 @@ export default function DashboardPage() {
   const handleSignOut = async () => {
     if (confirm("Are you sure you want to sign out?")) {
       try {
-        await api("/auth/logout", { method: "POST" });
-      } catch {}
+        await logoutSession();
+      } catch (error) {
+        setDashboardError(error instanceof Error ? error.message : "Sign out was not confirmed. Please retry.");
+        return;
+      }
       localStorage.removeItem("knoxite_token");
       localStorage.removeItem("knoxite_user");
-      document.documentElement.classList.remove("dark");
       navigate("/");
     }
   };
@@ -170,7 +163,7 @@ export default function DashboardPage() {
     setIsRequesting(true);
     try {
       const token = localStorage.getItem("knoxite_token");
-      const response = await fetch(`${API_BASE_URL}/swaps/request`, {
+      const response = await authenticatedFetch(`${API_BASE_URL}/swaps/request`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -190,9 +183,12 @@ export default function DashboardPage() {
         setTimeout(() => setSuccessMessage(""), 4000);
         setSelectedMatch(null);
         fetchDashboardData();
+      } else {
+        const data = await response.json();
+        setDashboardError(data.error || "Unable to send this swap request.");
       }
     } catch (error: any) {
-      alert("Failed to send request.");
+      setDashboardError(error instanceof Error ? error.message : "Unable to send this swap request. Please retry.");
     } finally {
       setIsRequesting(false);
     }
@@ -205,23 +201,11 @@ export default function DashboardPage() {
       s.status === "ACCEPTED",
   );
 
-  const toggleDarkMode = () => {
-    const user = JSON.parse(localStorage.getItem("knoxite_user") || "{}");
-    const newMode = !isDarkMode;
-    setIsDarkMode(newMode);
 
-    if (newMode) {
-      document.documentElement.classList.add("dark");
-      if (user.id) localStorage.setItem(`theme_${user.id}`, "dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-      if (user.id) localStorage.setItem(`theme_${user.id}`, "light");
-    }
-  };
 
   if (isLoading) {
     return (
-      <div className="flex flex-col h-screen items-center justify-center bg-gradient-to-b from-[#E5F2FA] via-[#E5F2FA] via-70% to-[#F8FAFC] dark:bg-none dark:bg-slate-950">
+      <div className="flex flex-col h-screen items-center justify-center knoxite-surface">
         <Loader2 className="animate-spin text-blue-600 size-8 mb-3" />
         <p className="text-slate-900 dark:text-slate-200 font-bold text-xs uppercase tracking-widest">
           Syncing Knoxite Workspace...
@@ -231,9 +215,8 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#E5F2FA] via-[#E5F2FA] via-70% to-[#F8FAFC] dark:bg-none dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans flex flex-col relative overflow-x-hidden transition-colors duration-200">
+    <div className="min-h-screen knoxite-surface text-slate-900 dark:text-slate-100 font-sans flex flex-col relative overflow-x-hidden transition-colors duration-200">
       {/* SUBTLE ARCHITECTURAL GRID */}
-      <div className="absolute inset-0 bg-[linear-gradient(to_right,#e2e8f080_1px,transparent_1px),linear-gradient(to_bottom,#e2e8f080_1px,transparent_1px)] dark:bg-[linear-gradient(to_right,#1e293b50_1px,transparent_1px),linear-gradient(to_bottom,#1e293b50_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_70%_50%_at_50%_0%,#000_70%,transparent_110%)] pointer-events-none" />
 
       {/* 1. FLOATING GLASS HEADER */}
       <div className="sticky top-4 z-30 px-4 sm:px-6">
@@ -358,6 +341,7 @@ export default function DashboardPage() {
                     <button
                       type="button"
                       onClick={toggleDarkMode}
+                      aria-pressed={isDarkMode}
                       className="w-full flex items-center justify-between px-3 py-2.5 text-xs font-bold text-slate-700 dark:text-slate-200 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors text-left group"
                     >
                       <div className="flex items-center gap-3">
@@ -568,16 +552,17 @@ export default function DashboardPage() {
         <DialogContent className="max-w-[90vw] md:max-w-md rounded-3xl p-6 border-slate-200 dark:border-slate-800 dark:bg-slate-900 text-slate-900 dark:text-slate-100">
           <DialogHeader className="space-y-1">
             <DialogTitle className="text-xl font-black text-slate-900 dark:text-white">
-              Propose Bilateral Swap
+              Send a Swap Request
             </DialogTitle>
             <DialogDescription className="text-xs text-slate-500 dark:text-slate-400">
-              Initiate a 1-on-1 skill exchange handshake with{" "}
+              Send a skill swap request to{" "}
               <span className="font-bold text-slate-800 dark:text-slate-200">
                 {selectedMatch?.name}
               </span>
               .
             </DialogDescription>
           </DialogHeader>
+          {dashboardError && <p role="alert" className="text-sm text-red-700 dark:text-red-300">{dashboardError}</p>}
 
           {selectedMatch && (
             <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-800 flex items-center justify-between text-xs my-1">
@@ -695,11 +680,11 @@ function ActiveSwapCard({ swap, currentUserId }: any) {
           </AvatarFallback>
         </Avatar>
         <div className="min-w-0 flex-1">
-          <h4 className="font-bold text-slate-900 dark:text-white text-base group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors truncate">
+          <h4 className="font-bold text-slate-900 dark:text-white text-base group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors break-words">
             {partner?.name || "Partner"}
           </h4>
-          <p className="text-xs text-slate-400 dark:text-slate-500 font-medium">
-            Click to open session workspace
+          <p className="text-xs text-slate-600 dark:text-slate-400 font-medium">
+            Open your exchange
           </p>
         </div>
       </div>
@@ -711,7 +696,7 @@ function ActiveSwapCard({ swap, currentUserId }: any) {
             Session Progress
           </span>
           <span className="font-bold text-slate-800 dark:text-slate-200">
-            {mySessions || 0} / {totalSessions} Completed
+            {mySessions || 0} / {totalSessions} Confirmed by you
           </span>
         </div>
 

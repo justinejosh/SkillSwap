@@ -25,6 +25,7 @@ function privateAttempt(a: Attempt) {
   return {
     id: a.id,
     offeringId: a.offeringId,
+    offeringActive: a.offering.isActive,
     skillName: a.offering.skill.name,
     level: a.level,
     attemptNumber: a.attemptNumber,
@@ -65,7 +66,7 @@ export async function assessmentAvailability(
   userId: string,
 ) {
   const offering = await db.userOfferedSkill.findFirst({
-    where: { id: offeringId, userId, isActive: true },
+    where: { id: offeringId, userId },
     include: { skill: true },
   });
   if (!offering) throw new HttpError(404, "Offering not found.");
@@ -103,13 +104,15 @@ export async function assessmentAvailability(
       level,
       supported: !!version || !!active,
       eligible:
-        !earned && prerequisite && (!!version || !!active) && rule.allowed,
+        offering.isActive && !earned && prerequisite && (!!version || !!active) && rule.allowed,
       reason: earned
         ? "This tier has already been earned."
-        : !prerequisite
-          ? "Earn Amateur for this skill first."
+        : !offering.isActive
+          ? "Restore this teaching skill before starting or resuming assessments."
           : !version && !active
             ? "Assessment is unavailable for this skill and level."
+            : !prerequisite
+              ? "Earn Amateur for this skill first."
             : rule.reason,
       activeAttemptId: active?.id ?? null,
       nextEligibleAt: rule.nextEligibleAt,
@@ -123,6 +126,7 @@ export async function assessmentAvailability(
   });
   return {
     offeringId,
+    isActive: offering.isActive,
     skillName: offering.skill.name,
     tier: offering.tier,
     levels,

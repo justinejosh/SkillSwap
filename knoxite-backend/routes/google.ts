@@ -1,8 +1,9 @@
 import express, { Request } from "express";
+import { requireRegistrationConsent, recordRegistrationConsent } from "../services/registrationConsent";
 import { GoogleAuthChallenge, Prisma, PrismaClient } from "@prisma/client";
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import bcrypt from "bcrypt";
-import { AppConfig, studentEmailAllowed } from "../lib/config";
+import { AppConfig, studentEmailAllowed, pilotAccountAllowed } from "../lib/config";
 import { HttpError, onlyKeys, text } from "../lib/http";
 import {
   actor,
@@ -283,12 +284,14 @@ export function googleRouter(
       "programId",
       "yearLevelId",
       "termsAccepted",
+      "noticeVersion",
     ]);
     if (req.body.termsAccepted !== true)
       throw new HttpError(
         422,
         "Accept the Terms of Service and Privacy Policy.",
       );
+    const consentVersion = requireRegistrationConsent(req.body.termsAccepted, req.body.noticeVersion, config);
     const id = text(req.body.onboardingId, "Onboarding", 100);
     const name = text(req.body.name, "Display name", 100);
     const programId = text(req.body.programId, "College program");
@@ -307,6 +310,8 @@ export function googleRouter(
         !studentEmailAllowed(pending.verifiedEmail, config)
       )
         throw invalid();
+      if (!pilotAccountAllowed(pending.verifiedEmail, config))
+        throw new HttpError(403, "This account is not authorized for the local OAuth pilot.");
       await validateAcademicSelection(tx, programId, yearLevelId);
       await consume(tx, id);
       if (
@@ -326,11 +331,13 @@ export function googleRouter(
           name,
           email: pending.verifiedEmail,
           passwordHash: null,
+          role: "USER",
           emailVerifiedAt: new Date(),
           programId,
           yearLevelId,
         },
       });
+      await recordRegistrationConsent(tx, user.id, consentVersion);
       await tx.externalIdentity.create({
         data: {
           provider: "GOOGLE",

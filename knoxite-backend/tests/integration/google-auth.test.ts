@@ -6,13 +6,13 @@ import bcrypt from "bcrypt";
 import { PrismaClient } from "@prisma/client";
 import { TokenPayload } from "google-auth-library";
 import { createApp } from "../../app";
-import { requireLocalDatabase } from "../../scripts/safeDatabase";
+import { requireOwnedFixtureDatabase } from "./fixtureDatabase";
 import { seedAcademicCatalog } from "../../services/academics";
 import { googleTestConfig } from "../googleFixture";
 import { HttpError } from "../../lib/http";
 
 test("isolated Google authentication and account preservation", async (t) => {
-  const url = requireLocalDatabase();
+  const url = requireOwnedFixtureDatabase();
   assert.match(new URL(url).pathname, /_test$/);
   const db = new PrismaClient({ datasources: { db: { url } } });
   const config = googleTestConfig();
@@ -115,6 +115,7 @@ test("isolated Google authentication and account preservation", async (t) => {
         programId: program.id,
         yearLevelId: program.yearLevels[0].id,
         termsAccepted: true,
+        noticeVersion: config.registrationConsent!.version,
         ...extra,
       });
     return {

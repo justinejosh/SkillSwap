@@ -31,17 +31,20 @@ export function reportsRouter(db: PrismaClient) {
       throw new HttpError(422, "Choose a supported report reason.");
     if (targetId === actor(req))
       throw new HttpError(422, "You cannot report yourself.");
-    if (
-      !(await db.user.findFirst({
+    const target = await db.user.findFirst({
         where: { id: targetId, role: "USER" },
         select: { id: true },
-      }))
-    )
+      });
+    if (!target)
       throw new HttpError(404, "Student not found.");
+    // MySQL IDs can compare case-insensitively. Compare resolved identities,
+    // not just the request spelling, before recording a peer report.
+    if (target.id === actor(req))
+      throw new HttpError(422, "You cannot report yourself.");
     const saved = await db.userReport.create({
       data: {
         reporterId: actor(req),
-        targetId,
+        targetId: target.id,
         reason,
         description: text(req.body.description, "Description", 4000),
       },

@@ -2,6 +2,14 @@
 
 This change implements the approved plan on `dev-justine`. It is not a production deployment. Do not merge directly into `main`.
 
+## Targeted thesis-alignment review — 2026-11-13
+
+The attached working thesis was read only; its SHA-256 was checked against the pre-review fingerprint. The normalized WRMR calculation is already correct: the manuscript example yields B 92.5, D 92.0 and C 86.0. No formula, weight, cancellation/legacy policy, eligibility rule or schema was changed.
+
+Small corrections show WRMR as a score out of 100, identify balanced input labels and explain one-partner evidence; monthly administrative analytics now reuse the existing session/review outcome gate instead of counting inconsistent completed flags. Existing cold-start access and prior implementations are retained. Four backend regressions and desktop/mobile matching regressions cover the changes.
+
+Read-only inspection of the independently verified recovery-1 synthetic database found all 13 programs/four years but no assigned/validated program mappings and no assessment versions. The team's reported mapping confirmation is distinct from recording actual evidence in the database. No flags, mappings or banks were changed. Original and production databases were not accessed. See `docs/THESIS_ALIGNMENT_AND_PENDING_REVISIONS.md` for manuscript page references, exact partner formulas, pending decisions, changed files, release gates and newly executed validation; see `VALIDATION.md` for test counts.
+
 ## Scope and sources of truth
 
 The three thesis objectives remain profiling/skill management, reciprocal WRMR matching, and exchange/performance/progress analytics. The application is scoped to OLFU Santa Rosa **college students only**. There are no SHS registration fields, strands, or proximity rules.
@@ -42,7 +50,7 @@ The subsequent manual source/file review and negative authorization tests are re
 
 Email verification uses a random single-use token, a stored SHA-256 hash, a 30-minute expiry, and a configured HTTPS institutional delivery webhook. Tokens are never returned by the API or logged. No actual email was sent during development. Configure `EMAIL_DELIVERY_URL` and `EMAIL_DELIVERY_TOKEN` according to the JSON contract in `services/email.ts`; unavailable delivery leaves accounts unverified with a resend path. Registering or validating a suffix alone does not establish email ownership.
 
-Google OAuth has **not** been implemented. See `docs/GOOGLE_OAUTH_FEASIBILITY.md` for the review and outstanding institutional requirements. No Google credentials or OAuth libraries are installed.
+Google Sign-In is implemented locally using backend ID-token verification, single-use challenges and explicit account linking; it remains **disabled by default**. Email/password authentication is preserved. See `docs/GOOGLE_SIGN_IN.md` for the actual architecture, installed library and outstanding institutional/credential/security activation gates. The earlier feasibility-only status has been superseded; local implementation does not establish university approval.
 
 ## WRMR policy
 
@@ -65,6 +73,24 @@ Leaderboards require reliable completed outcomes with at least two distinct part
 Historical outcomes migrate as unvalidated. Unreviewed concluded exchanges make completion metrics unavailable. Historical agreements that cannot satisfy the new integrity checks remain readable but require reconciliation before further progress; no old consent, completion date, or review legitimacy is invented. The team must review actual legacy records before releasing the upgrade. Monthly analytics use actual stored completion/cancellation dates and do not synthesize historical phases.
 
 ## Authentication and account recovery follow-up
+
+An isolated interactive synthetic sandbox is available through the root
+`sandbox:setup`/`sandbox:start` scripts. It uses its own labelled MySQL container
+and persistent volume on 3309 (`knoxite_sandbox_dev`), backend 5010 and frontend
+5180; the original database, ports, and `.env` files remain unchanged. Random
+credentials and the captured synthetic mailbox live in a current-user/SYSTEM
+restricted directory outside the repository. Three students and an administrator
+are initialized through normal registration, captured email verification and
+password authentication. The local seed alone assigns the synthetic admin role.
+Verification, session checks, roles, rate limits and authorization remain active.
+Production refuses the separate development entry; normal app routes expose no
+sandbox/mailbox endpoint. See `docs/LOCAL_SANDBOX.md` for exact commands.
+
+The optional Resend REST adapter reuses verification/password-recovery workflows
+without a new runtime dependency. The existing webhook remains the default.
+Sender approval, a verified sending domain and a private scoped API key remain
+external prerequisites. No real email was sent or provider account configured.
+Google remains disabled. See `docs/EMAIL_DELIVERY_SETUP.md` for both adapters.
 
 Google Identity Services/OpenID Connect is now implemented behind a default-off
 backend flag. Explicit institutional Workspace, college/campus eligibility, and

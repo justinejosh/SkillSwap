@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router";
+import { authenticatedFetch } from "@/app/lib/api";
+import { useState, useEffect, useRef } from "react";
+import { Link, useNavigate } from "react-router";
 import { Button } from "@/app/components/ui/button";
 import {
   Tabs,
@@ -17,6 +18,8 @@ import { API_BASE_URL } from "@/config";
 
 export default function NotificationPage() {
   const navigate = useNavigate();
+  const [error,setError] = useState("");
+  const requestSequence = useRef(0);
   const [swaps, setSwaps] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -28,16 +31,21 @@ export default function NotificationPage() {
     if (userString) {
       setCurrentUserId(JSON.parse(userString).id);
     }
-    fetchSwaps();
+    void fetchSwaps();
+    const sync=()=>{if(document.visibilityState!=="hidden")void fetchSwaps(true);};
+    window.addEventListener("focus",sync);window.addEventListener("pageshow",sync);
+    const timer=window.setInterval(sync,10000);
+    return()=>{requestSequence.current++;window.removeEventListener("focus",sync);window.removeEventListener("pageshow",sync);window.clearInterval(timer);};
   }, []);
 
-  const fetchSwaps = async () => {
+  const fetchSwaps = async (quiet = false) => {
+    const sequence=++requestSequence.current;
     try {
-      setLoading(true);
+      if(!quiet)setLoading(true);
       const token =
         localStorage.getItem("knoxite_token") || localStorage.getItem("token");
 
-      const res = await fetch(`${API_BASE_URL}/swap-requests`, {
+      const res = await authenticatedFetch(`${API_BASE_URL}/swap-requests`, {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
@@ -47,12 +55,12 @@ export default function NotificationPage() {
 
       if (res.ok) {
         const data = await res.json();
-        setSwaps(data);
-      }
+        if(sequence===requestSequence.current){setSwaps(data);setError("");}
+      } else {const data=await res.json();if(sequence===requestSequence.current)setError(data.error||"Unable to load swap requests.");}
     } catch (err) {
-      console.error("Fetch Swaps Failed:", err);
+      if(sequence===requestSequence.current)setError("Unable to load swap requests. Please retry.");
     } finally {
-      setLoading(false);
+      if(sequence===requestSequence.current)setLoading(false);
     }
   };
 
@@ -63,7 +71,7 @@ export default function NotificationPage() {
     setActionLoading(swapId);
     try {
       const token = localStorage.getItem("knoxite_token");
-      const res = await fetch(
+      const res = await authenticatedFetch(
         `${API_BASE_URL}/swap-requests/${swapId}/status`,
         {
           method: "PATCH",
@@ -84,10 +92,10 @@ export default function NotificationPage() {
         }
       } else {
         const data = await res.json();
-        alert(data.error || "Request could not be updated.");
+        setError(data.error || "Request could not be updated.");
       }
     } catch (err) {
-      console.error("Action Error:", err);
+      setError("Unable to update this request. Please retry.");
     } finally {
       setActionLoading(null);
     }
@@ -108,7 +116,7 @@ export default function NotificationPage() {
     try {
       const token =
         localStorage.getItem("knoxite_token") || localStorage.getItem("token");
-      const res = await fetch(`${API_BASE_URL}/swaps/cancel/request/${id}`, {
+      const res = await authenticatedFetch(`${API_BASE_URL}/swaps/cancel/request/${id}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -116,10 +124,10 @@ export default function NotificationPage() {
       if (res.ok) {
         fetchSwaps();
       } else {
-        alert("Failed to cancel request.");
+        setError("The request could not be withdrawn. Refresh and try again.");
       }
     } catch (err) {
-      console.error("Cancellation Error:", err);
+      setError("Unable to withdraw this request. Please retry.");
     } finally {
       setActionLoading(null);
     }
@@ -153,8 +161,7 @@ export default function NotificationPage() {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#E5F2FA] via-[#E5F2FA] via-70% to-[#F8FAFC] dark:bg-none dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans flex flex-col relative overflow-x-hidden transition-colors duration-200">
-      <div className="absolute inset-0 bg-[linear-gradient(to_right,#e2e8f080_1px,transparent_1px),linear-gradient(to_bottom,#e2e8f080_1px,transparent_1px)] dark:bg-[linear-gradient(to_right,#1e293b50_1px,transparent_1px),linear-gradient(to_bottom,#1e293b50_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_70%_50%_at_50%_0%,#000_70%,transparent_110%)] pointer-events-none" />
+    <div className="min-h-screen knoxite-surface text-slate-900 dark:text-slate-100 font-sans flex flex-col relative overflow-x-hidden transition-colors duration-200">
 
       {/* FLOATING GLASS HEADER */}
       <div className="sticky top-4 z-30 px-4 sm:px-6">
@@ -196,14 +203,15 @@ export default function NotificationPage() {
             Exchange Inquiries
           </span>
           <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">
-            Skill Swap Notifications
+            Swap Requests
           </h1>
           <p className="text-sm text-slate-500 dark:text-slate-400">
-            Review incoming handshake requests, monitor sent proposals, and
+            Review incoming skill swap requests, check sent requests, and
             manage exchange history.
           </p>
         </div>
 
+        {error && <p role="alert" className="rounded-xl border border-red-300 p-3 text-sm text-red-700 dark:text-red-300">{error}</p>}
         <Tabs defaultValue="incoming" className="space-y-6">
           <TabsList className="grid grid-cols-3 w-full bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 h-12 p-1 rounded-2xl shadow-2xs">
             <TabsTrigger
@@ -303,6 +311,8 @@ function SwapRequestItem({
 }: any) {
   const isPending = swap.status === "PENDING";
   const partner = isReceiver ? swap.requester : swap.receiver;
+  const exchangeStatus = swap.linkedSwap?.status || swap.status;
+  const labels: Record<string,string> = {PENDING:"Pending",ACCEPTED:"Request accepted",PENDING_AGREEMENT:"Agreement pending",CONFIRMED:"In progress",COMPLETED:"Completed",CANCELLED:"Cancelled",REJECTED:"Declined",WITHDRAWN:"Withdrawn"};
 
   return (
     <div
@@ -327,10 +337,10 @@ function SwapRequestItem({
           </Avatar>
 
           <div className="min-w-0">
-            <h3 className="font-bold text-slate-900 dark:text-white text-base truncate">
+            <h3 className="font-bold text-slate-900 dark:text-white text-base break-words">
               {partner?.name || "Member"}
             </h3>
-            <span className="text-[11px] text-slate-400 dark:text-slate-500 font-medium">
+            <span className="text-[11px] text-slate-600 dark:text-slate-400 font-medium">
               {isReceiver ? "Incoming Request" : "Outgoing Request"}
             </span>
           </div>
@@ -345,7 +355,7 @@ function SwapRequestItem({
                 : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700"
           }`}
         >
-          {swap.status}
+          {labels[exchangeStatus] || exchangeStatus}
         </span>
       </div>
 
@@ -382,12 +392,12 @@ function SwapRequestItem({
       )}
 
       {swap.status === "ACCEPTED" && swap.linkedSwap?.id && (
-        <a
+        <div className="flex flex-wrap gap-4"><Link
           className="text-sm text-blue-700 underline dark:text-blue-300"
-          href={`/swap-agreement/${swap.linkedSwap.id}`}
+          to={`/swap-agreement/${swap.linkedSwap.id}`}
         >
-          Review Agreement
-        </a>
+          {swap.linkedSwap.status === "PENDING_AGREEMENT" ? "Review Agreement" : "View Agreement"}
+        </Link><Link className="text-sm text-blue-700 underline dark:text-blue-300" to={`/swap-details/${swap.linkedSwap.id}`}>View Exchange</Link></div>
       )}
       <div className="flex flex-wrap items-center gap-2.5 pt-1">
         {isPending && isReceiver && onAction && (

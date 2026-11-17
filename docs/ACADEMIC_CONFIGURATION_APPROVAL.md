@@ -1,6 +1,12 @@
 # Academic configuration approval record
 
-Status on 2026-11-07: **pending institutional and subject review**. This record contains no approved department assignments or validated student question banks. The application remains scoped to OLFU Santa Rosa college students.
+## Review update — 2026-11-13
+
+The research team now reports confirmation of the 13 program-to-department relationships. Supporting campus evidence was not supplied to this audit, so the dated draft below is retained as provenance, not a rejection of that report. Record the confirming authority, evidence, date and reviewer before using the existing validated-mapping administration action.
+
+A read-only query of the independently verified **synthetic recovery-1** database at port 3311 found all 13 active program labels and four active year levels, but **0/13 assigned departments and 0/13 validated mappings**. All mapping dates/reviewers/evidence are absent and versions are zero. One active College of Computer Studies department row exists without program assignments. There are no assessment bank versions. These are sandbox facts only; the original `knoxite` and production databases were not inspected. No mapping, approval flag or question bank was changed. See `THESIS_ALIGNMENT_AND_PENDING_REVISIONS.md` for the full evidence boundaries and follow-up.
+
+Historical status on 2026-11-07: **pending institutional and subject review**. That record contained no approved department assignments or validated student question banks. The application remains scoped to OLFU Santa Rosa college students.
 
 ## Institutional eligibility
 

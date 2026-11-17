@@ -8,10 +8,10 @@ import { PrismaClient } from "@prisma/client";
 import { createApp } from "../../app";
 import { loadConfig } from "../../lib/config";
 import { seedAcademicCatalog } from "../../services/academics";
-import { requireLocalDatabase } from "../../scripts/safeDatabase";
+import { requireOwnedFixtureDatabase } from "./fixtureDatabase";
 
 test("registered student journey and authorization review on isolated MySQL", async (t) => {
-  const url = requireLocalDatabase();
+  const url = requireOwnedFixtureDatabase();
   assert.match(new URL(url).pathname, /_test$/);
   const db = new PrismaClient({ datasources: { db: { url } } });
   const prefix = `journey-${randomUUID().slice(0, 8)}`;
@@ -22,6 +22,8 @@ test("registered student journey and authorization review on isolated MySQL", as
     INSTITUTION_EMAIL_DOMAINS: domain,
     CAMPUS_EMAIL_SUFFIX: "lag",
     EMAIL_VERIFICATION_REQUIRED: "true",
+    REGISTRATION_CONSENT_ENABLED: "true",
+    REGISTRATION_NOTICE_VERSION: "DRAFT_CI_NOTICE_v1",
   });
   const deliveries = new Map<string, string>();
   const server = createApp(db, config, async (email, link) => {
@@ -120,6 +122,8 @@ test("registered student journey and authorization review on isolated MySQL", as
               password,
               programId,
               yearLevelId: year.id,
+              termsAccepted: true,
+              noticeVersion: config.registrationConsent!.version,
             },
           );
           assert.equal(registered.verificationSent, true);
@@ -280,22 +284,20 @@ test("registered student journey and authorization review on isolated MySQL", as
             },
           );
         const offeringA = await call("POST", "/profile/skills/offer", 201, ta, {
-          name: `${prefix}-skill-a`,
-          category: "technology",
+          presetKey: "python-programming-fundamentals",
         });
         const offeringB = await call("POST", "/profile/skills/offer", 201, tb, {
-          name: `${prefix}-skill-b`,
-          category: "technology",
+          presetKey: "javascript-fundamentals",
         });
         offeringId = offeringA.offering.id;
         skillA = offeringA.skill.id;
         skillB = offeringB.skill.id;
         assert.equal(offeringA.offering.tier, "NOT_ASSESSED");
         await call("POST", "/profile/skills/want", 201, ta, {
-          name: offeringB.skill.name,
+          skillId: offeringB.skill.id,
         });
         await call("POST", "/profile/skills/want", 201, tb, {
-          name: offeringA.skill.name,
+          skillId: offeringA.skill.id,
         });
         await call(
           "POST",
@@ -440,7 +442,7 @@ test("registered student journey and authorization review on isolated MySQL", as
 
     await t.test(
       "unranked reciprocal exchange reaches bilateral completion and reliable WRMR analytics",
-      async () => {
+      async (step) => {
         const request = await call("POST", "/swaps/request", 201, ta, {
           receiverId: bId,
           offeredSkillId: skillA,
@@ -486,12 +488,19 @@ test("registered student journey and authorization review on isolated MySQL", as
           },
         );
         assert.equal(confirmed.swap.status, "CONFIRMED");
+        await call("POST",`/swaps/${swapId}/log-session`,409,ta,{sessionNumber:1});
+        const scheduledStart=Date.now()+60000;
         await call("POST", "/sessions", 201, ta, {
           swapId,
           sessionNumber: 1,
-          scheduledAt: new Date(Date.now() + 86400_000).toISOString(),
+          scheduledAt: new Date(scheduledStart).toISOString(),
           meetingLink: "https://example.invalid/synthetic-session",
         });
+        await call("POST",`/swaps/${swapId}/log-session`,409,ta,{sessionNumber:1});
+        step.mock.timers.enable({apis:["Date"],now:scheduledStart+3600_000-1});
+        step.after(()=>step.mock.timers.reset());
+        await call("POST",`/swaps/${swapId}/log-session`,409,ta,{sessionNumber:1});
+        step.mock.timers.setTime(scheduledStart+3600_000);
         await call("POST", "/reputation/submit", 409, ta, {
           swapId,
           rating: 5,

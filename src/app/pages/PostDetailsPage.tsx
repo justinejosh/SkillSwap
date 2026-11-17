@@ -1,3 +1,4 @@
+import { authenticatedFetch } from "@/app/lib/api";
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router";
 import { Button } from "@/app/components/ui/button";
@@ -49,7 +50,7 @@ export default function PostDetailsPage() {
 
   const fetchPostDetails = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/forum/posts/${id}`, {
+      const response = await authenticatedFetch(`${API_BASE_URL}/forum/posts/${id}`, {
         headers: { "bypass-tunnel-reminder": "true" },
       });
       if (response.ok) {
@@ -68,7 +69,7 @@ export default function PostDetailsPage() {
 
     try {
       const token = localStorage.getItem("knoxite_token");
-      const response = await fetch(`${API_BASE_URL}/forum/posts/${id}/comments`, {
+      const response = await authenticatedFetch(`${API_BASE_URL}/forum/posts/${id}/comments`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -97,7 +98,7 @@ export default function PostDetailsPage() {
     setIsDeleting(true);
     try {
       const token = localStorage.getItem("knoxite_token");
-      const response = await fetch(`${API_BASE_URL}/forum/posts/${id}`, {
+      const response = await authenticatedFetch(`${API_BASE_URL}/forum/posts/${id}`, {
         method: "DELETE",
         headers: {
           Authorization: `Bearer ${token}`,

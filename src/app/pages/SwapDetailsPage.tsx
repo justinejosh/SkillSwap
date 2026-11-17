@@ -1,22 +1,20 @@
+import { ExchangeSummary } from "@/app/components/ExchangeSummary";
+import { authenticatedFetch } from "@/app/lib/api";
 import { api } from "@/app/lib/api";
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { useLiveSwap } from "@/app/lib/useLiveSwap";
 import { useParams, useNavigate } from "react-router";
 import { Button } from "@/app/components/ui/button";
 import {
   Card,
   CardContent,
   CardHeader,
-  CardTitle,
 } from "@/app/components/ui/card";
 import { Progress } from "@/app/components/ui/progress";
 import {
   ArrowLeft,
-  CheckCircle2,
   MessageSquare,
-  Star,
-  Award,
   Loader2,
-  Send,
 } from "lucide-react";
 import { API_BASE_URL } from "@/config";
 
@@ -24,43 +22,17 @@ export default function SwapDetailsPage() {
   const { swapId } = useParams();
   const navigate = useNavigate();
   const [error, setError] = useState("");
-  const [swap, setSwap] = useState<any>(null);
+  const { swap, loading, error: syncError, refresh: fetchDetails } = useLiveSwap(swapId);
   const [isUpdating, setIsUpdating] = useState(false);
-  const [currentUser, setCurrentUser] = useState<any>(null);
-
-  useEffect(() => {
-    const user = JSON.parse(localStorage.getItem("knoxite_user") || "{}");
-    setCurrentUser(user);
-    fetchDetails();
-  }, [swapId]);
-
-  const fetchDetails = async () => {
-    try {
-      const token = localStorage.getItem("knoxite_token");
-      const res = await fetch(`${API_BASE_URL}/swaps/${swapId}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "bypass-tunnel-reminder": "true",
-        },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setSwap(data);
-      } else {
-        const data = await res.json();
-        setError(data.error || "Unable to load swap.");
-      }
-    } catch (err) {
-      console.error("Fetch Error:", err);
-    }
-  };
+  const currentUser = swap?.me;
 
   const logSession = async () => {
     if (isUpdating) return;
     setIsUpdating(true);
+    setError("");
     try {
       const token = localStorage.getItem("knoxite_token");
-      const res = await fetch(`${API_BASE_URL}/swaps/${swapId}/log-session`, {
+      const res = await authenticatedFetch(`${API_BASE_URL}/swaps/${swapId}/log-session`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -75,13 +47,13 @@ export default function SwapDetailsPage() {
         }),
       });
       if (res.ok) {
-        fetchDetails();
+        await fetchDetails();
       } else {
         const data = await res.json();
         setError(data.error || "Session confirmation failed.");
       }
     } catch (err) {
-      console.error("Log Session Error:", err);
+      setError(err instanceof Error ? err.message : "Unable to confirm your session. Please retry.");
     } finally {
       setIsUpdating(false);
     }
@@ -89,11 +61,12 @@ export default function SwapDetailsPage() {
 
   if (!swap || !currentUser) {
     return (
-      <div className="flex flex-col h-screen items-center justify-center bg-[#F8FAFC]">
+      <div className="flex flex-col h-screen items-center justify-center knoxite-surface">
         <Loader2 className="size-8 text-blue-600 animate-spin mb-3" />
-        <span className="text-slate-900 font-bold text-xs uppercase tracking-widest">
-          {error || "Synchronizing Rotation Data..."}
+        <span className="text-slate-900 dark:text-slate-100 font-bold text-xs uppercase tracking-widest">
+          {error || syncError || "Loading exchange..."}
         </span>
+        {!loading && <Button variant="outline" onClick={()=>void fetchDetails()}>Refresh</Button>}
       </div>
     );
   }
@@ -110,279 +83,56 @@ export default function SwapDetailsPage() {
 
   const iAmDone = mySessions >= swap.sessions;
   const partnerIsDone = partnerSessions >= swap.sessions;
-  const readyToReview = iAmDone && partnerIsDone && swap.status === "CONFIRMED";
+  const readyToReview = swap.canReview === true;
+  const ownReview = swap.reviewSummary?.myReview;
 
+  const active = ["PENDING_AGREEMENT", "CONFIRMED"].includes(swap.status);
+  const statusTitle = isCompleted ? "Exchange completed" : swap.status === "CANCELLED" ? "Exchange cancelled" : swap.status === "PENDING_AGREEMENT" ? "Agreement awaiting approval" : swap.status !== "CONFIRMED" ? "Exchange is read-only" : ownReview ? "Your review submitted" : iAmDone && partnerIsDone ? "Both Students Confirmed Their Sessions" : iAmDone ? "Waiting for your partner's confirmations" : "Exchange in progress";
+  const statusMessage = isCompleted ? "Both students have submitted their reviews. Your exchange and agreement remain available in history." : swap.status === "CANCELLED" ? "No further sessions or reviews can be added. Your exchange history is retained." : swap.status === "PENDING_AGREEMENT" ? "Both students must approve the same agreement before sessions begin." : swap.status !== "CONFIRMED" ? "View the saved agreement for this exchange. Contact an administrator if its status needs review." : ownReview ? "Your review is saved. The exchange completes after both reviews are recorded." : iAmDone && partnerIsDone ? "You can now rate your partner. The exchange completes after both reviews are recorded." : iAmDone ? "You have confirmed all required sessions. Your partner still needs to confirm theirs." : "Confirm each session after participating. Your partner records their own confirmations separately.";
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#E5F2FA] via-[#E5F2FA] via-70% to-[#F8FAFC] dark:bg-none dark:bg-slate-950   text-slate-900 dark:text-slate-100 font-sans flex flex-col relative overflow-x-hidden transition-colors duration-200">
-      {/* SUBTLE ARCHITECTURAL GRID */}
-      <div className="absolute inset-0 bg-[linear-gradient(to_right,#e2e8f080_1px,transparent_1px),linear-gradient(to_bottom,#e2e8f080_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_70%_50%_at_50%_0%,#000_70%,transparent_110%)] pointer-events-none" />
-
-      {/* 1. FLOATING GLASS HEADER */}
-      <div className="sticky top-4 z-30 px-4 sm:px-6">
-        <header className="max-w-2xl mx-auto flex items-center justify-between px-4 sm:px-5 py-3.5 rounded-2xl bg-white/85 backdrop-blur-md border border-slate-200/80 shadow-xs">
-          <div className="flex items-center gap-2.5">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => navigate("/dashboard")}
-              className="size-9 rounded-xl text-blue-600 hover:bg-blue-50 hover:text-blue-700 transition-colors shrink-0"
-              title="Back to Dashboard"
-            >
-              <ArrowLeft className="size-5" />
-            </Button>
-
-            <div className="h-5 w-[1px] bg-slate-200 mx-0.5 hidden sm:block" />
-
-            <div
-              onClick={() => navigate("/dashboard")}
-              className="flex items-center gap-2.5 cursor-pointer"
-            >
-              <div className="size-9 bg-blue-600 rounded-xl flex items-center justify-center text-white font-black text-lg shadow-md shadow-blue-600/25">
-                K
-              </div>
-              <div className="flex items-baseline gap-2">
-                <span className="text-xl font-black text-slate-900 tracking-tight">
-                  Swap Tracking
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <Button
-            variant="outline"
-            size="sm"
-            className="border-slate-200 text-slate-700 hover:bg-slate-50 rounded-xl text-xs font-bold h-9 px-3.5 shadow-2xs"
-            onClick={() =>
-              navigate(`/chat?partnerId=${swap?.partner?.id}&swapId=${swap.id}`)
-            }
-          >
-            <MessageSquare className="mr-1.5 size-3.5 text-blue-600" /> Message
-          </Button>
-        </header>
-      </div>
-
-      {/* 2. MAIN TRACKING CONTAINER */}
-      <main className="flex-1 max-w-2xl mx-auto w-full px-4 pt-8 space-y-6 relative z-10">
-        {swap.status === "CONFIRMED" && (
-          <Button
-            variant="outline"
-            onClick={() => navigate(`/calendar?swapId=${swap.id}`)}
-          >
-            Schedule Sessions
-          </Button>
-        )}
-        {error && (
-          <p role="alert" className="text-red-700">
-            {error}
-          </p>
-        )}
-        {swap.status === "PENDING_AGREEMENT" && (
-          <Button onClick={() => navigate(`/swap-agreement/${swap.id}`)}>
-            Review and Approve Agreement
-          </Button>
-        )}
-        {["PENDING_AGREEMENT", "CONFIRMED"].includes(swap.status) && (
-          <Button
-            variant="outline"
-            onClick={async () => {
-              if (
-                !window.confirm(
-                  "Cancel this exchange? Its history will be retained.",
-                )
-              )
-                return;
-              try {
-                await api(`/swaps/cancel/swap/${swap.id}`, {
-                  method: "DELETE",
-                });
-                await fetchDetails();
-              } catch (e: any) {
-                setError(e.message);
-              }
-            }}
-          >
-            Cancel Exchange
-          </Button>
-        )}
-        <Card className="border-slate-200/90 shadow-xs bg-white rounded-3xl overflow-hidden">
-          <CardHeader className="bg-white border-b border-slate-100 p-6 sm:p-7">
-            <div className="flex justify-between items-center gap-3">
-              <div>
-                <CardTitle className="text-slate-900 font-black text-2xl tracking-tight">
-                  Skill Swap Progress
-                </CardTitle>
-              </div>
-              <span className="bg-blue-50 text-blue-700 border border-blue-200/60 font-bold text-[10px] uppercase tracking-wider px-2.5 py-1 rounded-lg">
-                {swap.status.replace("_", " ")}
-              </span>
-            </div>
-          </CardHeader>
-
-          <CardContent className="p-6 sm:p-7 space-y-7">
-            {/* BILATERAL PROGRESS METRICS */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* My Progress */}
-              <div className="space-y-3 p-5 rounded-2xl border border-slate-200/70 bg-slate-50/70">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                  Your Validation
-                </p>
-                <div className="flex justify-between items-baseline">
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-3xl font-black text-blue-600">
-                      {mySessions}
-                    </span>
-                    <span className="text-xs font-bold text-slate-400">
-                      / {swap.sessions}
-                    </span>
-                  </div>
-                  {iAmDone && (
-                    <CheckCircle2 className="size-5 text-emerald-600" />
-                  )}
-                </div>
-                <Progress
-                  value={(mySessions / swap.sessions) * 100}
-                  className="h-2 bg-blue-100 [&>div]:bg-blue-600 rounded-full"
-                />
-              </div>
-
-              {/* Partner Progress */}
-              <div className="space-y-3 p-5 rounded-2xl border border-slate-200/70 bg-slate-50/70">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest truncate">
-                  {swap.partner?.name || "Partner"}'s Validation
-                </p>
-                <div className="flex justify-between items-baseline">
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-3xl font-black text-slate-800">
-                      {partnerSessions}
-                    </span>
-                    <span className="text-xs font-bold text-slate-400">
-                      / {swap.sessions}
-                    </span>
-                  </div>
-                  {partnerIsDone && (
-                    <CheckCircle2 className="size-5 text-emerald-600" />
-                  )}
-                </div>
-                <Progress
-                  value={(partnerSessions / swap.sessions) * 100}
-                  className="h-2 bg-slate-200 [&>div]:bg-emerald-600 rounded-full"
-                />
-              </div>
-            </div>
-
-            {/* ACTION & STATUS STATES */}
-            <div className="pt-2 border-t border-slate-100">
-              {isCompleted ? (
-                <div className="text-center p-6 bg-emerald-50 rounded-2xl border border-emerald-200/70 space-y-3">
-                  <Award className="size-10 text-emerald-600 mx-auto" />
-                  <div className="space-y-1">
-                    <h3 className="font-bold text-emerald-950 text-base">
-                      Exchange Completed
-                    </h3>
-                    <p className="text-xs text-emerald-700">
-                      Both counterparties have completed and validated all
-                      agreed swap hours.
-                    </p>
-                  </div>
-                  <Button
-                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl h-11 text-xs shadow-sm shadow-emerald-600/20"
-                    onClick={() => navigate("/dashboard")}
-                  >
-                    Return Home
-                  </Button>
-                </div>
-              ) : readyToReview ? (
-                <div className="text-center p-6 bg-amber-50 rounded-2xl border border-amber-200/70 space-y-3">
-                  <Star className="size-10 text-amber-500 mx-auto fill-amber-500" />
-                  <div className="space-y-1">
-                    <h3 className="font-bold text-amber-950 text-base">
-                      Mutual Validation Complete
-                    </h3>
-                    <p className="text-xs text-amber-700 font-medium">
-                      Both peers have confirmed the sessions. Proceed to peer
-                      evaluation to conclude the swap.
-                    </p>
-                  </div>
-                  <Button
-                    className="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold h-11 rounded-xl text-xs shadow-sm shadow-amber-500/20"
-                    onClick={() =>
-                      navigate(
-                        `/reputation?partnerId=${swap?.partner?.id}&swapId=${swap.id}`,
-                      )
-                    }
-                  >
-                    Evaluate Peer <Award className="ml-1.5 size-4" />
-                  </Button>
-                </div>
-              ) : iAmDone ? (
-                <div className="text-center p-6 bg-blue-50/70 rounded-2xl border border-blue-200/70 space-y-2">
-                  <Loader2 className="size-7 text-blue-600 animate-spin mx-auto mb-1" />
-                  <h3 className="font-bold text-blue-950 text-base">
-                    Awaiting Partner Validation
-                  </h3>
-                  <p className="text-xs text-blue-700 font-medium max-w-sm mx-auto">
-                    You have logged all sessions. Waiting for{" "}
-                    {swap.partner?.name || "your partner"} to confirm their side
-                    of the exchange.
-                  </p>
-                </div>
-              ) : (
-                <div className="flex flex-col gap-4">
-                  <Button
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold h-12 rounded-xl text-xs uppercase tracking-wider shadow-md shadow-blue-600/20"
-                    onClick={logSession}
-                    disabled={
-                      isUpdating ||
-                      swap.status !== "CONFIRMED" ||
-                      !swap.integrityVerified
-                    }
-                  >
-                    {isUpdating ? (
-                      <Loader2 className="animate-spin size-4" />
-                    ) : (
-                      "Log Completed Session"
-                    )}
-                  </Button>
-
-                  <div className="p-4 bg-slate-50/80 rounded-2xl border border-dashed border-slate-200 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="bg-white p-2.5 rounded-xl shadow-2xs border border-slate-100 text-blue-600">
-                        <MessageSquare className="size-4" />
-                      </div>
-                      <div>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">
-                          Coordination
-                        </p>
-                        <p className="text-xs font-bold text-slate-900">
-                          Need to schedule a meeting?
-                        </p>
-                      </div>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      className="text-blue-600 font-bold text-xs uppercase hover:bg-blue-50 rounded-xl"
-                      onClick={() =>
-                        navigate(
-                          `/chat?partnerId=${swap?.partner?.id}&swapId=${swap.id}`,
-                        )
-                      }
-                    >
-                      Chat Now <Send className="ml-1.5 size-3" />
-                    </Button>
-                  </div>
-                </div>
-              )}
+    <div className="knoxite-surface min-h-screen pb-8 text-slate-900 dark:text-slate-100">
+      <header className="mx-auto flex w-full max-w-[800px] flex-wrap items-center justify-between gap-3 px-4 pt-6 sm:px-6">
+        <div className="flex min-w-0 items-center gap-3">
+          <Button variant="outline" size="icon" onClick={()=>navigate("/dashboard")} aria-label="Back to Dashboard"><ArrowLeft className="size-4" /></Button>
+          <div><p className="text-xs font-bold text-blue-700 dark:text-blue-300">KNOXITE</p><h1 className="text-2xl font-bold">Swap Tracking</h1></div>
+        </div>
+        {active && <Button variant="outline" onClick={()=>navigate(`/chat?partnerId=${swap.partner.id}&swapId=${swap.id}`)}><MessageSquare className="mr-2 size-4" />Message</Button>}
+      </header>
+      <main className="mx-auto w-full max-w-[800px] space-y-5 px-4 pt-6 sm:px-6">
+        {(error||syncError)&&<p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-200">{error||syncError}</p>}
+        <Card className="overflow-hidden rounded-3xl border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+          <CardContent className="space-y-6 p-5 sm:p-6">
+            <ExchangeSummary swap={swap} />
+            <div className="flex flex-wrap gap-3 border-t border-slate-200 pt-4 dark:border-slate-700">
+              <Button variant="outline" onClick={()=>navigate(`/swap-agreement/${swap.id}`)}>{swap.status==="PENDING_AGREEMENT"?"Review Agreement":"View Agreement"}</Button>
+              {swap.status==="CONFIRMED"&&swap.integrityVerified&&<Button variant="outline" onClick={()=>navigate(`/calendar?swapId=${swap.id}`)}>Schedule Sessions</Button>}
             </div>
           </CardContent>
         </Card>
+        <Card className="rounded-3xl border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+          <CardHeader className="pb-4"><h2 className="text-lg font-bold">Session confirmations</h2><p className="text-sm text-slate-600 dark:text-slate-300">Each student records their own confirmations. These counts are separate from peer reviews.</p></CardHeader>
+          <CardContent className="space-y-5">
+            <div className="grid gap-3 sm:grid-cols-2">
+              {[{title:"Your Confirmations",count:mySessions,name:currentUser.name},{title:"Partner Confirmations",count:partnerSessions,name:swap.partner?.name}].map(({title,count,name})=><section key={title} aria-label={title} className="min-w-0 space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800/70">
+                <h3 className="text-sm font-semibold">{title}</h3><p className="min-h-10 break-words text-sm text-slate-600 dark:text-slate-300">{name}</p>
+                <p className="text-2xl font-bold text-blue-800 dark:text-blue-200">{count}<span className="ml-1 text-sm font-medium text-slate-600 dark:text-slate-300">/ {swap.sessions}</span></p>
+                <Progress aria-label={title} value={swap.sessions>0?(count/swap.sessions)*100:0} className="h-2 bg-blue-100 dark:bg-slate-700 [&>div]:bg-blue-600 dark:[&>div]:bg-blue-400" />
+                <p className="text-xs text-slate-600 dark:text-slate-300">{count>=swap.sessions?"All confirmations recorded":active?"Confirmations still pending":"Recorded confirmations at closure"}</p>
+              </section>)}
+            </div>
+            <section role="status" className="space-y-2 rounded-2xl border border-blue-200 bg-blue-50 p-4 text-blue-950 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-100"><h3 className="font-semibold">{statusTitle}</h3><p className="text-sm">{statusMessage}</p></section>
+            <div className="flex flex-wrap gap-3">
+              {swap.status==="PENDING_AGREEMENT"&&<Button onClick={()=>navigate(`/swap-agreement/${swap.id}`)}>Review and Approve Agreement</Button>}
+              {swap.status==="CONFIRMED"&&swap.integrityVerified&&!iAmDone&&<Button disabled={isUpdating||!!syncError||swap.confirmationEligibility?.eligible!==true} onClick={logSession}>{isUpdating?"Saving confirmation...":`Confirm Session ${mySessions+1}`}</Button>}
+              {readyToReview&&<Button disabled={!!syncError} onClick={()=>navigate(`/reputation?swapId=${swap.id}&partnerId=${swap.partner.id}`)}>Rate Your Swap Partner</Button>}
+              {ownReview&&<Button variant="outline" onClick={()=>navigate(`/reputation?swapId=${swap.id}`)}>View Your Review</Button>}
+              <Button variant="outline" onClick={()=>void fetchDetails()}>Refresh status</Button>
+            </div>
+            {swap.status==="CONFIRMED"&&!iAmDone&&<p className="text-sm text-slate-600 dark:text-slate-300">{swap.confirmationEligibility?.reason||"Refresh status to check when this session can be confirmed."}{swap.confirmationEligibility?.scheduledEndAt&&<> Scheduled end: <time dateTime={swap.confirmationEligibility.scheduledEndAt}>{new Date(swap.confirmationEligibility.scheduledEndAt).toLocaleString()}</time>.</>}</p>}
+          </CardContent>
+        </Card>
+        {active&&<section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-dashed border-slate-300 p-4 dark:border-slate-700"><p className="text-sm text-slate-600 dark:text-slate-300">Need to end this exchange? Its history will be kept.</p><Button variant="outline" disabled={isUpdating||!!syncError} className="border-red-200 text-red-700 dark:border-red-800 dark:text-red-300" onClick={async()=>{if(!window.confirm("Cancel this exchange? Its history will be retained."))return;setIsUpdating(true);setError("");try{await api(`/swaps/cancel/swap/${swap.id}`,{method:"DELETE"});await fetchDetails();}catch(e){setError(e instanceof Error?e.message:"Unable to cancel this exchange.");}finally{setIsUpdating(false);}}}>Cancel Exchange</Button></section>}
       </main>
-
-      {/* 3. FOOTER */}
-      <footer className="mt-auto py-4 text-center relative z-10">
-        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
-          Knoxite.org
-        </p>
-      </footer>
     </div>
   );
 }

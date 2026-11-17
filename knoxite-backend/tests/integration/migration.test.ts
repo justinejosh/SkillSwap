@@ -4,10 +4,10 @@ import { randomUUID } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 import { PrismaClient } from "@prisma/client";
-import { requireLocalDatabase } from "../../scripts/safeDatabase";
+import { requireOwnedFixtureDatabase } from "./fixtureDatabase";
 import { backendRoot } from "../../scripts/preflight";
 test("migration rehearsal preserves historical data and blocks unsafe legacy rows", async (t) => {
-  const rootUrl = requireLocalDatabase();
+  const rootUrl = requireOwnedFixtureDatabase(true);
   assert.match(new URL(rootUrl).pathname, /_test$/);
   const root = new PrismaClient({ datasources: { db: { url: rootUrl } } });
   const created: string[] = [];

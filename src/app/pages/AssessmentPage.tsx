@@ -1,5 +1,5 @@
 import { AdvancedAssessmentScope } from "@/app/components/AdvancedAssessmentScope";
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useContext, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { api, ApiError } from "@/app/lib/api";
 import { Button } from "@/app/components/ui/button";
@@ -9,9 +9,12 @@ import {
   AssessmentTier,
 } from "@/app/components/AssessmentBadge";
 import { AssessmentPrompt } from "@/app/components/AssessmentPrompt";
+import { restoreAssessmentDraft, saveAssessmentDraft } from "@/app/lib/assessmentDraft";
+import { SessionTimeoutContext } from "@/app/components/SessionGuardian";
 type Level = "BASIC" | "ADVANCED";
 interface Availability {
   offeringId: string;
+  isActive?: boolean;
   skillName: string;
   tier: AssessmentTier;
   levels: {
@@ -38,6 +41,7 @@ interface Availability {
 }
 interface Attempt {
   id: string;
+  offeringActive?: boolean;
   offeringId: string;
   skillName: string;
   level: Level;
@@ -60,6 +64,7 @@ interface Attempt {
   }[];
 }
 export default function AssessmentPage() {
+  const sessionPolicyActive = useContext(SessionTimeoutContext);
   const { offeringId, attemptId } = useParams();
   const navigate = useNavigate();
   const [availability, setAvailability] = useState<Availability | null>(null);
@@ -70,6 +75,9 @@ export default function AssessmentPage() {
   const [loading, setLoading] = useState(true);
   const [now, setNow] = useState(Date.now());
   const [advancedPrompt, setAdvancedPrompt] = useState(false);
+  useEffect(() => {
+    if (sessionPolicyActive && attempt) saveAssessmentDraft(attempt, answers);
+  }, [sessionPolicyActive, attempt, answers]);
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(timer);
@@ -87,6 +95,7 @@ export default function AssessmentPage() {
         const a = await api<Attempt>(`/assessments/attempts/${attemptId}`);
         if (!live) return;
         setAttempt(a);
+        setAnswers(restoreAssessmentDraft(a));
         const info = await api<Availability>(
           `/assessments/offerings/${a.offeringId}`,
         );
@@ -168,6 +177,7 @@ export default function AssessmentPage() {
         },
       );
       setAttempt(result);
+      saveAssessmentDraft(result, {});
       const info = await api<Availability>(
         `/assessments/offerings/${result.offeringId}`,
       );
@@ -218,6 +228,9 @@ export default function AssessmentPage() {
           {(attempt || availability) && (
             <AssessmentBadge tier={attempt?.tier || availability!.tier} />
           )}
+          {(attempt?.offeringActive === false || availability?.isActive === false) && (
+            <p role="status">This teaching skill was removed. Your history and earned tier are retained. Restore the skill in My Skills before continuing an assessment.</p>
+          )}
           {attempt?.level === "ADVANCED" && <AdvancedAssessmentScope />}
           {attempt?.learningOutcomes && (
             <p className="whitespace-pre-wrap text-sm">
@@ -249,13 +262,14 @@ export default function AssessmentPage() {
                 )}
                 <p className="text-sm text-slate-600 dark:text-slate-300">
                   Starting an attempt counts toward the retake limit. Refreshing
-                  keeps the same questions and deadline; unsent answer
-                  selections may need to be selected again.
+                  keeps the same questions and deadline; unsent answer selections {sessionPolicyActive
+                    ? "are saved in this tab until the attempt expires or you log out."
+                    : "may need to be selected again."}
                 </p>
                 {attempt.questions.map((q, index) => (
                   <fieldset
                     key={q.id}
-                    disabled={busy || !remaining}
+                    disabled={busy || !remaining || attempt.offeringActive === false}
                     className="space-y-3 rounded-xl border border-slate-200 p-4 dark:border-slate-700"
                   >
                     <legend className="max-w-full whitespace-pre-wrap break-words px-1 font-semibold">
@@ -272,9 +286,11 @@ export default function AssessmentPage() {
                           name={q.id}
                           value={option.id}
                           checked={answers[q.id] === option.id}
-                          onChange={() =>
-                            setAnswers((a) => ({ ...a, [q.id]: option.id }))
-                          }
+                          onChange={() => setAnswers((a) => {
+                            const next = { ...a, [q.id]: option.id };
+                            if (sessionPolicyActive) saveAssessmentDraft(attempt, next);
+                            return next;
+                          })}
                         />
                         <span className="whitespace-pre-wrap break-words">
                           {option.text}
@@ -283,7 +299,7 @@ export default function AssessmentPage() {
                     ))}
                   </fieldset>
                 ))}
-                <Button type="submit" disabled={busy || !remaining}>
+                <Button type="submit" disabled={busy || !remaining || attempt.offeringActive === false}>
                   {busy ? "Submitting..." : "Submit Assessment"}
                 </Button>
               </form>

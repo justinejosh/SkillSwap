@@ -1,6 +1,10 @@
+import { AdminShell } from "@/app/components/admin/AdminShell";
+import { AssessmentDirectory } from "@/app/components/admin/AssessmentDirectory";
+import { AdminReports } from "@/app/components/admin/AdminReports";
+import { AdminConfirm, AdminStatus } from "@/app/components/admin/AdminUI";
 import { AdvancedAssessmentScope } from "@/app/components/AdvancedAssessmentScope";
-import { FormEvent, useEffect, useState } from "react";
-import { Link } from "react-router";
+import { FormEvent, useEffect, useRef, useState } from "react";
+import { Link, useSearchParams } from "react-router";
 import { api } from "@/app/lib/api";
 import { Button } from "@/app/components/ui/button";
 const blank = {
@@ -14,6 +18,11 @@ const blank = {
   items: [],
 };
 export default function AssessmentAdminPage() {
+  const [params]=useSearchParams();
+  const section=["academic","reports","import"].includes(params.get("section")||"")?params.get("section")!:"directory";
+  const [loading,setLoading]=useState(true),[ready,setReady]=useState(false),[importCandidate,setImportCandidate]=useState<any>(null),[programSearch,setProgramSearch]=useState("");
+  const loadSequence=useRef(0),actionLock=useRef(false);
+
   const [academicData, setAcademicData] = useState<{
     programs: any[];
     departments: any[];
@@ -48,21 +57,17 @@ export default function AssessmentAdminPage() {
     order: 1,
   });
   async function load() {
-    const [b, s, r, a] = await Promise.all([
-      api("/admin/assessments"),
-      api("/admin/assessment-catalog"),
-      api("/admin/reports"),
-      api("/admin/academic-programs"),
-    ]);
-    setBanks(b);
-    setSkills(s);
-    setReports(r);
-    setAcademicData(a);
+    const seq=++loadSequence.current;setLoading(true);
+    try {
+      const result=await api(section==="directory"?"/admin/assessments":section==="import"?"/admin/assessment-catalog":section==="academic"?"/admin/academic-programs":"/admin/reports");
+      if(seq!==loadSequence.current)return;
+      setReady(true);setError("");
+      if(section==="directory")setBanks(result);else if(section==="import")setSkills(result);else if(section==="academic")setAcademicData(result);else setReports(result);
+    } finally {if(seq===loadSequence.current)setLoading(false);}
   }
-  useEffect(() => {
-    void load().catch((e) => setError(e.message));
-  }, []);
+  useEffect(()=>{setReady(false);setError("");setNotice("");void load().catch(e=>setError(e.message));return()=>{loadSequence.current++;};},[section]);
   async function action(work: () => Promise<unknown>, message: string) {
+    if(actionLock.current)return;actionLock.current=true;
     setBusy(true);
     setError("");
     setNotice("");
@@ -73,58 +78,30 @@ export default function AssessmentAdminPage() {
     } catch (e: any) {
       setError(e.message);
     } finally {
-      setBusy(false);
+      setBusy(false);actionLock.current=false;
     }
   }
-  function importBank(e: FormEvent) {
-    e.preventDefault();
-    void action(
-      () =>
-        api("/admin/assessments/versions", {
-          method: "POST",
-          body: JSON.stringify(JSON.parse(json)),
-        }),
-      "Draft imported. It is unavailable to students until validated and published.",
-    );
+  function prepareImport() {
+    try {const parsed=JSON.parse(json);if(!parsed||typeof parsed!=="object"||Array.isArray(parsed))throw new Error("Use a JSON object.");setImportCandidate(parsed);setError("");return true;}
+    catch(e){setError(`Invalid question-bank JSON: ${e instanceof Error?e.message:"check its syntax"}`);return false;}
   }
   const inputClass =
     "w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-700 dark:bg-slate-900";
-  return (
-    <main className="min-h-screen bg-slate-50 p-4 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
-      <div className="mx-auto max-w-5xl space-y-7">
-        <Link
-          to="/admin-dashboard"
-          className="text-blue-700 underline dark:text-blue-300"
-        >
-          Back to Admin Dashboard
-        </Link>
-        <h1 className="text-2xl font-bold">
-          Assessment and trust administration
-        </h1>
-        <Link
-          to="/admin/integrity"
-          className="text-blue-700 underline dark:text-blue-300"
-        >
-          Review repeated-partner evidence
-        </Link>
-        {error && (
-          <p
-            role="alert"
-            className="rounded border border-red-400 p-3 text-red-700 dark:text-red-300"
-          >
-            {error}
-          </p>
-        )}
-        {notice && (
-          <p role="status" className="rounded border p-3">
-            {notice}
-          </p>
-        )}
-        <section className="space-y-4 rounded-2xl border bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
+  return <AdminShell title={section==="academic"?"Academic Configuration":section==="reports"?"Reports":"Assessment Management"}>
+    {["directory","import"].includes(section)&&<nav aria-label="Assessment workspace" className="admin-workspace-tabs flex flex-wrap gap-3 text-sm"><Link className="rounded-lg border border-blue-300 px-3 py-2 text-blue-700 dark:text-blue-300" aria-current={section==="directory"?"page":undefined} to="/admin/assessments">Question Bank Directory</Link><Link className="rounded-lg border border-blue-300 px-3 py-2 text-blue-700 dark:text-blue-300" aria-current={section==="import"?"page":undefined} to="/admin/assessments?section=import">Import Question Bank</Link></nav>}
+    {error&&<p role="alert" className="admin-error">{error}</p>}{notice&&<p role="status" className="admin-panel">{notice}</p>}
+    {loading?<p role="status" className="admin-panel">Loading administration records...</p>:!ready?<Button variant="outline" onClick={()=>void load().catch(e=>setError(e.message))}>Retry loading records</Button>:<>
+      {section==="directory"&&<AssessmentDirectory banks={banks} busy={busy} action={action}/>}
+      {section==="import"&&(        <section className="admin-panel space-y-4">
           <AdvancedAssessmentScope />
           <h2 className="text-xl font-semibold">
             Import a curated question bank
           </h2>
+          <p className="text-sm">The preset catalog contains 80 skills. Adding the catalog creates no question banks, approvals or assessment tiers.</p>
+          <AdminConfirm label="Initialize 80 Skill Presets" title="Initialize missing canonical skill records?" description="This idempotent setup adds or reuses canonical skills. It does not create banks, review approvals or tiers. Use only when catalog initialization is needed." disabled={busy} onConfirm={() => action(
+            () => api("/admin/skill-catalog/initialize", { method: "POST", body: "{}" }),
+            "Preset skills added or reused. Existing skills and assessment history were retained.",
+          )}/>
           <p className="text-sm">
             Basic versions use 10 equally weighted multiple-choice questions.
             Advanced versions use 5–10 applied scenario choices with predefined
@@ -152,7 +129,7 @@ export default function AssessmentAdminPage() {
               validator must verify this before publishing.
             </p>
           </details>
-          <form onSubmit={importBank} className="space-y-3">
+          <form onSubmit={e=>e.preventDefault()} className="space-y-3">
             <label htmlFor="bank-json" className="block font-semibold">
               Question bank JSON
             </label>
@@ -163,140 +140,18 @@ export default function AssessmentAdminPage() {
               onChange={(e) => setJson(e.target.value)}
               spellCheck={false}
             />
-            <Button disabled={busy}>Import Draft</Button>
+            <AdminConfirm label="Import Draft" disabled={busy} beforeOpen={prepareImport} title={`Import a draft for ${skills.find(s=>s.id===importCandidate?.skillId)?.name||importCandidate?.skillId||"the selected skill"} · ${importCandidate?.level||"level not supplied"}?`} description="Creates a new DRAFT version only. It is unavailable to students until a genuine review and separate publication. No existing version or question is overwritten." onConfirm={()=>action(()=>api("/admin/assessments/versions",{method:"POST",body:JSON.stringify(importCandidate)}),"Draft imported. It remains unavailable to students until validated and published.")}/>
           </form>
         </section>
-        <section className="space-y-4">
-          <h2 className="text-xl font-semibold">Banks and versions</h2>
-          {!banks.length && (
-            <p>
-              No question banks. Assessments remain unavailable until content is
-              validated and published.
-            </p>
-          )}
-          {banks.map((bank) => (
-            <article
-              key={bank.id}
-              className="space-y-4 rounded-xl border bg-white p-5 dark:border-slate-700 dark:bg-slate-900"
-            >
-              <h3 className="font-bold capitalize">
-                {bank.skill.name} · {bank.level}
-              </h3>
-              {bank.versions.map((v: any) => (
-                <div
-                  key={v.id}
-                  className="space-y-3 border-t pt-4 dark:border-slate-700"
-                >
-                  <p>
-                    Version {v.version}: {v.status} · {v.questionCount} items ·
-                    Pass {v.passingPercent}% · {v._count.attempts} attempts
-                  </p>
-                  <p className="whitespace-pre-wrap text-sm">
-                    Learning outcomes: {v.learningOutcomes}
-                  </p>
-                  <details>
-                    <summary className="cursor-pointer text-blue-700 dark:text-blue-300">
-                      Inspect private questions and grading
-                    </summary>
-                    <pre className="max-h-96 overflow-auto whitespace-pre-wrap break-words rounded bg-slate-100 p-3 text-xs dark:bg-slate-800">
-                      {JSON.stringify(v.items, null, 2)}
-                    </pre>
-                  </details>
-                  {v.status === "DRAFT" && (
-                    <>
-                      <label
-                        className="block text-sm"
-                        htmlFor={`notes-${v.id}`}
-                      >
-                        Validation notes: competency coverage, correctness,
-                        applied format, and grading fairness
-                      </label>
-                      <textarea
-                        id={`notes-${v.id}`}
-                        className={inputClass}
-                        value={notes[v.id] || ""}
-                        onChange={(e) =>
-                          setNotes((n) => ({ ...n, [v.id]: e.target.value }))
-                        }
-                      />
-                      <div className="flex flex-wrap gap-3">
-                        <Button
-                          disabled={busy || !notes[v.id]?.trim()}
-                          variant="outline"
-                          onClick={() =>
-                            void action(
-                              () =>
-                                api(
-                                  `/admin/assessments/versions/${v.id}/validate`,
-                                  {
-                                    method: "POST",
-                                    body: JSON.stringify({
-                                      validationNotes: notes[v.id],
-                                    }),
-                                  },
-                                ),
-                              "Human validation recorded.",
-                            )
-                          }
-                        >
-                          Record Human Validation
-                        </Button>
-                        <Button
-                          disabled={busy || !v.validatedAt}
-                          onClick={() => {
-                            if (
-                              window.confirm(
-                                "Publish this reviewed version for students? Existing attempts retain their previous version.",
-                              )
-                            )
-                              void action(
-                                () =>
-                                  api(
-                                    `/admin/assessments/versions/${v.id}/publish`,
-                                    { method: "POST", body: "{}" },
-                                  ),
-                                "Version published.",
-                              );
-                          }}
-                        >
-                          Publish Version
-                        </Button>
-                      </div>
-                    </>
-                  )}
-                  {v.status === "PUBLISHED" && (
-                    <Button
-                      disabled={busy}
-                      variant="outline"
-                      onClick={() =>
-                        void action(
-                          () =>
-                            api(`/admin/assessments/versions/${v.id}/retire`, {
-                              method: "POST",
-                              body: "{}",
-                            }),
-                          "Version retired for new attempts.",
-                        )
-                      }
-                    >
-                      Retire Version
-                    </Button>
-                  )}
-                  {v.validationNotes && (
-                    <p className="text-sm">Validation: {v.validationNotes}</p>
-                  )}
-                </div>
-              ))}
-            </article>
-          ))}
-        </section>
-        <section className="space-y-4 rounded-2xl border bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
+)}
+      {section==="academic"&&<div className="space-y-5">        <section className="admin-panel space-y-4">
           <h2 className="text-xl font-semibold">Official academic options</h2>
           <p className="text-sm">
             Use the institution's approved department and year-level names and
             stable codes. Empty lists remain unavailable rather than receiving
             guessed values.
           </p>
+          <details className="rounded-xl border border-slate-200 p-4 dark:border-slate-700"><summary className="cursor-pointer font-semibold">Add an academic option</summary>
           <form
             className="grid gap-3 sm:grid-cols-2"
             onSubmit={(e) => {
@@ -367,15 +222,16 @@ export default function AssessmentAdminPage() {
             )}
             <Button disabled={busy}>Add Official Option</Button>
           </form>
+          </details>
         </section>
-        <section className="space-y-4 rounded-2xl border bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
+        <section className="admin-panel space-y-4">
           <h2 className="text-xl font-semibold">
             College programs and department mapping
           </h2>
           <p className="text-sm">
-            The team supplied a provisional mapping for all 13 programs across
-            nine colleges. Drafts are excluded from WRMR until campus-specific
-            evidence is recorded.
+            Review the stored department mapping and permitted years for each
+            program. Recorded validation and provisional status are shown
+            separately; the original team draft is available below.
           </p>
           {academicData.provisionalDraft && (
             <details>
@@ -434,18 +290,25 @@ export default function AssessmentAdminPage() {
           >
             Initialize Team-Approved Programs
           </Button>
-          <ul className="text-sm">
-            {academicData.programs.map((p) => (
-              <li key={p.id}>
-                {p.label} · {p.yearLevels.map((y: any) => y.name).join(", ")} ·{" "}
-                {p.mappingValidatedAt
-                  ? p.department?.name
-                  : p.department
-                    ? `${p.department.name} (provisional; excluded from WRMR)`
-                    : "Department mapping pending"}
-              </li>
-            ))}
-          </ul>
+          <label className="block text-sm">Search academic programs<input type="search" value={programSearch} onChange={e=>setProgramSearch(e.target.value)}/></label>
+          <div className="admin-scroll" tabIndex={0} aria-label="Scrollable academic program directory">
+            <table className="admin-table admin-academic-table">
+              <caption className="sr-only">Academic program directory</caption>
+              <thead><tr><th>Program</th><th>College / department</th><th>Allowed years</th><th>Stored mapping status</th><th>Evidence</th></tr></thead>
+              <tbody>{academicData.programs.filter(p=>`${p.code} ${p.label} ${p.department?.name||""}`.toLowerCase().includes(programSearch.toLowerCase())).map(p=><tr key={p.id}>
+                <td><strong>{p.label}</strong></td>
+                <td>{p.department?.name||"Not assigned"}</td>
+                <td>{p.yearLevels.map((y:any)=>y.name).join(", ")||"Not configured"}</td>
+                <td><AdminStatus status={p.mappingValidatedAt?"Validation recorded":p.department?"Provisional":"Not recorded"}/>{!p.mappingValidatedAt&&<p className="admin-record-caption">Excluded from WRMR</p>}</td>
+                <td><details className="admin-mapping-evidence"><summary aria-label={`Stored mapping evidence for ${p.label}`}>View details</summary>
+                  <p className="mt-3">{p.mappingValidatedAt?`Validation recorded: ${new Date(p.mappingValidatedAt).toLocaleString()}`:"No official validation recorded"}</p>
+                  <p className="mt-2">Mapping version {p.mappingVersion} · Reviewer ID {p.mappingValidatedById||"not recorded"}</p>
+                  <pre className="mt-3">{p.mappingNotes||"No mapping evidence supplied."}</pre>
+                </details></td>
+              </tr>)}</tbody>
+            </table>
+          </div>
+          <details className="rounded-xl border border-slate-200 p-4 dark:border-slate-700"><summary className="cursor-pointer font-semibold">Update a program department mapping</summary>
           <form
             className="space-y-3"
             onSubmit={(e) => {
@@ -496,7 +359,7 @@ export default function AssessmentAdminPage() {
                 }
               >
                 <option value="">Select confirmed department</option>
-                {academicData.departments.map((d) => (
+                {academicData.departments.filter((d) => d.isActive !== false).map((d) => (
                   <option key={d.id} value={d.id}>
                     {d.name}
                   </option>
@@ -562,6 +425,9 @@ export default function AssessmentAdminPage() {
               Save as Provisional
             </Button>
           </form>
+          </details>
+          <p className="text-sm text-slate-600 dark:text-slate-300">BSIT, BSIHM-CA and BSIHM-HACLO intentionally remain first-year-only. Viewing this workspace does not change mappings or year levels; changes require the existing approval process.</p>
+          <details className="rounded-xl border border-slate-200 p-4 dark:border-slate-700"><summary className="cursor-pointer font-semibold">Configure permitted program year levels</summary>
           <form
             className="space-y-3 border-t pt-4"
             onSubmit={(e) => {
@@ -626,90 +492,10 @@ export default function AssessmentAdminPage() {
             </div>
             <Button disabled={busy}>Save Program Year Levels</Button>
           </form>
+          </details>
         </section>
-        <section className="space-y-4">
-          <h2 className="text-xl font-semibold">Student reports</h2>
-          {!reports.length && <p>No reports.</p>}
-          {reports.map((r) => (
-            <article
-              key={r.id}
-              className="space-y-3 rounded-xl border bg-white p-5 dark:border-slate-700 dark:bg-slate-900"
-            >
-              <p>
-                {r.reporter.name} reported{" "}
-                <Link
-                  className="text-blue-700 underline"
-                  to={`/students/${r.target.id}`}
-                >
-                  {r.target.name}
-                </Link>
-                : {r.reason} · {r.status}
-              </p>
-              <p className="whitespace-pre-wrap">{r.description}</p>
-              {r.status === "PENDING" && (
-                <>
-                  <label className="block" htmlFor={`report-${r.id}`}>
-                    Resolution notes
-                  </label>
-                  <textarea
-                    id={`report-${r.id}`}
-                    className={inputClass}
-                    value={notes[r.id] || ""}
-                    onChange={(e) =>
-                      setNotes((n) => ({ ...n, [r.id]: e.target.value }))
-                    }
-                  />
-                  <div className="flex flex-wrap gap-3">
-                    {["RESOLVED", "DISMISSED"].map((status) => (
-                      <Button
-                        key={status}
-                        disabled={busy || !notes[r.id]?.trim()}
-                        variant="outline"
-                        onClick={() =>
-                          void action(
-                            () =>
-                              api(`/admin/reports/${r.id}`, {
-                                method: "PATCH",
-                                body: JSON.stringify({
-                                  status,
-                                  resolution: notes[r.id],
-                                }),
-                              }),
-                            "Report updated.",
-                          )
-                        }
-                      >
-                        {status === "RESOLVED" ? "Resolve" : "Dismiss"}
-                      </Button>
-                    ))}
-                    <Button
-                      disabled={busy}
-                      variant="destructive"
-                      onClick={() => {
-                        if (
-                          window.confirm(
-                            "Suspend this student's access while retaining their records?",
-                          )
-                        )
-                          void action(
-                            () =>
-                              api(`/admin/users/${r.target.id}`, {
-                                method: "DELETE",
-                              }),
-                            "Student suspended.",
-                          );
-                      }}
-                    >
-                      Suspend Student
-                    </Button>
-                  </div>
-                </>
-              )}
-              {r.resolution && <p>Resolution: {r.resolution}</p>}
-            </article>
-          ))}
-        </section>
-      </div>
-    </main>
-  );
+</div>}
+      {section==="reports"&&<AdminReports reports={reports} busy={busy} action={action}/>}
+    </>}
+  </AdminShell>;
 }

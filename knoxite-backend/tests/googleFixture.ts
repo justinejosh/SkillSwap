@@ -1,6 +1,7 @@
 import { loadConfig } from "../lib/config";
 export function googleTestEnvironment() {
   return {
+    REGISTRATION_CONSENT_ENABLED: "true", REGISTRATION_NOTICE_VERSION: "DRAFT_TEST_NOTICE_v1",
     JWT_SECRET: "synthetic-google-test-key-".repeat(3),
     INSTITUTION_EMAIL_DOMAINS: "fixture.example",
     CAMPUS_EMAIL_SUFFIX: "lag",

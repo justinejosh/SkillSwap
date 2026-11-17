@@ -4,13 +4,16 @@ import {
 } from "../services/academics";
 import { PrismaClient } from "@prisma/client";
 import express, { RequestHandler } from "express";
+import { registrationPolicy, requireRegistrationConsent, recordRegistrationConsent } from "../services/registrationConsent";
 import bcrypt from "bcrypt";
 import { createHash, createHmac, randomBytes } from "node:crypto";
-import { AppConfig, studentEmailAllowed } from "../lib/config";
+import { AppConfig, studentEmailAllowed, pilotAccountAllowed } from "../lib/config";
 import { HttpError, onlyKeys, text } from "../lib/http";
 import { actor, authentication } from "../middleware/authMiddleware";
 import { VerificationMailer } from "../services/email";
 import { issueSession, assertAccountAllowed } from "../services/authSessions";
+import { loginThrottle } from "../lib/loginThrottle";
+import { lastInteraction, sessionDeadlines, SESSION_POLICY, timeoutsEnabled } from "../services/sessionPolicy";
 
 function password(value: unknown): string {
   if (
@@ -71,7 +74,6 @@ export function authRouter(
       req.method === "POST" &&
       [
         "/register",
-        "/login",
         "/request-verification",
         "/verify-email",
         "/password",
@@ -83,7 +85,7 @@ export function authRouter(
     next();
   });
   router.get("/academic-options", async (_req, res) => {
-    res.json(await academicOptions(db));
+    res.json({ ...await academicOptions(db), registrationPolicy: registrationPolicy(config) });
   });
   const emailDeliveryAvailable = () => mailer.isConfigured?.() ?? true;
   function requireDelivery() {
@@ -140,7 +142,10 @@ export function authRouter(
       "password",
       "programId",
       "yearLevelId",
+      "termsAccepted",
+      "noticeVersion",
     ]);
+    const consentVersion = requireRegistrationConsent(req.body.termsAccepted, req.body.noticeVersion, config);
     const name = text(req.body.name, "Name", 100);
     const email = emailAddress(req.body.email);
     const programId = text(req.body.programId, "College program");
@@ -154,17 +159,25 @@ export function authRouter(
     if (!studentEmailAllowed(email, config))
       throw new HttpError(
         422,
-        "Use your OLFU Santa Rosa institutional email with the configured campus identifier before @.",
+        config.institutionDomains.includes("student.fatima.edu.ph")
+          ? "Use your university-issued email in the confirmed initials/surname/four-digit Laguna format. Contact the administrator for an eligibility review if your issued address differs."
+          : "Use your OLFU Santa Rosa institutional email with the configured campus identifier before @.",
       );
+    if (!pilotAccountAllowed(email, config))
+      throw new HttpError(403, "This account is not authorized for the local OAuth pilot.");
     const passwordHash = await bcrypt.hash(password(req.body.password), 12);
     if (await db.user.findUnique({ where: { email }, select: { id: true } }))
       throw new HttpError(
         409,
         "This email is registered. Sign in or request email verification.",
       );
-    const user = await db.user.create({
+    const user = await db.$transaction(async tx => {
+      const saved = await tx.user.create({
       data: { name, email, passwordHash, programId, yearLevelId },
       select: { id: true, email: true },
+      });
+      await recordRegistrationConsent(tx, saved.id, consentVersion);
+      return saved;
     });
     let verificationSent = false;
     try {
@@ -319,7 +332,7 @@ export function authRouter(
     });
     res.json({ message: "Email verified. You can now sign in." });
   });
-  router.post("/login", async (req, res) => {
+  router.post("/login", loginThrottle(), async (req, res) => {
     onlyKeys(req.body, ["email", "password"]);
     const email = emailAddress(req.body.email);
     if (
@@ -348,6 +361,37 @@ export function authRouter(
       );
     });
     res.json(result);
+  });
+  router.get("/session-status", auth, (req, res) => {
+    res.json(req.sessionTiming ?? { enabled: false });
+  });
+  router.post("/session-activity", auth, async (req, res) => {
+    if (!timeoutsEnabled(config)) throw new HttpError(404, "Session activity is not enabled.");
+    if (!config.origins.includes(req.get("Origin") || ""))
+      throw new HttpError(403, "Use the configured Knoxite application.");
+    onlyKeys(req.body, ["interaction"]);
+    if (!["pointer", "key", "touch", "scroll", "stay"].includes(req.body.interaction))
+      throw new HttpError(422, "Explicit user interaction is required.");
+    const timing = await db.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM User WHERE id = ${actor(req)} FOR UPDATE`;
+      await tx.$queryRaw`SELECT id FROM AuthSession WHERE id = ${req.sessionId!} FOR UPDATE`;
+      const session = await tx.authSession.findFirst({
+        where: { id: req.sessionId!, userId: actor(req), revokedAt: null },
+        select: { createdAt: true, expiresAt: true, user: { select: {
+          role: true, email: true, isSuspended: true, emailVerifiedAt: true, tokenVersion: true,
+        } } },
+      });
+      if (!session || session.user.tokenVersion !== req.sessionTokenVersion)
+        throw new HttpError(401, "Session has been revoked.");
+      assertAccountAllowed(session.user, config);
+      const now = new Date();
+      const claims = { sessionPolicy: SESSION_POLICY, sessionRole: req.sessionIssuedRole };
+      sessionDeadlines(session, session.user.role, claims, await lastInteraction(tx, req.sessionId!), now);
+      await tx.$executeRaw`UPDATE AuthSession SET lastInteractiveAt = ${now}
+        WHERE id = ${req.sessionId!} AND revokedAt IS NULL`;
+      return sessionDeadlines(session, session.user.role, claims, now, now);
+    });
+    res.json(timing);
   });
   router.get("/sessions", auth, async (req, res) => {
     const sessions = await db.authSession.findMany({

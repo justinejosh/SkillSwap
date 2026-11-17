@@ -4,11 +4,11 @@ import { once } from "node:events";
 import { PrismaClient } from "@prisma/client";
 import { createApp } from "../../app";
 import { loadConfig } from "../../lib/config";
-import { requireLocalDatabase } from "../../scripts/safeDatabase";
+import { requireOwnedFixtureDatabase } from "./fixtureDatabase";
 import { seedAcademicCatalog } from "../../services/academics";
 
 test("isolated academic catalog initialization returns real IDs without changing student records", async () => {
-  const url = requireLocalDatabase();
+  const url = requireOwnedFixtureDatabase();
   assert.match(new URL(url).pathname, /_test$/);
   const db = new PrismaClient({ datasources: { db: { url } } });
   const config = loadConfig({
@@ -38,7 +38,9 @@ test("isolated academic catalog initialization returns real IDs without changing
     assert.equal(body.programs.length, 13);
     assert.equal(body.yearLevels.length, 4);
     for (const program of body.programs) {
-      assert.equal(program.yearLevels.length, 4);
+      const restricted=["BSIT","BSIHM-CA","BSIHM-HACLO"].includes(program.code);
+      assert.equal(program.yearLevels.length, restricted?1:4);
+      if(restricted)assert.equal(program.yearLevels[0].code,"YEAR_1");
       assert.equal(program.department, null);
       assert.ok(await db.program.findUnique({ where: { id: program.id } }));
     }

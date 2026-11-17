@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { Button } from "@/app/components/ui/button";
-import { Input } from "@/app/components/ui/input";
 import { Label } from "@/app/components/ui/label";
 import {
   Dialog,
@@ -31,6 +30,7 @@ import {
   AssessmentLegend,
 } from "@/app/components/AssessmentBadge";
 import { AssessmentPrompt } from "@/app/components/AssessmentPrompt";
+import { SkillPresetInput } from "@/app/components/SkillPresetInput";
 
 export default function MySkillsPage() {
   const navigate = useNavigate();
@@ -45,11 +45,13 @@ export default function MySkillsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [newSkillName, setNewSkillName] = useState("");
   const [newSkillCategory, setNewSkillCategory] = useState("technology");
+  const [selectedPresetKey, setSelectedPresetKey] = useState<string>();
   const [activeTab, setActiveTab] = useState<"offered" | "wanted">("offered");
 
   useEffect(() => {
     fetchMySkills();
   }, []);
+  useEffect(() => { if (isAddSkillOpen) setSelectedPresetKey(undefined); }, [isAddSkillOpen]);
 
   const fetchMySkills = async () => {
     try {
@@ -64,20 +66,19 @@ export default function MySkillsPage() {
   };
   const handleAddSkill = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newSkillName.trim() || saving) return;
+    if (saving) return;
+    if (!selectedPresetKey) { setError("Choose a predefined skill before saving."); return; }
     setSaving(true);
     setError("");
     setNotice("");
     try {
       const saved = await api(`/profile/skills/${skillType}`, {
         method: "POST",
-        body: JSON.stringify({
-          name: newSkillName,
-          category: newSkillCategory,
-        }),
+        body: JSON.stringify({ presetKey: selectedPresetKey }),
       });
       setIsAddSkillOpen(false);
       setNewSkillName("");
+      setSelectedPresetKey(undefined);
       await fetchMySkills();
       if (
         skillType === "offer" &&
@@ -194,26 +195,26 @@ export default function MySkillsPage() {
           </div>
 
           <Dialog open={isAddSkillOpen} onOpenChange={setIsAddSkillOpen}>
-            <DialogContent className="max-w-[95vw] sm:max-w-md rounded-3xl p-6 border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">
+            <DialogContent className="max-w-[95vw] sm:max-w-md max-h-[90dvh] overflow-y-auto rounded-3xl p-6 border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">
               <DialogHeader className="space-y-1">
                 <DialogTitle className="text-xl font-black text-slate-900 dark:text-white">
                   Add New Skill
                 </DialogTitle>
                 <DialogDescription className="text-xs text-slate-500 dark:text-slate-400">
-                  Expand your trading matrix to get better matches.
+                  Add a skill you can teach or want to learn.
                 </DialogDescription>
               </DialogHeader>
 
               <form className="space-y-4 mt-2" onSubmit={handleAddSkill}>
                 <div className="space-y-1.5">
-                  <Label className="text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">
+                  <Label htmlFor="skill-direction" className="text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">
                     Exchange Direction
                   </Label>
                   <Select
                     value={skillType}
                     onValueChange={(val: any) => setSkillType(val)}
                   >
-                    <SelectTrigger className="border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 h-11 rounded-xl text-sm">
+                    <SelectTrigger id="skill-direction" className="border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 h-11 rounded-xl text-sm">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100">
@@ -228,27 +229,18 @@ export default function MySkillsPage() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label className="text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">
-                    Skill Name
-                  </Label>
-                  <Input
-                    placeholder="e.g., UI Design, SQL, Python..."
-                    value={newSkillName}
-                    onChange={(e) => setNewSkillName(e.target.value)}
-                    required
-                    className="border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 h-11 rounded-xl text-sm focus-visible:ring-blue-600"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label className="text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">
+                  <Label htmlFor="skill-category" className="text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">
                     Domain Category
                   </Label>
                   <Select
                     value={newSkillCategory}
-                    onValueChange={setNewSkillCategory}
+                    onValueChange={(category) => {
+                      setNewSkillCategory(category);
+                      if (selectedPresetKey) setNewSkillName("");
+                      setSelectedPresetKey(undefined);
+                    }}
                   >
-                    <SelectTrigger className="border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 h-11 rounded-xl text-sm">
+                    <SelectTrigger id="skill-category" className="border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 h-11 rounded-xl text-sm">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100">
@@ -261,13 +253,16 @@ export default function MySkillsPage() {
                   </Select>
                 </div>
 
+                <SkillPresetInput value={newSkillName} category={newSkillCategory}
+                  onChange={(name, category, key) => { setNewSkillName(name); setNewSkillCategory(category); setSelectedPresetKey(key); }} />
+
                 {error && (
                   <p role="alert" className="text-sm text-red-700">
                     {error}
                   </p>
                 )}
                 <Button
-                  disabled={saving}
+                  disabled={saving || !selectedPresetKey}
                   type="submit"
                   className="w-full bg-blue-600 hover:bg-blue-700 h-11 font-bold text-xs text-white rounded-xl shadow-md shadow-blue-600/20 mt-2"
                 >
@@ -416,6 +411,7 @@ function SkillCard({
 }) {
   const isBlue = variant === "blue";
   const navigate = useNavigate();
+  const activeAttemptId = skill.tier === "AMATEUR" ? skill.activeAdvancedAttemptId : skill.activeBasicAttemptId;
 
   return (
     <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/90 dark:border-slate-800 p-5 shadow-xs hover:shadow-md hover:border-slate-300 dark:hover:border-slate-700 transition-all flex flex-wrap items-center justify-between gap-4">
@@ -450,17 +446,17 @@ function SkillCard({
         <div className="flex min-w-0 flex-col items-start gap-2">
           <AssessmentBadge tier={skill.tier} />
           {skill.tier !== "VERIFIED" &&
-          (skill.tier === "AMATEUR"
+          (activeAttemptId || (skill.tier === "AMATEUR"
             ? skill.advancedAvailable
-            : skill.basicAvailable) ? (
+            : skill.basicAvailable)) ? (
             <Button
               size="sm"
               variant="outline"
               onClick={() =>
-                navigate(`/assessments/offerings/${skill.offeringId}`)
+                navigate(activeAttemptId ? `/assessments/${activeAttemptId}` : `/assessments/offerings/${skill.offeringId}`)
               }
             >
-              {skill.tier === "AMATEUR"
+              {activeAttemptId ? "Resume Assessment" : skill.tier === "AMATEUR"
                 ? "Upgrade to Verified"
                 : "Take Assessment"}
             </Button>
@@ -469,7 +465,7 @@ function SkillCard({
               <p className="text-xs text-slate-500 dark:text-slate-300">
                 {skill.tier === "AMATEUR"
                   ? "Advanced assessment unavailable"
-                  : "Assessment unavailable"}
+                  : "Assessment Unavailable"}
               </p>
             )
           )}

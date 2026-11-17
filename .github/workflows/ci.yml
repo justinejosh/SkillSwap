@@ -5,22 +5,9 @@ permissions:
 jobs:
   backend:
     runs-on: ubuntu-latest
-    services:
-      mysql:
-        image: mysql:8.4
-        env:
-          MYSQL_ROOT_PASSWORD: synthetic-ci-password
-          MYSQL_DATABASE: knoxite_test
-        ports: ["3306:3306"]
-        options: >-
-          --health-cmd="mysqladmin ping -h localhost -psynthetic-ci-password --silent"
-          --health-interval=10s --health-timeout=5s --health-retries=12
     defaults:
       run:
         working-directory: knoxite-backend
-    env:
-      DATABASE_URL: mysql://root:synthetic-ci-password@127.0.0.1:3306/knoxite_test
-      KNOXITE_LOCAL_DATABASE_ACK: local-synthetic-or-sanitized
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -31,10 +18,22 @@ jobs:
       - run: npm ci --ignore-scripts
       - run: npm run db:generate
       - run: npm run typecheck
+      - name: Restore private assessment QA inputs
+        run: node development/ciAssessmentContent.cjs restore
+        env:
+          KNOXITE_QA_PART1: ${{ secrets.KNOXITE_QA_PART1 }}
+          KNOXITE_QA_PART2: ${{ secrets.KNOXITE_QA_PART2 }}
+          KNOXITE_QA_SHA256: ${{ secrets.KNOXITE_QA_SHA256 }}
       - run: npm test
-      - run: npm run db:bootstrap
-      - run: npm run test:integration
+      # Runner creates ownership-labelled tmpfs MySQL on random loopback ports,
+      # generates private credentials, and applies ONLY prisma/release migrations.
+      # Every integration file gets its own fresh database, removed in finally.
+      - run: docker pull mysql:8.4
+      - run: node development/ciIntegration.cjs
       - run: npm audit --audit-level=moderate
+      - name: Remove owned private QA inputs
+        if: always()
+        run: node development/ciAssessmentContent.cjs cleanup
   frontend:
     runs-on: ubuntu-latest
     env:

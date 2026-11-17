@@ -1,3 +1,4 @@
+import { authenticatedFetch } from "@/app/lib/api";
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router";
 import { Button } from "@/app/components/ui/button";
@@ -28,7 +29,7 @@ export default function CommunityForumPage() {
 
   const fetchPosts = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/forum/posts`);
+      const response = await authenticatedFetch(`${API_BASE_URL}/forum/posts`);
       if (response.ok) {
         const data = await response.json();
         setPosts(data);
@@ -45,7 +46,7 @@ export default function CommunityForumPage() {
     const token = localStorage.getItem("knoxite_token");
 
     try {
-      const response = await fetch(`${API_BASE_URL}/forum/posts`, {
+      const response = await authenticatedFetch(`${API_BASE_URL}/forum/posts`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

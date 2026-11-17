@@ -10,6 +10,7 @@ const draftDepartments = JSON.parse(
     "utf8",
   ),
 );
+const skillPresets = JSON.parse(readFileSync(resolve("knoxite-backend/config/skill-catalog.json"), "utf8")).skills;
 async function fixture(page: Page, initialTier = "NOT_ASSESSED") {
   const state = {
     tier: initialTier,
@@ -140,15 +141,17 @@ async function fixture(page: Page, initialTier = "NOT_ASSESSED") {
     const body = route.request().postDataJSON();
     let data: any = {};
     if (path === "/profile") data = profile();
+    else if (path === "/profile/skill-catalog") data = { presets: skillPresets.map((p: any) => ({ ...p, skillId: `canonical-${p.key}` })) };
     else if (path.endsWith("academic-options"))
-      data = { programs, yearLevels: programs[0].yearLevels };
+      data = { programs, yearLevels: programs[0].yearLevels,registrationPolicy:{available:true,noticeVersion:"DRAFT_CI_NOTICE_v1",approved:false} };
     else if (path === "/profile/skills/offer" && method === "POST") {
-      const supported = body.name === "Fixture Supported";
+      const selected = skillPresets.find((p: any) => p.key === body.presetKey);
+      const supported = selected?.name === "Python Programming Fundamentals";
       const skill = {
         id: "skill",
         offeringId: "offering",
-        name: body.name,
-        category: body.category,
+        name: selected.name,
+        category: selected.category,
         tier: state.tier,
         basicAvailable: supported,
         advancedAvailable: supported,
@@ -239,7 +242,8 @@ async function fixture(page: Page, initialTier = "NOT_ASSESSED") {
 }
 async function addSkill(page: Page, name: string) {
   await page.getByRole("button", { name: "+ Add Skill", exact: true }).click();
-  await page.getByPlaceholder("e.g., UI Design, SQL, Python...").fill(name);
+  await page.getByLabel("Choose a Skill", { exact: true }).fill(name);
+  await page.getByRole("option", { name, exact: true }).click();
   await page.getByRole("button", { name: "Save Skill", exact: true }).click();
 }
 test("saving a supported offering precedes a persistent skip confirmation", async ({
@@ -247,7 +251,7 @@ test("saving a supported offering precedes a persistent skip confirmation", asyn
 }) => {
   const state = await fixture(page);
   await page.goto("/my-skills");
-  await addSkill(page, "Fixture Supported");
+  await addSkill(page, "Python Programming Fundamentals");
   await expect(page.getByRole("dialog")).toContainText(
     "Your teaching skill is saved",
   );
@@ -275,7 +279,7 @@ test("unsupported teaching skills remain available without invented assessments"
 }) => {
   await fixture(page);
   await page.goto("/my-skills");
-  await addSkill(page, "Unsupported fixture skill");
+  await addSkill(page, "SQL Fundamentals");
   await expect(page.getByRole("status")).toContainText(
     "Assessment is unavailable",
   );
@@ -576,25 +580,73 @@ test("mixed cohorts keep unranked matches in a separate visible group without as
     page.getByRole("region", { name: "Matches awaiting enough evidence (1)" }),
   ).toBeVisible();
   await expect(
-    page.getByRole("region", { name: "Matches with WRMR scores (1)" }),
+    page.getByRole("region", { name: "Ranked Matches (1)" }),
   ).toBeVisible();
   await expect(
     page.getByRole("link", { name: "Awaiting evidence (1)", exact: true }),
   ).toBeVisible();
   await expect(
-    page.getByRole("link", { name: "With WRMR scores (1)", exact: true }),
+    page.getByRole("link", { name: "Ranked Matches (1)", exact: true }),
   ).toBeVisible();
   const unranked = page.getByRole("article", {
     name: "Synthetic Peer reciprocal match",
     exact: true,
   });
   await expect(unranked.getByText("Unranked", { exact: true })).toBeVisible();
-  await expect(unranked).not.toContainText("0.0% WRMR");
-  await expect(page.getByText("81.0% WRMR", { exact: true })).toBeVisible();
+  await expect(unranked).not.toContainText("% Match Score");
+  await expect(page.getByText("81.0% Match Score", { exact: true })).toBeVisible();
   expect(
     await page.getByRole("article").first().getAttribute("aria-label"),
   ).toBe("Synthetic Peer reciprocal match");
 });
+
+for (const path of ["/dashboard", "/knox-hub"]) {
+  test(`match scores show percentages of the maximum with transparent one-partner evidence at ${path}`, async ({ page }) => {
+    const state = await fixture(page);
+    await page.addInitScript(() => localStorage.setItem("knoxite_onboarding_completed", "true"));
+    state.matches.push(...[
+      ["B", 4.8, 0.95, 0.8, 92.5], ["D", 5, 1, 0.6, 92], ["C", 4.2, 0.8, 1, 86],
+    ].map(([name, rating, completion, proximity, score]) => ({
+      ...unrankedPeer(`fixture-${name}`, `User ${name}`), matchScore: score,
+      matchDetails: { averageRating: rating, completionRate: completion, ratingCount: 1,
+        uniqueRatingPartners: 1, proximity: { value: proximity, reason: "Synthetic academic fixture." }, missing: [] },
+    })), unrankedPeer());
+    await page.goto(path);
+    const scored = page.getByRole("region", { name: "Ranked Matches (3)", exact: true });
+    await expect(scored.getByRole("article")).toHaveCount(3);
+    await expect(scored.getByRole("article").getByRole("heading", { level: 3 })).toHaveText(["User B", "User D", "User C"]);
+    for (const label of ["92.5% Match Score", "92.0% Match Score", "86.0% Match Score"])
+      await expect(scored.getByText(label, { exact: true })).toBeVisible();
+    await expect(page.locator("main")).not.toContainText("WRMR");
+    const first = scored.getByRole("article").first();
+    await expect(first).toContainText("Peer rating:");
+    await scored.getByText("How match scores work", { exact: true }).click();
+    await expect(scored).toContainText("peer ratings (50%), completion (30%), and academic similarity (20%)");
+    await expect(scored).toContainText("maximum 100-point ranking score");
+    await expect(scored).toContainText("not a probability of swap success");
+    await expect(first).toContainText("Limited evidence: peer feedback comes from one partner.");
+    await expect(first.getByRole("button", { name: "Request Swap", exact: true })).toBeEnabled();
+    const unranked = page.getByRole("region", { name: "Matches awaiting enough evidence (1)", exact: true });
+    await expect(unranked).not.toContainText("% Match Score");
+    await expect(unranked.getByRole("button", { name: "Request Swap", exact: true })).toBeEnabled();
+  });
+  test(`match score rounding and missing values remain distinct at ${path}`, async ({ page }) => {
+    const state = await fixture(page);
+    await page.addInitScript(() => localStorage.setItem("knoxite_onboarding_completed", "true"));
+    state.matches.push(...[100, 88.76, 88.7, 0, null].map((score, i) => ({
+      ...unrankedPeer(`format-${i}`, `Formatting Peer ${i}`), matchScore: score,
+    })));
+    await page.goto(path);
+    const ranked = page.getByRole("region", { name: "Ranked Matches (4)", exact: true });
+    await expect(ranked.getByRole("article").getByRole("heading", { level: 3 })).toHaveText(["Formatting Peer 0", "Formatting Peer 1", "Formatting Peer 2", "Formatting Peer 3"]);
+    for (const label of ["100.0% Match Score", "88.8% Match Score", "88.7% Match Score", "0.0% Match Score"])
+      await expect(ranked.getByText(label, { exact: true })).toBeVisible();
+    const unranked = page.getByRole("article", { name: "Formatting Peer 4 reciprocal match", exact: true });
+    await expect(unranked.getByText("Unranked", { exact: true })).toBeVisible();
+    await expect(unranked).not.toContainText("% Match Score");
+    await expect(unranked.getByRole("button", { name: "Request Swap", exact: true })).toBeEnabled();
+  });
+}
 
 test("leaderboard eligibility explains two distinct partners without restricting matches", async ({
   page,
@@ -608,6 +660,8 @@ test("leaderboard eligibility explains two distinct partners without restricting
           eligible: false,
           reasons: [
             "Complete exchanges with at least two distinct partners for leaderboard eligibility.",
+            "Complete exchanges with at least two distinct partners for leaderboard eligibility.",
+            "No validated peer rating is available.",
           ],
         },
       },
@@ -618,6 +672,8 @@ test("leaderboard eligibility explains two distinct partners without restricting
   );
   await page.goto("/leaderboard");
   await expect(page.getByRole("status")).toContainText("two distinct partners");
+  await expect(page.getByRole("status")).toContainText("No validated peer rating is available.");
+  expect((await page.getByRole("status").innerText()).match(/Complete exchanges/g)).toHaveLength(1);
   await expect(page.getByRole("status")).toContainText("request swaps");
   await expect(page.getByText("No mentors ranked yet.")).toBeVisible();
   await expect(page.getByText("Your Standing", { exact: true })).toHaveCount(0);
@@ -700,7 +756,10 @@ test("public portfolios identify provisional colleges without presenting validat
     page.getByText("Proposed college: College of Computer Studies.", {
       exact: false,
     }),
-  ).toContainText("does not contribute to WRMR proximity");
+  ).toContainText("does not contribute to academic similarity in match scores");
+  await page.getByText("About peer ratings and exchange statistics", { exact: true }).click();
+  await expect(page.locator("main")).not.toContainText("WRMR");
+  await expect(page.locator("main")).toContainText("not a probability of swap success");
   await expect(
     page.getByText("Department unavailable", { exact: false }),
   ).toBeVisible();
@@ -750,7 +809,7 @@ test("administrators import the provisional mapping without assigning official v
         : [],
     });
   });
-  await page.goto("/admin/assessments");
+  await page.goto("/admin/assessments?section=academic");
   await page
     .getByText("Review the team's provisional mapping", { exact: true })
     .click();
@@ -771,6 +830,25 @@ test("administrators import the provisional mapping without assigning official v
   expect(mutations).toEqual([
     "/api/admin/academic-programs/provisional-mapping",
   ]);
+});
+
+test("archived duplicate colleges are excluded from the official department selector", async ({ page }) => {
+  await fixture(page);
+  await page.route("**/api/profile", (route) => route.fulfill({ json: { id: "owner", name: "Synthetic Admin", role: "ADMIN" } }));
+  await page.route("**/api/admin/**", (route) => route.fulfill({
+    json: new URL(route.request().url()).pathname.endsWith("/academic-programs") ? {
+      programs: [], yearLevels: [], departments: [
+        { id: "cas", code: "CAS", name: "College of Arts and Sciences", isActive: true },
+        { id: "old-cas", code: "COLLEGE_ARTS_SCIENCES", name: "College of Arts and Sciences", isActive: false },
+        { id: "ccs", code: "CCS", name: "College of Computer Studies", isActive: false },
+        { id: "kept-ccs", code: "COLLEGE_COMPUTER_STUDIES", name: "College of Computer Studies", isActive: true },
+      ],
+    } : [],
+  }));
+  await page.goto("/admin/assessments?section=academic");
+  await page.getByText("Update a program department mapping", { exact: true }).click();
+  const options = page.getByRole("combobox", { name: /^Official department/ }).locator("option");
+  await expect(options).toHaveText(["Select confirmed department", "College of Arts and Sciences", "College of Computer Studies"]);
 });
 
 test("private administrator review records a neutral disposition without account penalties", async ({
@@ -856,7 +934,7 @@ test("private administrator review records a neutral disposition without account
     .click();
   await expect(
     page.getByRole("heading", {
-      name: "Student A and Student B · DISMISSED",
+      name: "Student A and Student B \u00b7 DISMISSED",
       exact: true,
     }),
   ).toBeVisible();
@@ -900,6 +978,7 @@ test("unavailable academic options disable registration until a successful retry
           })),
         })),
         yearLevels: catalog.yearLevels,
+        registrationPolicy:{available:true,noticeVersion:"DRAFT_CI_NOTICE_v1",approved:false},
       },
     });
   });

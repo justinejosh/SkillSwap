@@ -76,10 +76,12 @@ export default function GoogleSignIn({
   linking = false,
   onLinked,
   onOnboardingChange,
+  signup = false,
 }: {
   linking?: boolean;
   onLinked?: () => void;
   onOnboardingChange?: (active: boolean) => void;
+  signup?: boolean;
 }) {
   const navigate = useNavigate();
   const [clientId, setClientId] = useState("");
@@ -97,6 +99,7 @@ export default function GoogleSignIn({
   const [options, setOptions] = useState<{
     programs: any[];
     yearLevels: any[];
+    registrationPolicy?: {available:boolean;noticeVersion:string|null;approved:boolean};
   }>({ programs: [], yearLevels: [] });
   const [programId, setProgramId] = useState("");
   const [yearLevelId, setYearLevelId] = useState("");
@@ -192,7 +195,7 @@ export default function GoogleSignIn({
         type: "standard",
         theme: "outline",
         size: "large",
-        text: "signin_with",
+        text: signup ? "continue_with" : "signin_with",
         width: Math.min(
           320,
           container.current.parentElement?.clientWidth || 240,
@@ -226,6 +229,7 @@ export default function GoogleSignIn({
           programId,
           yearLevelId,
           termsAccepted: terms,
+          noticeVersion: options.registrationPolicy?.noticeVersion,
         }),
       });
       setOnboarding(null);
@@ -236,7 +240,14 @@ export default function GoogleSignIn({
       setBusy(false);
     }
   }
-  if (!clientId) return null;
+  if (!clientId) return linking ? null : (
+    <section aria-label="Google Sign-In" className="space-y-2 mb-5">
+      <Button type="button" variant="outline" disabled className="w-full">
+        {signup ? "Continue with Google" : "Sign in with Google"}
+      </Button>
+      <p className="text-xs text-slate-600">Google Sign-In is unavailable in this environment. Use email and password.</p>
+    </section>
+  );
   const years =
     options.programs.find((p) => p.id === programId)?.yearLevels || [];
   return (
@@ -249,6 +260,7 @@ export default function GoogleSignIn({
           ? "Link your institutional Google account to this Knoxite account. Confirm your current Knoxite password first."
           : "Sign in with your eligible institutional Google Workspace account."}
       </p>
+      {!linking && <p className="text-xs text-slate-600">If Google reports access blocked, contact OLFU IT about third-party application access. A personal Google account is not eligible.</p>}
       {error && (
         <p role="alert" className="text-sm text-red-700">
           {error}
@@ -274,6 +286,7 @@ export default function GoogleSignIn({
               required
             />
           </label>
+          <p className="text-xs text-slate-600 dark:text-slate-300">{options.registrationPolicy?.available ? `Notice: ${options.registrationPolicy.noticeVersion}${options.registrationPolicy.approved ? "" : " — development draft; not approved for real student registration"}` : "New registration is unavailable until consent storage and a reviewed notice are configured."}</p>
           <Button type="submit" disabled={busy}>
             Confirm password to link Google
           </Button>
@@ -367,7 +380,8 @@ export default function GoogleSignIn({
           <Link className="text-sm text-blue-700 underline" to="/privacy">
             Read terms and privacy policy
           </Link>
-          <Button type="submit" disabled={busy || !options.programs.length}>
+          <p className="text-xs text-slate-600 dark:text-slate-300">{options.registrationPolicy?.available ? `Notice: ${options.registrationPolicy.noticeVersion}${options.registrationPolicy.approved ? "" : " — development draft; not approved for real student registration"}` : "New registration is unavailable until consent storage and a reviewed notice are configured."}</p>
+          <Button type="submit" disabled={busy || !options.programs.length || !options.registrationPolicy?.available}>
             Create college profile
           </Button>
           <Button

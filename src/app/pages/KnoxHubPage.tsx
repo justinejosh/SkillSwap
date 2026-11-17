@@ -1,3 +1,4 @@
+import { authenticatedFetch } from "@/app/lib/api";
 import { MatchResults } from "@/app/components/MatchResults";
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router";
@@ -41,6 +42,7 @@ export default function KnoxHubPage() {
   );
   const [isRequesting, setIsRequesting] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
+  const [requestError, setRequestError] = useState("");
 
   useEffect(() => {
     fetchMatches();
@@ -54,7 +56,7 @@ export default function KnoxHubPage() {
         return;
       }
 
-      const response = await fetch(`${API_BASE_URL}/matches`, {
+      const response = await authenticatedFetch(`${API_BASE_URL}/matches`, {
         headers: {
           Authorization: `Bearer ${token}`,
           "bypass-tunnel-reminder": "true",
@@ -135,13 +137,14 @@ export default function KnoxHubPage() {
   const handleSubmitSwapRequest = async () => {
     if (!selectedMatch) return;
     setIsRequesting(true);
+    setRequestError("");
 
     try {
       const token = localStorage.getItem("knoxite_token");
       const targetWantedSkillId = selectedMatch.matchingWantedSkills?.[0]?.id;
       const targetOfferedSkillId = selectedMatch.matchingOfferedSkills?.[0]?.id;
 
-      const response = await fetch(`${API_BASE_URL}/swaps/request`, {
+      const response = await authenticatedFetch(`${API_BASE_URL}/swaps/request`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -166,7 +169,7 @@ export default function KnoxHubPage() {
       setTimeout(() => setSuccessMessage(""), 4000);
       setSelectedMatch(null);
     } catch (error: any) {
-      alert(error.message);
+      setRequestError(error instanceof Error ? error.message : "Unable to send this swap request. Please retry.");
     } finally {
       setIsRequesting(false);
     }
@@ -174,7 +177,7 @@ export default function KnoxHubPage() {
 
   if (isLoading) {
     return (
-      <div className="flex flex-col justify-center items-center min-h-screen bg-gradient-to-b from-[#E5F2FA] via-[#E5F2FA] via-70% to-[#F8FAFC] dark:bg-none dark:bg-slate-950">
+      <div className="flex flex-col justify-center items-center min-h-screen knoxite-surface">
         <Loader2 className="animate-spin size-8 text-blue-600 mb-3" />
         <p className="text-slate-900 dark:text-slate-200 font-bold text-xs uppercase tracking-widest">
           Loading KnoxHub Directory...
@@ -184,9 +187,8 @@ export default function KnoxHubPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#E5F2FA] via-[#E5F2FA] via-70% to-[#F8FAFC] dark:bg-none dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans flex flex-col relative overflow-x-hidden transition-colors duration-200">
+    <div className="min-h-screen knoxite-surface text-slate-900 dark:text-slate-100 font-sans flex flex-col relative overflow-x-hidden transition-colors duration-200">
       {/* SUBTLE ARCHITECTURAL GRID */}
-      <div className="absolute inset-0 bg-[linear-gradient(to_right,#e2e8f080_1px,transparent_1px),linear-gradient(to_bottom,#e2e8f080_1px,transparent_1px)] dark:bg-[linear-gradient(to_right,#1e293b50_1px,transparent_1px),linear-gradient(to_bottom,#1e293b50_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_70%_50%_at_50%_0%,#000_70%,transparent_110%)] pointer-events-none" />
 
       {/* 1. FLOATING GLASS HEADER */}
       <div className="sticky top-4 z-30 px-4 sm:px-6">
@@ -451,12 +453,12 @@ export default function KnoxHubPage() {
         {/* 3. REQUEST SWAP MODAL */}
         <Dialog
           open={!!selectedMatch}
-          onOpenChange={(open) => !open && setSelectedMatch(null)}
+          onOpenChange={(open) => {if(!open){setSelectedMatch(null);setRequestError("");}}}
         >
           <DialogContent className="max-w-[90vw] md:max-w-md rounded-3xl p-6 border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">
             <DialogHeader className="space-y-1">
               <DialogTitle className="text-xl font-black text-slate-900 dark:text-white">
-                Propose Bilateral Swap
+                Send a Swap Request
               </DialogTitle>
               <DialogDescription className="text-xs text-slate-500 dark:text-slate-400">
                 Sending a skill exchange request to{" "}
@@ -466,6 +468,7 @@ export default function KnoxHubPage() {
                 .
               </DialogDescription>
             </DialogHeader>
+            {requestError && <p role="alert" className="text-sm text-red-700 dark:text-red-300">{requestError}</p>}
 
             {selectedMatch && (
               <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-800 flex items-center justify-between text-xs my-1">

@@ -3,7 +3,7 @@ import { sessionsRouter } from "./routes/sessions";
 import express from "express";
 import cors from "cors";
 import { PrismaClient } from "@prisma/client";
-import { AppConfig } from "./lib/config";
+import { AppConfig, studentEmailAllowed } from "./lib/config";
 import { errorHandler, HttpError } from "./lib/http";
 import { actor, authentication } from "./middleware/authMiddleware";
 import { authRouter } from "./routes/auth";
@@ -51,6 +51,7 @@ export function createApp(
       origin: (origin, done) =>
         done(null, !origin || config.origins.includes(origin)),
       methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
+      exposedHeaders: ["Retry-After"],
       allowedHeaders: [
         "Authorization",
         "Content-Type",
@@ -85,10 +86,11 @@ export function createApp(
     res.json(result);
   });
   app.get("/api/leaderboard", async (req, res) => {
-    const users = await db.user.findMany({
+    const candidates = await db.user.findMany({
       where: eligibleStudentWhere(config),
-      select: portfolioSelect,
+      select: { ...portfolioSelect, email: true },
     });
+    const users = candidates.filter((u) => studentEmailAllowed(u.email, config));
     const metrics = await loadUserMetrics(
       db,
       users.map((u) => u.id),
@@ -127,10 +129,11 @@ export function createApp(
     });
   });
   app.get("/api/leaderboard/swaps", async (_req, res) => {
-    const users = await db.user.findMany({
+    const candidates = await db.user.findMany({
       where: eligibleStudentWhere(config),
-      select: { id: true, name: true, avatarUrl: true },
+      select: { id: true, name: true, avatarUrl: true, email: true },
     });
+    const users = candidates.filter((u) => studentEmailAllowed(u.email, config));
     const metrics = await loadUserMetrics(
       db,
       users.map((u) => u.id),
@@ -139,7 +142,7 @@ export function createApp(
       users
         .filter((u) => leaderboardEligibility(metrics.get(u.id)!).eligible)
         .map((u) => ({
-          ...u,
+          id: u.id, name: u.name, avatarUrl: u.avatarUrl,
           totalSwaps: metrics.get(u.id)!.completedSwaps,
           uniqueCompletedPartners: metrics.get(u.id)!.uniqueCompletedPartners,
           completionRate: metrics.get(u.id)!.completionRate!,

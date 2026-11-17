@@ -6,9 +6,11 @@ import { HttpError, onlyKeys, text } from "../lib/http";
 import { portfolioSelect, publicPortfolio } from "../services/portfolios";
 import { loadUserMetrics } from "../services/userMetrics";
 import { transaction } from "../lib/transaction";
+import { listSkillCatalog, resolveSkill, resolveStudentPreset } from "../services/skillCatalog";
 
 export function profileRouter(db: PrismaClient) {
   const router = express.Router();
+  router.get("/skill-catalog", async (_req, res) => { res.json(await listSkillCatalog(db)); });
   router.get("/", async (req, res) => {
     const user = await db.user.findUnique({
       where: { id: actor(req) },
@@ -39,12 +41,20 @@ export function profileRouter(db: PrismaClient) {
       },
       select: { skillId: true, level: true },
     });
+    // Retirement closes new starts, not an already-issued attempt on its pinned version.
+    const activeAttempts = await db.assessmentAttempt.findMany({
+      where: { offeringId: { in: user.offeringLinks.map((o) => o.id) }, status: "IN_PROGRESS", expiresAt: { gt: new Date() } },
+      orderBy: { startedAt: "desc" },
+      select: { id: true, offeringId: true, level: true },
+    });
     const offeredSkills = user.offeringLinks.map((o) => ({
       id: o.skill.id,
       name: o.skill.name,
       category: o.skill.category,
       offeringId: o.id,
       tier: o.tier,
+      activeBasicAttemptId: activeAttempts.find((a) => a.offeringId === o.id && a.level === "BASIC")?.id ?? null,
+      activeAdvancedAttemptId: activeAttempts.find((a) => a.offeringId === o.id && a.level === "ADVANCED")?.id ?? null,
       basicAvailable: banks.some(
         (b) => b.skillId === o.skillId && b.level === "BASIC",
       ),
@@ -128,33 +138,14 @@ export function profileRouter(db: PrismaClient) {
   });
   for (const type of ["offer", "want"] as const) {
     router.post(`/skills/${type}`, async (req, res) => {
-      onlyKeys(req.body, ["name", "category"]);
-      const name = text(req.body.name, "Skill name", 100).toLowerCase();
-      const category = text(
-        req.body.category ?? "other",
-        "Category",
-        30,
-      ).toLowerCase();
-      if (
-        ![
-          "technology",
-          "creative",
-          "music",
-          "language",
-          "lifestyle",
-          "business",
-          "academic",
-          "other",
-          "general",
-        ].includes(category)
-      )
-        throw new HttpError(422, "Choose a supported category.");
+      const student = req.userRole !== "ADMIN";
+      if (student && (req.body?.name !== undefined || req.body?.category !== undefined))
+        throw new HttpError(422, "Choose a predefined skill using its preset key or canonical Skill ID. Free-text skill submission is disabled.");
+      onlyKeys(req.body, student ? ["presetKey", "skillId"] : ["name", "category", "presetKey", "skillId"]);
       const result = await transaction(db, async (tx) => {
-        const skill = await tx.skill.upsert({
-          where: { name },
-          create: { name, category },
-          update: {},
-        });
+        const skill = student || req.body.skillId !== undefined
+          ? await resolveStudentPreset(tx, req.body)
+          : await resolveSkill(tx, req.body);
         await tx.user.update({
           where: { id: actor(req) },
           data: {

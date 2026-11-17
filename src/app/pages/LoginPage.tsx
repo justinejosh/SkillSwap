@@ -1,3 +1,4 @@
+import { applyStoredTheme } from "@/app/lib/theme";
 import { api } from "@/app/lib/api";
 import GoogleSignIn from "@/app/components/GoogleSignIn";
 import { useState, useEffect, useRef } from "react";
@@ -27,9 +28,25 @@ export default function LoginPage() {
     null,
   );
   const signInForm = useRef<HTMLFormElement>(null);
+  const submitting = useRef(false);
+  const [retryUntil, setRetryUntil] = useState(0);
+  const [clock, setClock] = useState(Date.now);
+  const retrySeconds = Math.max(0, Math.ceil((retryUntil - clock) / 1000));
+  const retryLabel = `${Math.floor(retrySeconds / 60)}:${String(retrySeconds % 60).padStart(2, "0")}`;
 
   useEffect(() => {
-    document.documentElement.classList.remove("dark");
+    if (!retryUntil) return;
+    const tick = () => {
+      const now = Date.now();
+      setClock(now);
+      if (now >= retryUntil) setRetryUntil(0);
+    };
+    tick();
+    const timer = window.setInterval(tick, 1000);
+    return () => window.clearInterval(timer);
+  }, [retryUntil]);
+
+  useEffect(() => {
     let active = true;
     api<{ emailDeliveryAvailable: boolean }>("/auth/recovery-options")
       .then((result) => {
@@ -45,6 +62,8 @@ export default function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitting.current || retryUntil > Date.now()) return;
+    submitting.current = true;
     setError("");
     setNotice("");
     setIsLoading(true);
@@ -62,6 +81,15 @@ export default function LoginPage() {
       const data = await response.json();
 
       if (!response.ok) {
+        if (response.status === 429) {
+          const seconds = Number(data.details?.retryAfterSeconds ?? response.headers.get("Retry-After"));
+          if (Number.isFinite(seconds) && seconds > 0) {
+            const now = Date.now();
+            setClock(now);
+            setRetryUntil(now + Math.ceil(seconds) * 1000);
+            return;
+          }
+        }
         throw new Error(data.error || "Failed to login. Please try again.");
       }
 
@@ -71,13 +99,7 @@ export default function LoginPage() {
       // SAVE USER DATA: includes 'role' from backend response
       localStorage.setItem("knoxite_user", JSON.stringify(data.user));
 
-      // Read ONLY this specific user's saved theme preference
-      const userTheme = localStorage.getItem(`theme_${data.user.id}`);
-      if (userTheme === "dark") {
-        document.documentElement.classList.add("dark");
-      } else {
-        document.documentElement.classList.remove("dark");
-      }
+      applyStoredTheme();
 
       // Role-based routing redirect
       if (data.user?.role === "ADMIN") {
@@ -88,6 +110,7 @@ export default function LoginPage() {
     } catch (err: any) {
       setError(err.message);
     } finally {
+      submitting.current = false;
       setIsLoading(false);
     }
   };
@@ -112,12 +135,15 @@ export default function LoginPage() {
                 onSubmit={handleSubmit}
                 className="space-y-4"
               >
-                {error && (
+                <h2 className="text-sm font-semibold text-blue-900">Sign in with Email</h2>
+                {(error || retrySeconds > 0) && (
                   <div
                     role="alert"
                     className="p-3 text-xs md:text-sm text-red-600 bg-red-50 border border-red-200 rounded-md text-center"
                   >
-                    {error}
+                    {retrySeconds > 0 ? <>
+                      Too many unsuccessful sign-in attempts. <span aria-live="off">Try again in {retryLabel}.</span>
+                    </> : error}
                   </div>
                 )}
                 {notice && (
@@ -185,10 +211,10 @@ export default function LoginPage() {
                 </div>
                 <Button
                   type="submit"
-                  disabled={isLoading}
+                  disabled={isLoading || retrySeconds > 0}
                   className="w-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-200 py-6 text-lg font-bold transition-all active:scale-[0.98] mt-2"
                 >
-                  {isLoading ? "Authenticating..." : "Sign in"}
+                  {isLoading ? "Authenticating..." : retrySeconds > 0 ? `Try again in ${retryLabel}` : "Sign in"}
                 </Button>
               </form>
             )}

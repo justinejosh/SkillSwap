@@ -5,7 +5,7 @@ import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 import bcrypt from "bcrypt";
 import { PrismaClient } from "@prisma/client";
-import { requireLocalDatabase } from "../../scripts/safeDatabase";
+import { requireOwnedFixtureDatabase } from "./fixtureDatabase";
 import { backendRoot } from "../../scripts/preflight";
 import {
   captureLegacyData,
@@ -16,7 +16,7 @@ import { createApp } from "../../app";
 import { loadConfig } from "../../lib/config";
 
 test("Google migration preserves all populated legacy rows and enforces case-sensitive identities", async () => {
-  const rootUrl = requireLocalDatabase();
+  const rootUrl = requireOwnedFixtureDatabase(true);
   assert.match(new URL(rootUrl).pathname, /_test$/);
   const root = new PrismaClient({ datasources: { db: { url: rootUrl } } });
   const name = `knoxite_google_migration_${randomUUID().replaceAll("-", "")}_test`;

@@ -1,4 +1,5 @@
 import express from "express";
+import { confirmationEligibility } from "../services/sessionConfirmationEligibility";
 import { Prisma, PrismaClient } from "@prisma/client";
 import { actor, requireStudent } from "../middleware/authMiddleware";
 import { HttpError, integer, onlyKeys, text } from "../lib/http";
@@ -112,7 +113,7 @@ export function swapRouters(db: PrismaClient, config: AppConfig) {
         where: {
           OR: [{ requesterId: actor(req) }, { receiverId: actor(req) }],
         },
-        include: { ...swapInclude, linkedSwap: { select: { id: true } } },
+        include: { ...swapInclude, linkedSwap: { select: { id: true, status: true } } },
         orderBy: { createdAt: "desc" },
       }),
     );
@@ -292,10 +293,25 @@ export function swapRouters(db: PrismaClient, config: AppConfig) {
     if (!swap) throw new HttpError(404, "Swap not found.");
     assertParticipant(swap, actor(req));
     const requester = swap.requesterId === actor(req);
+    const partnerId = requester ? swap.receiverId : swap.requesterId;
+    const reviews = await db.review.findMany({
+      where: { swapId: swap.id },
+      select: { id: true, reviewerId: true, revieweeId: true, rating: true, comment: true, isValidated: true, createdAt: true },
+    });
+    const own = reviews.find(r => r.reviewerId === actor(req));
+    const nextNumber = (requester ? swap.requesterSessions : swap.receiverSessions) + 1;
+    const schedule = await db.swapSession.findUnique({where:{swapId_sessionNumber:{swapId:swap.id,sessionNumber:nextNumber}}});
     res.json({
       ...swap,
+      confirmationEligibility: confirmationEligibility(swap, actor(req), nextNumber, schedule),
       me: requester ? swap.requester : swap.receiver,
       partner: requester ? swap.receiver : swap.requester,
+      canReview: partnerId !== actor(req) && swap.status === "CONFIRMED" && swap.integrityVerified &&
+        swap.requesterSessions >= swap.sessions && swap.receiverSessions >= swap.sessions && !own,
+      reviewSummary: {
+        myReview: own ? { id: own.id, rating: own.rating, comment: own.comment, isValidated: own.isValidated, createdAt: own.createdAt } : null,
+        partnerSubmitted: reviews.some(r => r.reviewerId === partnerId && r.revieweeId === actor(req) && r.isValidated),
+      },
     });
   });
   swaps.post("/:id/agreement", async (req, res) => {
@@ -326,13 +342,13 @@ export function swapRouters(db: PrismaClient, config: AppConfig) {
           409,
           "Legacy agreement needs administrator reconciliation.",
         );
+      if (!["PENDING_AGREEMENT", "CONFIRMED"].includes(s.status))
+        throw new HttpError(409, "Agreement is closed.");
       if (s.agreementVersion !== version)
         throw new HttpError(
           409,
           "Agreement terms changed. Reload and review before signing.",
         );
-      if (!["PENDING_AGREEMENT", "CONFIRMED"].includes(s.status))
-        throw new HttpError(409, "Agreement is closed.");
       const changed = sessions !== s.sessions || duration !== s.duration;
       if (s.status === "CONFIRMED") {
         if (changed)
@@ -397,6 +413,9 @@ export function swapRouters(db: PrismaClient, config: AppConfig) {
           422,
           "Confirm the next unlogged session within the agreement limit.",
         );
+      const schedule = await tx.swapSession.findUnique({ where: { swapId_sessionNumber: { swapId: id, sessionNumber: number } } });
+      const eligibility = confirmationEligibility(s, actor(req), number, schedule);
+      if (!eligibility.eligible) throw new HttpError(409, eligibility.reason);
       await tx.sessionConfirmation.create({
         data: { swapId: id, participantId: actor(req), sessionNumber: number },
       });
@@ -421,6 +440,8 @@ export function swapRouters(db: PrismaClient, config: AppConfig) {
       assertParticipant(s, actor(req));
       const revieweeId =
         s.requesterId === actor(req) ? s.receiverId : s.requesterId;
+      if (revieweeId === actor(req))
+        throw new HttpError(422, "You cannot review yourself.");
       if (req.body.partnerId !== undefined && req.body.partnerId !== revieweeId)
         throw new HttpError(
           422,

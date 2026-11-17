@@ -1,6 +1,9 @@
 import { useEffect, useState, ReactNode } from "react";
 import { Navigate } from "react-router";
 import { api } from "@/app/lib/api";
+import { SessionGuardian } from "./SessionGuardian";
+import { clearAssessmentDrafts } from "@/app/lib/assessmentDraft";
+import { applyStoredTheme } from "@/app/lib/theme";
 export function AuthGuard({
   children,
   role,
@@ -19,6 +22,14 @@ export function AuthGuard({
   useEffect(() => {
     const ended = () => setToken(null);
     window.addEventListener("knoxite-session-ended", ended);
+    const changed = (event: StorageEvent) => {
+      if (event.key === "knoxite-manual-logout") clearAssessmentDrafts();
+      if (event.key === "knoxite_token" || event.key === null) {
+        setState({ loading: true });
+        setToken(localStorage.getItem("knoxite_token"));
+      }
+    };
+    window.addEventListener("storage", changed);
     let live = true;
     if (token)
       api<{
@@ -40,6 +51,7 @@ export function AuthGuard({
                 avatarUrl: user.avatarUrl,
               }),
             );
+            applyStoredTheme();
             setState({ loading: false, role: user.role });
           }
         })
@@ -49,6 +61,7 @@ export function AuthGuard({
     return () => {
       live = false;
       window.removeEventListener("knoxite-session-ended", ended);
+      window.removeEventListener("storage", changed);
     };
   }, [token]);
   if (!token) return <Navigate to="/login" replace />;
@@ -74,5 +87,5 @@ export function AuthGuard({
         replace
       />
     );
-  return <>{children}</>;
+  return <SessionGuardian key={token}>{children}</SessionGuardian>;
 }

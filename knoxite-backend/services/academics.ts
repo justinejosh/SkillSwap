@@ -141,7 +141,10 @@ export async function seedAcademicCatalog(db: PrismaClient) {
         where: { code: program.code },
         create: {
           ...program,
-          yearLevels: { connect: years.map((y) => ({ id: y.id })) },
+          // Only new rows receive these defaults; never overwrite stored years.
+          yearLevels: { connect: years
+            .filter(y => !["BSIT", "BSIHM-CA", "BSIHM-HACLO"].includes(program.code) || y.code === "YEAR_1")
+            .map((y) => ({ id: y.id })) },
         },
         update: {},
       });
