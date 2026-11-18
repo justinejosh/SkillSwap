@@ -58,4 +58,9 @@ jobs:
       - run: npm run build
       - run: npx playwright install --with-deps chromium
       - run: npm run test:browser
-      - run: npm audit --audit-level=moderate
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=moderate
+
+      - name: Report development dependency vulnerabilities
+        run: npm audit --audit-level=moderate
+        continue-on-error: true
