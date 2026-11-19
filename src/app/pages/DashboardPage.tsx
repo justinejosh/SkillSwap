@@ -82,12 +82,13 @@ export default function DashboardPage() {
   }, [navigate]);
 
   useEffect(() => {
+    if (isLoading) return;
     const timer = setTimeout(() => {
       startTour();
-    }, 500);
+    }, 150);
 
     return () => clearTimeout(timer);
-  }, []);
+  }, [isLoading, startTour]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -242,8 +243,9 @@ export default function DashboardPage() {
               </Badge>
             )}
 
-            <div id="tour-nav-messages">
+            <div>
               <Button
+                id="tour-nav-messages"
                 variant="ghost"
                 size="icon"
                 onClick={() => navigate("/chat")}
@@ -254,8 +256,9 @@ export default function DashboardPage() {
               </Button>
             </div>
 
-            <div id="tour-nav-notifications">
+            <div>
               <Button
+                id="tour-nav-notifications"
                 variant="ghost"
                 size="icon"
                 onClick={() => navigate("/notification")}
@@ -271,11 +274,11 @@ export default function DashboardPage() {
 
             {/* PROFILE TRIGGER & DROPDOWN */}
             <div
-              id="tour-nav-profile"
               ref={profileMenuRef}
               className="relative pl-1"
             >
               <button
+                id="tour-nav-profile"
                 type="button"
                 onClick={() => setIsProfileMenuOpen((prev) => !prev)}
                 className="relative flex items-center justify-center rounded-full transition-transform active:scale-95 focus:outline-none"
@@ -396,8 +399,9 @@ export default function DashboardPage() {
         <aside className="md:col-span-3 space-y-4">
           <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/90 dark:border-slate-800 p-5 shadow-xs">
             <nav className="flex flex-col gap-1.5">
-              <div id="tour-knoxhub">
+              <div>
                 <button
+                  id="tour-knoxhub"
                   onClick={() => navigate("/knox-hub")}
                   className="w-full text-left px-3.5 py-2.5 rounded-xl text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-slate-800/70 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
                 >
@@ -405,8 +409,9 @@ export default function DashboardPage() {
                 </button>
               </div>
 
-              <div id="tour-my-skills">
+              <div>
                 <button
+                  id="tour-my-skills"
                   onClick={() => navigate("/my-skills")}
                   className="w-full text-left px-3.5 py-2.5 rounded-xl text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-slate-800/70 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
                 >
@@ -414,8 +419,9 @@ export default function DashboardPage() {
                 </button>
               </div>
 
-              <div id="tour-community-forum">
+              <div>
                 <button
+                  id="tour-community-forum"
                   onClick={() => navigate("/community-forum")}
                   className="w-full text-left px-3.5 py-2.5 rounded-xl text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-slate-800/70 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
                 >
@@ -423,8 +429,9 @@ export default function DashboardPage() {
                 </button>
               </div>
 
-              <div id="tour-leaderboard">
+              <div>
                 <button
+                  id="tour-leaderboard"
                   onClick={() => navigate("/leaderboard")}
                   className="w-full text-left px-3.5 py-2.5 rounded-xl text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-slate-800/70 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
                 >

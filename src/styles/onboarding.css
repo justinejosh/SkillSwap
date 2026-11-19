@@ -1,0 +1,72 @@
+/* Keep Driver's spotlight/positioning; never hide its exit or navigation controls. */
+.knoxite-tour-popover.driver-popover {
+  --tour-background: #fff;
+  --tour-text: #1e293b;
+  --tour-muted: #475569;
+  --tour-border: #cbd5e1;
+  --tour-focus: #2563eb;
+  background: var(--tour-background);
+  color: var(--tour-text);
+  border: 1px solid var(--tour-border);
+  border-radius: 16px;
+  box-shadow: 0 12px 32px rgb(15 23 42 / 18%);
+  padding: 18px;
+  min-width: min(260px, calc(100vw - 24px));
+  max-width: min(320px, calc(100vw - 24px));
+  font-family: inherit;
+}
+.dark .knoxite-tour-popover.driver-popover {
+  --tour-background: #0f172a;
+  --tour-text: #f1f5f9;
+  --tour-muted: #cbd5e1;
+  --tour-border: #475569;
+  --tour-focus: #60a5fa;
+}
+.knoxite-tour-popover .driver-popover-title {
+  padding-right: 44px;
+  color: var(--tour-text);
+  font-size: 17px;
+  line-height: 1.4;
+}
+.knoxite-tour-popover .driver-popover-description {
+  color: var(--tour-muted);
+  font-size: 14px;
+  line-height: 1.6;
+}
+.knoxite-tour-popover .driver-popover-close-btn {
+  color: var(--tour-muted);
+  width: auto;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 13px;
+}
+.knoxite-tour-popover .driver-popover-footer { gap: 10px; }
+.knoxite-tour-popover .driver-popover-progress-text { color: var(--tour-muted); }
+.knoxite-tour-popover .driver-popover-footer-btn {
+  background: var(--tour-background);
+  color: var(--tour-text);
+  border-color: var(--tour-border);
+  border-radius: 8px;
+  padding: 7px 10px;
+  font-size: 13px;
+}
+.knoxite-tour-popover .driver-popover-next-btn {
+  background: #1d4ed8;
+  color: #fff;
+  border-color: #1d4ed8;
+}
+.knoxite-tour-popover .driver-popover-next-btn:hover { background: #1e40af; }
+.knoxite-tour-popover button:focus-visible {
+  outline: 3px solid var(--tour-focus);
+  outline-offset: 2px;
+}
+.driver-active-element[id^="tour-"] {
+  outline: 3px solid #3b82f6;
+  outline-offset: 3px;
+  border-radius: 10px;
+}
+.knoxite-tour-popover .driver-popover-arrow { border-color: var(--tour-background); }
+.knoxite-tour-popover .driver-popover-arrow-side-left { border-top-color: transparent; border-right-color: transparent; border-bottom-color: transparent; }
+.knoxite-tour-popover .driver-popover-arrow-side-right { border-top-color: transparent; border-left-color: transparent; border-bottom-color: transparent; }
+.knoxite-tour-popover .driver-popover-arrow-side-top { border-left-color: transparent; border-right-color: transparent; border-bottom-color: transparent; }
+.knoxite-tour-popover .driver-popover-arrow-side-bottom { border-left-color: transparent; border-right-color: transparent; border-top-color: transparent; }
