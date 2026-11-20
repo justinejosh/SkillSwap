@@ -72,6 +72,17 @@ export default function ProfilePage() {
 
       if (response.ok) {
         const data = await response.json();
+        // Navigation no longer refetches the guard's identity. Keep display-only
+        // fields current after a profile edit, without changing verified roles
+        // or allowing an old account's response to overwrite a new session.
+        if (localStorage.getItem("knoxite_token") === token) {
+          try {
+            const current = JSON.parse(localStorage.getItem("knoxite_user") || "{}");
+            if (current.id === data.id) localStorage.setItem("knoxite_user", JSON.stringify({
+              ...current, name: data.name, email: data.email, avatarUrl: data.avatarUrl,
+            }));
+          } catch { /* Display caching never establishes authentication. */ }
+        }
         setProfile(data);
         setProgramId(data.programId || "");
         setYearLevelId(data.yearLevelId || "");

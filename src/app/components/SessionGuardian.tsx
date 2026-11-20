@@ -1,3 +1,4 @@
+import { Link } from "react-router";
 import { createContext, ReactNode, useEffect, useRef, useState } from "react";
 import { api } from "@/app/lib/api";
 
@@ -85,7 +86,7 @@ export function SessionGuardian({ children }: { children: ReactNode }) {
       {!absoluteFirst && remaining > 0 && <button type="button" onClick={() => interact.current("stay")}
         className="mt-3 rounded-lg bg-blue-700 px-4 py-2 text-white">Stay signed in</button>}
       {absoluteFirst && <p>Sign in again when it expires; activity cannot extend this limit.</p>}
-      {remaining === 0 && <a className="mt-3 inline-block text-blue-700 underline" href="/login">Return to sign in</a>}
+      {remaining === 0 && <Link className="mt-3 inline-block text-blue-700 underline" to="/login">Return to sign in</Link>}
     </section>
   )}</SessionTimeoutContext.Provider>;
 }

@@ -1,4 +1,4 @@
-import { applyStoredTheme } from "@/app/lib/theme";
+import { saveSession } from "@/app/lib/session";
 import { api } from "@/app/lib/api";
 import GoogleSignIn from "@/app/components/GoogleSignIn";
 import { useState, useEffect, useRef } from "react";
@@ -93,20 +93,7 @@ export default function LoginPage() {
         throw new Error(data.error || "Failed to login. Please try again.");
       }
 
-      // Save the token for API authorization
-      localStorage.setItem("knoxite_token", data.token);
-
-      // SAVE USER DATA: includes 'role' from backend response
-      localStorage.setItem("knoxite_user", JSON.stringify(data.user));
-
-      applyStoredTheme();
-
-      // Role-based routing redirect
-      if (data.user?.role === "ADMIN") {
-        navigate("/admin-dashboard");
-      } else {
-        navigate("/dashboard");
-      }
+      navigate(saveSession(data));
     } catch (err: any) {
       setError(err.message);
     } finally {

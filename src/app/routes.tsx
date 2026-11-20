@@ -6,7 +6,7 @@ import VerifyEmailPage from "@/app/pages/VerifyEmailPage";
 import AccountRecoveryPage from "@/app/pages/AccountRecoveryPage";
 import ResetPasswordPage from "@/app/pages/ResetPasswordPage";
 import IntegrityAdminPage from "@/app/pages/IntegrityAdminPage";
-import { createBrowserRouter } from "react-router";
+import { Outlet, createBrowserRouter } from "react-router";
 
 import PreviewPage from "@/app/pages/PreviewPage";
 import LoginPage from "@/app/pages/LoginPage";
@@ -39,7 +39,7 @@ const StudentRoute = ({ children }: { children: React.ReactNode }) => (
   <AuthGuard role="USER">{children}</AuthGuard>
 );
 
-export const router = createBrowserRouter([
+const routes = [
   {
     path: "/admin/integrity",
     element: (
@@ -256,4 +256,12 @@ export const router = createBrowserRouter([
       </AdminRoute>
     ),
   },
+];
+
+// Keep authentication/session monitoring mounted across all protected children.
+// Existing child guards enforce their original roles using this verified context.
+const publicPaths = new Set(["/", "/login", "/signup", "/verify-email", "/recover-account", "/reset-password", "/privacy"]);
+export const router = createBrowserRouter([
+  ...routes.filter(route => publicPaths.has(route.path)),
+  { element: <AuthGuard><Outlet /></AuthGuard>, children: routes.filter(route => !publicPaths.has(route.path)) },
 ]);
