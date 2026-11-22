@@ -79,7 +79,7 @@ async function fresh(m) {
     if(tables.length) {
       check(tables.some(t=>t.name==="_prisma_migrations"),"Refusing fresh baseline over a nonempty legacy database");
       const migrations=await db.$queryRaw`SELECT migration_name,checksum,finished_at,rolled_back_at FROM _prisma_migrations`;
-      const names=["20261117000000_current_release","20261121000000_flexible_session_ranges","20261122000000_actual_session_completion"];
+      const names=["20261117000000_current_release","20261121000000_flexible_session_ranges","20261122000000_actual_session_completion","20261123000000_moderation_and_report_evidence"];
       const sorted=[...migrations].sort((a,b)=>a.migration_name.localeCompare(b.migration_name));
       check(sorted.length>0&&sorted.length<=names.length&&sorted.every((row,i)=>row.migration_name===names[i]&&row.finished_at&&!row.rolled_back_at&&row.checksum===crypto.createHash("sha256").update(fs.readFileSync(path.join(root,"prisma/release/migrations",names[i],"migration.sql"))).digest("hex")),"Unknown migration history; no baseline applied");
     }
