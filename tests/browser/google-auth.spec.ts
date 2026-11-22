@@ -457,6 +457,8 @@ test.describe("Google college profile signup presentation", () => {
 
 
 test("email signup legal reader preserves data and requires independent consent", async ({ page }) => {
+  const refWarnings:string[]=[];
+  page.on("console",message=>{if(/Function components cannot be given refs/.test(message.text()))refWarnings.push(message.text());});
   const f = await fixture(page, { enabled: false });
   await page.goto("/signup");
   await page.getByLabel("Full Name", { exact: true }).fill("Synthetic Preserved Student");
@@ -475,6 +477,7 @@ test("email signup legal reader preserves data and requires independent consent"
   await page.keyboard.press("Escape");
   await expect(page.getByRole("checkbox")).toBeChecked();
   expect(f.calls.some(c => c.path.endsWith("/register"))).toBe(false);
+  expect(refWarnings).toEqual([]);
 });
 
 test("standalone privacy uses identical disclosures and safe direct-entry navigation", async ({ page }) => {
@@ -530,27 +533,47 @@ test.describe("registration legal final checks", () => {
   });
   test("Google submission loading and error preserve academics and explicit consent", async ({ page }) => {
     await fixture(page, { onboarding: true });
+    let releaseIdentity!: () => void;
+    const identityPending = new Promise<void>(resolve => { releaseIdentity = resolve; });
+    await page.route("**/api/auth/google/login", async route => {
+      await identityPending;
+      await route.fallback();
+    });
     let release!: () => void;
     const pending = new Promise<void>(resolve => { release = resolve; });
     await page.route("**/api/auth/google/onboard", async route => {
       await pending;
       await route.fulfill({ status: 400, json: { error: "Synthetic onboarding validation error" } });
     });
-    await page.goto("/signup");
-    await page.getByRole("button", { name: "Continue with Google", exact: true }).click();
-    await page.getByLabel("College program", { exact: true }).selectOption("program");
-    await page.getByLabel("Year level", { exact: true }).selectOption("year");
-    await page.getByRole("checkbox").check();
-    await page.getByRole("button", { name: "Create college profile" }).click();
-    await expect(page.getByRole("button", { name: "Create college profile" })).toBeDisabled();
-    await expect(page.getByRole("button", { name: "Cancel Google sign-up" })).toBeDisabled();
-    await expect(page.getByRole("status")).toContainText("Checking Google sign-in");
-    release();
-    await expect(page.getByRole("alert")).toContainText("Synthetic onboarding validation error");
-    await expect(page.getByLabel("College program", { exact: true })).toHaveValue("program");
-    await expect(page.getByLabel("Year level", { exact: true })).toHaveValue("year");
-    await expect(page.getByRole("checkbox")).toBeChecked();
-    await expect(page.getByRole("button", { name: "Create college profile" })).toBeEnabled();
+    try {
+      await page.goto("/signup");
+      await page.getByRole("button", { name: "Continue with Google", exact: true }).click();
+      const form = page.getByRole("form", { name: "Complete your college profile", exact: true });
+      await expect(form).toHaveCount(0);
+      releaseIdentity();
+      await expect(form).toBeVisible();
+      // The regular signup has identically named fields. Wait for the actual
+      // Google form and its asynchronous options, not the outgoing email form.
+      await form.getByLabel("College program", { exact: true }).selectOption("program");
+      await expect(form.getByLabel("Year level", { exact: true }).locator('option[value="year"]')).toHaveCount(1);
+      await form.getByLabel("Year level", { exact: true }).selectOption("year");
+      await form.getByRole("checkbox").check();
+      const submitted = page.waitForRequest(request => request.url().endsWith("/api/auth/google/onboard") && request.method() === "POST");
+      await form.getByRole("button", { name: "Create college profile" }).click();
+      expect((await submitted).postDataJSON()).toMatchObject({ programId: "program", yearLevelId: "year", termsAccepted: true, noticeVersion: "DRAFT_TEST_NOTICE_v1" });
+      await expect(form.getByRole("button", { name: "Create college profile" })).toBeDisabled();
+      await expect(form.getByRole("button", { name: "Cancel Google sign-up" })).toBeDisabled();
+      await expect(page.getByRole("status")).toContainText("Checking Google sign-in");
+      release();
+      await expect(page.getByRole("alert")).toContainText("Synthetic onboarding validation error");
+      await expect(form.getByLabel("College program", { exact: true })).toHaveValue("program");
+      await expect(form.getByLabel("Year level", { exact: true })).toHaveValue("year");
+      await expect(form.getByRole("checkbox")).toBeChecked();
+      await expect(form.getByRole("button", { name: "Create college profile" })).toBeEnabled();
+    } finally {
+      releaseIdentity();
+      release();
+    }
   });
 });
 

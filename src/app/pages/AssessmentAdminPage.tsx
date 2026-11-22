@@ -278,6 +278,7 @@ export default function AssessmentAdminPage() {
           <Button
             disabled={busy}
             variant="outline"
+            className="h-auto min-h-11 max-w-full whitespace-normal break-words px-4 py-2 text-center"
             onClick={() =>
               void action(
                 () =>

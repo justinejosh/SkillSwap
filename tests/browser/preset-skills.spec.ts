@@ -43,6 +43,8 @@ async function category(page: Page, name: string) {
 }
 
 test("skill removal uses a cancellable accessible dialog and preserves errors for retry",async({page})=>{
+  const refWarnings:string[]=[];
+  page.on("console",message=>{if(/Function components cannot be given refs/.test(message.text()))refWarnings.push(message.text());});
   const state=await fixture(page);
   state.offered.push({id:"synthetic-python",offeringId:"synthetic-offering",name:"Python Programming Fundamentals",category:"Technology",tier:"AMATEUR",basicAvailable:true,advancedAvailable:false});
   await page.getByRole("dialog").getByRole("button",{name:"Close",exact:true}).click();await page.reload();
@@ -55,6 +57,7 @@ test("skill removal uses a cancellable accessible dialog and preserves errors fo
   await dialog.getByRole("button",{name:"Remove Skill",exact:true}).click();await expect(dialog.getByRole("alert")).toContainText("Please retry");expect(state.offered).toHaveLength(1);await expect(page.getByRole("button",{name:"Remove Python Programming Fundamentals",exact:true,includeHidden:true})).toHaveCount(1);
   state.removalFailure=false;await dialog.getByRole("button",{name:"Remove Skill",exact:true}).click();await expect(dialog).toHaveCount(0);await expect(remove).toHaveCount(0);
   expect(state.removals).toHaveLength(2);expect(nativeDialogs).toBe(0);
+  expect(refWarnings).toEqual([]);
 });
 test("every category supplies ten presets, with case-insensitive keyboard selection and canonical offered payload", async ({ page }) => {
   const state = await fixture(page);

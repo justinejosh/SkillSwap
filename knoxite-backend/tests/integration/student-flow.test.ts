@@ -180,13 +180,30 @@ test("registered student journey and authorization review on isolated MySQL", as
           ["GET", "/admin/reports"],
           ["PATCH", "/admin/reports/missing"],
           ["GET", "/analytics"],
-          ["DELETE", "/forum/posts/missing"],
         ];
         for (const [method, path] of endpoints) {
           const body = ["POST", "PATCH"].includes(method) ? {} : undefined;
           await call(method, path, 401, undefined, body);
           await call(method, path, 403, ta, body);
         }
+        // Forum deletion is author-or-ADMIN, not an administrative-only route.
+        // Check real ownership rather than demanding 403 for a missing post.
+        const previousPosts = await db.post.count();
+        const ownPost = await db.post.create({ data: { authorId: aId, title: "Synthetic owner post", content: "Synthetic deletion fixture" } });
+        const peerPost = await db.post.create({ data: { authorId: bId, title: "Synthetic peer post", content: "Synthetic preserved peer fixture" } });
+        await db.comment.create({ data: { postId: ownPost.id, authorId: bId, content: "Synthetic reply" } });
+        await call("DELETE", `/forum/posts/${ownPost.id}`, 401);
+        await call("DELETE", `/forum/posts/${peerPost.id}`, 403, ta);
+        await call("DELETE", `/forum/posts/${peerPost.id}`, 422, ta, { authorId: bId, role: "ADMIN" });
+        assert.equal(await db.post.count(), previousPosts + 2);
+        await call("DELETE", "/forum/posts/missing", 404, ta);
+        await call("DELETE", "/forum/posts/missing", 401);
+        await call("DELETE", `/forum/posts/${ownPost.id}`, 200, ta);
+        assert.equal(await db.post.findUnique({ where: { id: ownPost.id } }), null);
+        assert.equal(await db.comment.count({ where: { postId: ownPost.id } }), 0);
+        assert.ok(await db.post.findUnique({ where: { id: peerPost.id } }));
+        await call("DELETE", `/forum/posts/${peerPost.id}`, 200, tad);
+        assert.equal(await db.post.count(), previousPosts);
         const claims = jwt.decode(ta) as jwt.JwtPayload;
         const forgedRole = jwt.sign(
           { ...claims, role: "ADMIN" },

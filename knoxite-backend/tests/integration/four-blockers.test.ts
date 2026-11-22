@@ -3,7 +3,7 @@ import { before, after, test } from "node:test";
 import assert from "node:assert/strict";
 import { once } from "node:events";
 import { randomBytes, createHash } from "node:crypto";
-import { writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { spawn } from "node:child_process";
 import { createServer } from "node:net";
@@ -254,9 +254,12 @@ test("exact flexible migration preserves historical agreements, schedules, ackno
     const before=await snapshot(),beforeColumns=await columns(),beforeConstraints=await constraints(),beforeIndexes=await indexes();
     assert.equal(beforeColumns.find(c=>c.tbl==="Swap"&&c.col==="duration").nullable,"NO");
     assert.equal(beforeColumns.some(c=>c.tbl==="SwapSession"&&c.col==="endsAt"),false);
+    // A migration restarts application clients. Do not reuse SELECT * prepared
+    // statement metadata from a pre-DDL connection for preservation snapshots.
+    await old.$disconnect();
     infrastructure.cli(target,["db","execute","--file","prisma/release/migrations/20261121000000_flexible_session_ranges/migration.sql","--schema","prisma/release/schema.prisma"]);
     const after=await snapshot();
-    assert.ok(after.SwapSession.every((row:any)=>row.endsAt===null));
+    assert.ok(after.SwapSession.every((row:any)=>row.endsAt===null),JSON.stringify(after.SwapSession.map((row:any)=>({hasEndsAt:Object.hasOwn(row,"endsAt"),type:typeof row.endsAt,isNull:row.endsAt===null}))));
     after.SwapSession=after.SwapSession.map(({endsAt,...row}:any)=>row);
     assert.deepEqual(after,before);
     assert.deepEqual(await constraints(),beforeConstraints);assert.deepEqual(await indexes(),beforeIndexes);
@@ -264,12 +267,32 @@ test("exact flexible migration preserves historical agreements, schedules, ackno
     assert.deepEqual(afterColumns.filter(c=>!(c.tbl==="SwapSession"&&c.col==="endsAt")),beforeColumns.map(c=>c.tbl==="Swap"&&c.col==="duration"?{...c,nullable:"YES",def:null}:c));
     const end=afterColumns.find(c=>c.tbl==="SwapSession"&&c.col==="endsAt");
     assert.equal(end.nullable,"YES");assert.equal(end.kind,"datetime");assert.equal(Number(end.precision_value),3);
+    // This checkpoint predates actual-completion storage. Compare it with the
+    // exact intermediate schema, then rehearse the later additive field too.
+    const releaseSchema=readFileSync(join(__dirname,"../../../prisma/release/schema.prisma"),"utf8");
+    const actualField=/^\s*actualCompletedAt\s+DateTime\?\r?\n/gm;
+    assert.equal([...releaseSchema.matchAll(actualField)].length,1);
+    const intermediate=join(m.directory,"pre-actual-release.prisma");
+    writeFileSync(intermediate,releaseSchema.replace(actualField,""));
+    assert.equal(infrastructure.schemaDiff(target,intermediate),0);
+    await old.$disconnect();
+    infrastructure.cli(target,["db","execute","--file","prisma/release/migrations/20261122000000_actual_session_completion/migration.sql","--schema","prisma/release/schema.prisma"]);
+    const completed=await snapshot();
+    assert.ok(completed.SessionConfirmation.every((row:any)=>row.actualCompletedAt===null));
+    completed.SessionConfirmation=completed.SessionConfirmation.map(({actualCompletedAt,...row}:any)=>row);
+    completed.SwapSession=completed.SwapSession.map(({endsAt,...row}:any)=>row);
+    assert.deepEqual(completed,before);
+    assert.deepEqual(await constraints(),beforeConstraints);assert.deepEqual(await indexes(),beforeIndexes);
+    const completedColumns=await columns();assert.equal(completedColumns.length,afterColumns.length+1);
+    assert.deepEqual(completedColumns.filter(c=>!(c.tbl==="SessionConfirmation"&&c.col==="actualCompletedAt")),afterColumns);
+    const actual=completedColumns.find(c=>c.tbl==="SessionConfirmation"&&c.col==="actualCompletedAt");
+    assert.equal(actual.nullable,"YES");assert.equal(actual.kind,"datetime");assert.equal(Number(actual.precision_value),3);
     assert.equal(infrastructure.schemaDiff(target,"prisma/release/schema.prisma"),0);
     const active=await old.swap.findUniqueOrThrow({where:{id:"historical-active"}});
     const schedule=await old.swapSession.findUniqueOrThrow({where:{id:"historical-session-a"}});
     const next={...schedule,sessionNumber:2}; // Pure timing check; no historical row is edited.
     assert.equal(confirmationEligibility(active,"historical-a",2,next,Date.parse("2026-01-02T12:00:00Z")).eligible,true);
-    console.log("Historical preservation verified: 2 agreements, 2 schedules, 4 confirmations, 2 reviews; only duration nullability/default and nullable endsAt changed.");
+    console.log("Historical preservation verified: 2 agreements, 2 schedules, 4 confirmations, 2 reviews; flexible ranges and the later nullable actual-completion field verified separately.");
   }finally{await old.$disconnect();}
 });
 

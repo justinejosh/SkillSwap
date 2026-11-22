@@ -985,18 +985,37 @@ test("isolated MySQL API, assessment and exchange regression suite", async (t) =
         );
         assert.equal(accepted.status, 200);
         const id = accepted.data.redirectId;
-        for (const token of [ta, tb])
-          assert.equal(
-            (
-              await call("POST", `/swaps/${id}/agreement`, token, {
-                sessions: 4,
-                duration: 1,
-                agreedToTerms: true,
-                agreementVersion: 1,
-              })
-            ).status,
-            200,
-          );
+        const initial = (await call("GET", `/swaps/${id}`, ta)).data;
+        assert.equal(initial.duration, null);
+        const first = await call("POST", `/swaps/${id}/agreement`, ta, {
+          sessions: 4, duration: 1, agreedToTerms: true,
+          agreementVersion: initial.agreementVersion,
+        });
+        assert.equal(first.status, 200, JSON.stringify(first.data));
+        const current = first.data.swap;
+        assert.equal(current.agreementVersion, initial.agreementVersion + 1);
+        assert.equal(current.status, "PENDING_AGREEMENT");
+        assert.ok(current.requesterApprovedAt);
+        assert.equal(current.receiverApprovedAt, null);
+        const stale = await call("POST", `/swaps/${id}/agreement`, tb, {
+          sessions: 4, duration: 1, agreedToTerms: true,
+          agreementVersion: initial.agreementVersion,
+        });
+        assert.equal(stale.status, 409);
+        assert.equal(stale.data.error, "Agreement terms changed. Reload and review before signing.");
+        const afterStale = (await call("GET", `/swaps/${id}`, ta)).data;
+        assert.equal(afterStale.agreementVersion, current.agreementVersion);
+        assert.equal(afterStale.requesterApprovedAt, current.requesterApprovedAt);
+        assert.equal(afterStale.receiverApprovedAt, null);
+        const second = await call("POST", `/swaps/${id}/agreement`, tb, {
+          sessions: 4, duration: 1, agreedToTerms: true,
+          agreementVersion: current.agreementVersion,
+        });
+        assert.equal(second.status, 200, JSON.stringify(second.data));
+        assert.equal(second.data.swap.agreementVersion, current.agreementVersion);
+        assert.equal(second.data.swap.status, "CONFIRMED");
+        assert.equal(second.data.swap.requesterApprovedAt, current.requesterApprovedAt);
+        assert.ok(second.data.swap.receiverApprovedAt);
         assert.equal(
           (await call("DELETE", `/swaps/cancel/swap/${id}`, ta)).status,
           200,

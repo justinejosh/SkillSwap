@@ -1,5 +1,105 @@
 # CI compatibility and staging administrator handoff
 
+## 2026-11-22 integration and browser regression corrections (local)
+
+The API cancellation fixture was outdated. A new swap had four sessions and
+`duration=null`, version 1. Its first approval explicitly set `duration=1`,
+returning HTTP 200 with `swap.agreementVersion=2`. The second approval still
+submitted version 1 and correctly received HTTP 409:
+`Agreement terms changed. Reload and review before signing.`
+The session count was unchanged; fixed duration triggered the version advance.
+
+The full run also exposed an older migration fixture comparing the flexible-only
+checkpoint with the later actual-completion schema. It now compares against an
+explicit intermediate schema, then applies the unchanged actual-completion SQL
+only to its owned disposable database. It verifies the additional nullable field,
+unchanged indexes/constraints and unchanged historical rows at both checkpoints.
+Clients reconnect around DDL before taking the new-schema snapshots.
+
+The fixture now reads the initial server version, uses the version returned in
+`first.data.swap` for its second approval, and explicitly tests that a stale
+approval is rejected without changing the first signature. It checks that both
+participants approved the same version before retaining the original cancellation,
+idempotency, eligibility and outcome assertions. No backend agreement rule changed.
+
+Two legacy CLI fixtures also assumed their historical Google-only schema was
+the current release. They now execute the unchanged compiled CLI and its dependency
+closure in disposable workspaces, using the audited pre-Google model plus the
+Google migration's two models and nullable password. Current-release readiness
+remains covered by the separate complete release-chain tests. CLI/database guards,
+failed-history refusal, case-sensitive identity constraints, password preservation,
+backfill and duplicate-review rejection still execute. Child operator paths are
+isolated as well; no real operator lock/profile is used. Workspace cleanup removes
+the dependency junction and copied files first, with bounded retries for Windows
+file locks. Windows may retain an empty owned directory handle; the fixture only
+permits that specific EBUSY case after confirming no entries remain. Database
+container cleanup and all data-preservation assertions remain mandatory.
+
+The final student-journey fixture still classified forum deletion as ADMIN-only.
+Its obsolete missing-post 403 expectation was replaced by actual author/peer/ADMIN
+checks, including anonymous rejection, forged ownership rejection, missing-post
+404, owner-only comment cascade and preservation of unrelated posts. All genuinely
+administrative endpoints retain their anonymous/student denial assertions.
+
+The six selected browser configurations passed locally before modification;
+GitHub's logs establish the five failures, but its run uploaded no trace artifacts.
+Controlled local probes reproduced the conditions before applying corrections:
+
+- Wider readable font metrics made the unwrapped academic initialization button
+  exceed 320px. It now wraps within its available width, with automatic height
+  and a minimum 44px target. The existing responsive regression exercises 16px
+  text and keeps all viewport/control and no-mutation assertions.
+- A delayed Google identity response let the test fill the outgoing email signup
+  fields. The replacement Google form then had empty choices and consent; native
+  validation prevented submission. A scoped, valid submission already remained
+  disabled while pending. The corrected test waits for the named Google form,
+  its options and the actual POST, checks its consent/version payload, then checks
+  disabled controls, retained choices/consent and recovery after an error. A held
+  identity response makes the form transition deterministic, without sleeps.
+- The authentication skeleton could detach before the background style sample.
+  A detached node returned an empty string; the current surface returned the
+  correct `rgb(247, 250, 255)`. The test now polls the currently resolved surface;
+  all original color, gradient, contour, opacity and overflow assertions remain.
+  No background CSS was changed.
+- Legal-dialog opening reproduced React 18's Radix Portal/Slot ref warning.
+  Dialog and AlertDialog overlay wrappers now forward their refs to the actual
+  primitive. Existing legal-reader/removal tests assert there are no ref warnings.
+  Focus, Escape, consent and reduced-motion behavior are preserved.
+
+A local trace (52 snapshots) and screenshots were inspected; synthetic test
+artifacts/logs are stored outside Git under the operator's temporary directory.
+
+Files changed in this correction: `knoxite-backend/tests/integration/api.test.ts`,
+`knoxite-backend/tests/integration/four-blockers.test.ts`,
+`knoxite-backend/tests/integration/google-migration.test.ts`,
+`knoxite-backend/tests/integration/migration.test.ts`,
+`knoxite-backend/tests/integration/student-flow.test.ts`,
+`knoxite-backend/tests/integration/legacyCliFixture.ts` (new test-only helper),
+`src/app/pages/AssessmentAdminPage.tsx`, `src/app/components/ui/dialog.tsx`,
+`src/app/components/ui/alert-dialog.tsx`, `tests/browser/admin-console.spec.ts`,
+`tests/browser/google-auth.spec.ts`, `tests/browser/preset-skills.spec.ts`,
+`tests/browser/surface-scheduling.spec.ts`, and this report.
+
+Validation: targeted API integration **10/10 passed**; targeted browser checks
+**10/10 passed**, including all five previously failing configurations and both
+shared overlay regressions. Frontend TypeScript/build and backend TypeScript/build
+passed. An intermediate selector-encoding edit was corrected; the four calendar
+cases passed before the clean complete browser rerun. Full integration/browser
+results: browser **386/386 passed**; the exact full command
+`node development/ciIntegration.cjs` **passed all 9 files, 56/56 Node test results
+(including suite parents), 0 failures, 0 skips**. The final student-journey target
+also passed 7/7 independently. Migration SQL and runtime backend rules are unchanged.
+
+Only verified, ownership-labelled disposable MySQL targets are used by
+`development/ciIntegration.cjs`; each file gets a new isolated database. No Railway,
+production, recovery-1 or OAuth database was contacted. No hosting configuration,
+protected migration, backup, authentication policy, legal content or UI workflow
+was changed. Existing unrelated local operator work is preserved. No commit,
+push or deployment is authorized by this verification; GitHub CI must later be
+rerun on a separately authorized push. Vite's existing large-bundle warning remains.
+
+## Earlier compatibility evidence
+
 **Historical policy note — 2026-11-22:** Scheduled-end confirmation checks in
 this report describe the earlier implementation/test baseline. The current local
 rules allow explicit actual-completion logging for early or unscheduled sessions,

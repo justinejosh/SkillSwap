@@ -34,7 +34,11 @@ for(const theme of ["light","dark"] as const){
     test.setTimeout(60000);await fixture(page,theme);
     for(const route of ["/dashboard","/knox-hub","/leaderboard","/notification","/students/surface-b","/profile","/swap-agreement/surface-swap","/swap-details/surface-swap","/calendar?swapId=surface-swap","/chat"]){
       await page.goto(route);const surface=page.locator(".knoxite-surface").first();await expect(surface).toBeVisible();
-      const styles=await surface.evaluate(el=>{const s=getComputedStyle(el),p=getComputedStyle(el,"::before"),c=document.createElement("canvas");c.width=c.height=1;const ctx=c.getContext("2d")!;ctx.fillStyle=p.backgroundColor;ctx.fillRect(0,0,1,1);return{base:s.backgroundColor,image:s.backgroundImage,pointer:p.pointerEvents,animation:p.animationName,mask:p.maskImage,repeat:p.maskRepeat,alpha:ctx.getImageData(0,0,1,1).data[3]/255};});
+      const readStyles=()=>surface.evaluate(el=>{const s=getComputedStyle(el),p=getComputedStyle(el,"::before"),c=document.createElement("canvas");c.width=c.height=1;const ctx=c.getContext("2d")!;ctx.fillStyle=p.backgroundColor;ctx.fillRect(0,0,1,1);return{base:s.backgroundColor,image:s.backgroundImage,pointer:p.pointerEvents,animation:p.animationName,mask:p.maskImage,repeat:p.maskRepeat,alpha:ctx.getImageData(0,0,1,1).data[3]/255};});
+      // AuthGuard replaces its neutral surface after validation. Retry against
+      // the current DOM rather than asserting an empty style from a detached node.
+      let styles={} as Awaited<ReturnType<typeof readStyles>>;
+      await expect.poll(async()=>{styles=await readStyles();return styles.base;}).toBe(theme==="light"?"rgb(247, 250, 255)":"rgb(17, 28, 46)");
       expect(styles.base).toBe(theme==="light"?"rgb(247, 250, 255)":"rgb(17, 28, 46)");expect(styles.image).toContain("linear-gradient");expect(styles.image).not.toContain("radial-gradient");expect(styles.mask).toContain("svg");expect(styles.repeat).toBe("repeat");expect(styles.alpha).toBeGreaterThan(0);expect(styles.alpha).toBeLessThanOrEqual(.08);expect(styles.pointer).toBe("none");expect(styles.animation).toBe("none");expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
       if(route==="/dashboard"){await expect(page.getByRole("heading",{name:"Compatible Peer Matches",exact:true})).toBeVisible();await page.screenshot({path:info.outputPath(`wash-${theme}.png`),fullPage:true});}
     }

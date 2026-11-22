@@ -5,9 +5,11 @@ import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 import { PrismaClient } from "@prisma/client";
 import { requireOwnedFixtureDatabase } from "./fixtureDatabase";
-import { backendRoot } from "../../scripts/preflight";
+import { legacyCliFixture } from "./legacyCliFixture";
 test("migration rehearsal preserves historical data and blocks unsafe legacy rows", async (t) => {
   const rootUrl = requireOwnedFixtureDatabase(true);
+  const historical = legacyCliFixture();
+  const backendRoot = historical.root;
   assert.match(new URL(rootUrl).pathname, /_test$/);
   const root = new PrismaClient({ datasources: { db: { url: rootUrl } } });
   const created: string[] = [];
@@ -20,6 +22,7 @@ test("migration rehearsal preserves historical data and blocks unsafe legacy row
     url.pathname = `/${name}`;
     const env = {
       ...process.env,
+    LOCALAPPDATA: historical.localAppData,
       DATABASE_URL: url.toString(),
       KNOXITE_LOCAL_DATABASE_ACK: "local-synthetic-or-sanitized",
     };
@@ -179,5 +182,6 @@ test("migration rehearsal preserves historical data and blocks unsafe legacy row
       await root.$executeRawUnsafe(`DROP DATABASE \`${name}\``);
     }
     await root.$disconnect();
+    historical.dispose();
   }
 });

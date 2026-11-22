@@ -196,6 +196,12 @@ test("narrow-screen admin UI review",async({page},info)=>{
   const issues:any[]=[];
   for(const path of ["/admin-dashboard","/admin-dashboard?section=analytics","/admin-dashboard?section=students","/admin-dashboard?section=forum","/admin-dashboard?section=leaderboard","/admin/assessments","/admin/assessments?section=academic","/admin/assessments?section=reports","/admin/integrity"]){
     await page.goto(path);await page.getByRole("heading",{level:1}).waitFor();await page.waitForTimeout(100);
+    if(path==="/admin/assessments?section=academic") {
+      const initialize=page.getByRole("button",{name:"Initialize Team-Approved Programs",exact:true});
+      // Exercise wider platform/font metrics without shrinking or hiding text.
+      await initialize.evaluate(el=>{el.style.transition="none";el.style.fontSize="16px";});
+      await initialize.scrollIntoViewIfNeeded();await expect(initialize).toBeInViewport();
+    }
     await page.screenshot({path:info.outputPath(path.replace(/[^a-z0-9]/gi,"_")+".png")});
     const result=await page.evaluate(()=>({width:document.documentElement.scrollWidth,viewport:innerWidth,controls:[...document.querySelectorAll<HTMLElement>("button,a,input,select")].filter(el=>{const r=el.getBoundingClientRect();return r.width>0&&r.height>0&&(r.left<0||r.right>innerWidth+1)&&!el.closest(".admin-scroll")}).map(el=>({text:el.textContent?.trim().slice(0,70),tag:el.tagName,x:el.getBoundingClientRect().x,width:el.getBoundingClientRect().width}))}));
     if(result.width>result.viewport||result.controls.length)issues.push({path,...result});

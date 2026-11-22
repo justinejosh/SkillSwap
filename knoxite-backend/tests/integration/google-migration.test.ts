@@ -6,7 +6,7 @@ import { resolve } from "node:path";
 import bcrypt from "bcrypt";
 import { PrismaClient } from "@prisma/client";
 import { requireOwnedFixtureDatabase } from "./fixtureDatabase";
-import { backendRoot } from "../../scripts/preflight";
+import { legacyCliFixture } from "./legacyCliFixture";
 import {
   captureLegacyData,
   assertLegacyDataPreserved,
@@ -17,6 +17,8 @@ import { loadConfig } from "../../lib/config";
 
 test("Google migration preserves all populated legacy rows and enforces case-sensitive identities", async () => {
   const rootUrl = requireOwnedFixtureDatabase(true);
+  const historical = legacyCliFixture();
+  const backendRoot = historical.root;
   assert.match(new URL(rootUrl).pathname, /_test$/);
   const root = new PrismaClient({ datasources: { db: { url: rootUrl } } });
   const name = `knoxite_google_migration_${randomUUID().replaceAll("-", "")}_test`;
@@ -26,6 +28,7 @@ test("Google migration preserves all populated legacy rows and enforces case-sen
   await root.$executeRawUnsafe(`CREATE DATABASE \`${name}\``);
   const env = {
     ...process.env,
+    LOCALAPPDATA: historical.localAppData,
     DATABASE_URL: url.toString(),
     KNOXITE_LOCAL_DATABASE_ACK: "local-synthetic-or-sanitized",
   };
@@ -227,5 +230,6 @@ test("Google migration preserves all populated legacy rows and enforces case-sen
     assert.match(name, /^knoxite_google_migration_[a-f0-9]+_test$/);
     await root.$executeRawUnsafe(`DROP DATABASE \`${name}\``);
     await root.$disconnect();
+    historical.dispose();
   }
 });
