@@ -51,3 +51,38 @@ test("scheduling API rejects direct bypasses, closed exchanges and locked sessio
     const read=await fetch(url);assert.equal(read.status,200);const rows:any=await read.json();assert.equal(rows[0].scheduledAt,"2020-01-01T00:00:00.000Z");
   } finally {server.close();await once(server,"close");}
 });
+
+
+test("either participant locks scheduled and unscheduled sessions without changing history or the other confirmation", async () => {
+  let caller="a", writes=0;
+  const now=Date.now();
+  const swap:any={id:"swap",requesterId:"a",receiverId:"b",status:"CONFIRMED",integrityVerified:true,sessions:3,duration:null,requesterSessions:0,receiverSessions:0,requesterApprovedAt:new Date(now-60000),receiverApprovedAt:new Date(now-30000)};
+  const logs:any[]=[];
+  const schedules=new Map<number,any>([[1,{swapId:"swap",sessionNumber:1,scheduledAt:new Date(now+3600000),endsAt:new Date(now+5400000),meetingLink:"https://example.invalid/original"}]]);
+  const db:any={$transaction:async(fn:any)=>fn(db),$queryRaw:async()=>[],swap:{findUnique:async()=>swap},sessionConfirmation:{count:async({where}:any)=>logs.filter(l=>l.swapId===where.swapId&&l.sessionNumber===where.sessionNumber).length},swapSession:{findUnique:async({where}:any)=>schedules.get(where.swapId_sessionNumber.sessionNumber),upsert:async({create,update}:any)=>{writes++;const row={...(schedules.get(create.sessionNumber)||create),...update};schedules.set(create.sessionNumber,row);return row;}}};
+  const app=express();app.use(express.json());app.use((req,_res,next)=>{req.userId=caller;req.userRole="USER";next();});app.use(sessionsRouter(db));app.use(errorHandler);
+  const server=app.listen(0,"127.0.0.1");await once(server,"listening");
+  const url=`http://127.0.0.1:${(server.address() as any).port}/`;
+  async function save(number:number,status:number){const r=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({swapId:"swap",sessionNumber:number,scheduledAt:new Date(now+7200000).toISOString(),endsAt:new Date(now+8100000).toISOString()})});assert.equal(r.status,status,await r.clone().text());if(status===409)assert.match((await r.json() as any).error,/acknowledged/);}
+  try {
+    for(const participant of ["a","b"]){
+      // Session 1 exists, session 2 was never scheduled. Both must lock.
+      swap.requesterSessions=participant==="a"?2:0;swap.receiverSessions=participant==="b"?2:0;
+      logs.splice(0,logs.length,...[1,2].map(sessionNumber=>({swapId:"swap",sessionNumber,participantId:participant})));
+      const before=JSON.stringify({swap,logs,schedules:[...schedules]});const beforeWrites=writes;
+      for(caller of ["a","b"]){await save(1,409);await save(2,409);}
+      assert.equal(writes,beforeWrites);assert.equal(JSON.stringify({swap,logs,schedules:[...schedules]}),before);
+      assert.equal(schedules.has(2),false);
+      caller="outsider";await save(3,403);caller="a";
+      await save(3,201); // The remaining unacknowledged session is still eligible.
+    }
+    const lastWrites=writes;
+    swap.requesterSessions=3;swap.receiverSessions=0;
+    // Retain protection for historical counters even if no matching log exists.
+    logs.length=0;for(const number of [1,2,3])await save(number,409);
+    assert.equal(writes,lastWrites);assert.equal(swap.receiverSessions,0);assert.equal(swap.status,"CONFIRMED");
+    swap.requesterSessions=swap.receiverSessions=0;
+    logs.push({swapId:"swap",sessionNumber:3,participantId:"b"});
+    await save(3,409);assert.equal(writes,lastWrites); // Log guard remains authoritative too.
+  } finally {server.close();await once(server,"close");}
+});

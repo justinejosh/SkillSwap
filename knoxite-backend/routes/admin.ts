@@ -1,3 +1,4 @@
+import { ReportEvidenceService } from "../services/reportEvidence";
 import express from "express";
 import { PrismaClient } from "@prisma/client";
 import { actor, requireAdmin } from "../middleware/authMiddleware";
@@ -13,7 +14,7 @@ import {
 } from "../services/departmentDraft";
 import { integrityRouter } from "./integrity";
 import { INTEGRITY_REVIEW_REASON } from "../services/exchangeIntegrity";
-export function adminRouter(db: PrismaClient) {
+export function adminRouter(db: PrismaClient, evidence?: ReportEvidenceService) {
   const router = express.Router();
   router.use(requireAdmin);
   router.get("/users", async (req, res) => {
@@ -417,17 +418,42 @@ export function adminRouter(db: PrismaClient) {
         "Retired for new attempts. Existing attempts and earned tiers are retained.",
     });
   });
+  router.get("/moderation-audit", async (req, res) => {
+    const page = integer(Number(req.query.page ?? 1), "Page", 1, 100000);
+    const threadId = text(req.query.threadId ?? "", "Thread", 191, true);
+    const where = { action: "DELETE_REPLY", ...(threadId ? { threadId } : {}) };
+    const [total, records] = await Promise.all([db.adminAudit.count({ where }), db.adminAudit.findMany({ where, orderBy: [{ createdAt: "desc" }, { id: "desc" }], skip: (page-1)*20, take: 20 })]);
+    res.json({ total, page, pageSize: 20, records });
+  });
+  router.get("/reports/:id/evidence", async (req, res) => {
+    if (!evidence) throw new HttpError(503, "Private evidence storage is not enabled.");
+    const bytes = await evidence.preview(String(req.params.id), actor(req));
+    res.set({ "Content-Type": "image/webp", "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff", "Content-Security-Policy": "default-src 'none'; sandbox", "Content-Disposition": "inline; filename=report-evidence.webp" });
+    res.send(bytes);
+  });
+  router.post("/report-evidence/retention", async (req, res) => {
+    onlyKeys(req.body, ["confirm"]);
+    if (req.body.confirm !== undefined && typeof req.body.confirm !== "boolean") throw new HttpError(422, "Confirm must be a boolean.");
+    if (!evidence) throw new HttpError(503, "Private evidence storage is not enabled.");
+    res.json(await evidence.purgeExpired(actor(req), req.body.confirm === true));
+  });
+  router.post("/report-evidence/cleanup", async (req, res) => {
+    onlyKeys(req.body, []);
+    if (!evidence) throw new HttpError(503, "Private evidence storage is not enabled.");
+    await db.adminAudit.create({ data: { administratorId: actor(req), action: "CLEANUP_EVIDENCE_ORPHANS" } });
+    res.json(await evidence.cleanupOrphans());
+  });
   router.get("/reports", async (_req, res) => {
-    res.json(
-      await db.userReport.findMany({
+    const rows = await db.userReport.findMany({
         where: { reason: { not: INTEGRITY_REVIEW_REASON } },
         include: {
           reporter: { select: { id: true, name: true } },
           target: { select: { id: true, name: true } },
+          evidence: { select: { id: true, state: true } },
         },
         orderBy: { createdAt: "desc" },
-      }),
-    );
+      });
+    res.json(rows.map(({evidence: attachment, ...report}) => ({...report, hasEvidence: attachment?.state === "ATTACHED"})));
   });
   router.patch("/reports/:id", async (req, res) => {
     onlyKeys(req.body, ["status", "resolution"]);

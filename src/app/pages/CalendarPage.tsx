@@ -1,3 +1,4 @@
+import { schedulableSessionNumbers, sessionHasParticipation } from "@/app/lib/sessionScheduling";
 import { LoadingContent } from "@/app/components/PageSkeleton";
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router";
@@ -61,9 +62,20 @@ export default function CalendarPage() {
   },[load]);
   const eligible=swaps.filter(s=>s.status==="CONFIRMED"&&s.integrityVerified);
   const selected=swaps.find(s=>s.id===form.swapId), approved=approvalTime(selected);
-  const unscheduled=selected?Array.from({length:selected.sessions},(_,i)=>i+1).filter(number=>!sessions.some(s=>s.swapId===selected.id&&s.sessionNumber===number&&Number.isFinite(Date.parse(s.scheduledAt)))):[];
-  const canSchedule=selected?.status==="CONFIRMED"&&selected.integrityVerified&&Number.isFinite(approved);
-  const locked=sessions.some(s=>s.swapId===form.swapId&&s.sessionNumber===form.sessionNumber&&(s.confirmedByMe||s.confirmedByPartner));
+  const selectedRows=sessions.filter(s=>s.swapId===form.swapId);
+  const available=selected?schedulableSessionNumbers(selected,selectedRows):[];
+  const availableKey=available.join(",");
+  const unscheduled=available.filter(number=>!selectedRows.some(s=>s.sessionNumber===number&&Number.isFinite(Date.parse(s.scheduledAt))));
+  const recordedUnscheduled=selected?Array.from({length:selected.sessions},(_,i)=>i+1).filter(number=>sessionHasParticipation(selected,number,selectedRows)&&!selectedRows.some(s=>s.sessionNumber===number)):[];
+  const canSchedule=available.length>0&&Number.isFinite(approved);
+  const locked=!!selected&&sessionHasParticipation(selected,form.sessionNumber,selectedRows);
+  // A partner may record participation while this form is open. Move only a
+  // newly locked selection to the next eligible session, clearing stale input.
+  useEffect(()=>{
+    const numbers=availableKey?availableKey.split(",").map(Number):[];
+    if(numbers.length)setForm(f=>numbers.includes(f.sessionNumber)?f:{...f,sessionNumber:numbers[0],scheduledAt:"",endsAt:"",meetingLink:""});
+  },[availableKey]);
+  const visibleSessions=form.swapId?selectedRows:sessions;
   const minimum=localMinute(Math.ceil((Math.max(clock,Number.isFinite(approved)?approved:clock)+1)/60000)*60000);
   const past=!!form.scheduledAt&&new Date(form.scheduledAt).getTime()<=clock;
   async function submit(e:FormEvent) {
@@ -80,6 +92,7 @@ export default function CalendarPage() {
       setBusy(true);
       const latest=await api(`/swaps/${encodeURIComponent(form.swapId)}`);
       if(latest.status!=="CONFIRMED"||!latest.integrityVerified)throw new Error("This exchange is no longer available for scheduling. Refresh its status.");
+      if(sessionHasParticipation(latest,form.sessionNumber))throw new Error("An acknowledged session cannot be rescheduled. Refresh the calendar.");
       const date=validateStart(form.scheduledAt,latest);
       const latestEnd=validateEnd(form.endsAt,date);
       if(latest.duration != null && latestEnd.getTime() !== date.getTime()+latest.duration*3600000)
@@ -97,11 +110,11 @@ export default function CalendarPage() {
       {error&&<p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-200">{error}</p>}
       {notice&&<p role="status" className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-950 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-100">{notice}</p>}
       {loading?<LoadingContent layout="form" label="Loading your calendar..." />:<>
-        {selected&&<div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900 sm:p-6"><ExchangeSummary swap={selected}/>{!canSchedule&&<p className="mt-4 text-sm text-slate-600 dark:text-slate-300">{selected.status!=="CONFIRMED"?"This exchange is read-only. Its existing schedules remain available below.":"Recorded bilateral approvals are required before scheduling. Contact an administrator for help."}</p>}</div>}
+        {selected&&<div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900 sm:p-6"><ExchangeSummary swap={selected}/>{!canSchedule&&<p className="mt-4 text-sm text-slate-600 dark:text-slate-300">{selected.status!=="CONFIRMED"?"This exchange is read-only. Its existing schedules remain available below.":!selected.integrityVerified||!Number.isFinite(approved)?"Recorded bilateral approvals are required before scheduling. Contact an administrator for help.":"All agreed sessions have recorded participation. Session details are read-only; your partner still confirms independently."}</p>}</div>}
         <form noValidate onSubmit={submit} aria-label="Schedule a session" className="grid gap-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900 sm:grid-cols-2 sm:p-6">
           <h2 className="text-lg font-bold sm:col-span-2">Schedule a session</h2>
           <label className="min-w-0 text-sm font-semibold">Confirmed exchange<select required className={input} value={form.swapId} onChange={e=>{setForm({swapId:e.target.value,sessionNumber:1,scheduledAt:"",endsAt:"",meetingLink:""});setNotice("");setError("");}}><option value="">Choose exchange</option>{eligible.map(s=><option key={s.id} value={s.id}>{s.offeredSkill.name} / {s.wantedSkill.name}</option>)}</select></label>
-          <label className="min-w-0 text-sm font-semibold">Session number<select required disabled={!canSchedule} className={input} value={form.sessionNumber} onChange={e=>setForm(f=>({...f,sessionNumber:Number(e.target.value)}))}>{Array.from({length:selected?.sessions||0},(_,i)=>i+1).map(n=><option key={n} value={n} disabled={sessions.some(s=>s.swapId===form.swapId&&s.sessionNumber===n&&(s.confirmedByMe||s.confirmedByPartner))}>Session {n}{sessions.some(s=>s.swapId===form.swapId&&s.sessionNumber===n&&(s.confirmedByMe||s.confirmedByPartner))?" — acknowledged, locked":""}</option>)}</select></label>
+          <label className="min-w-0 text-sm font-semibold">Session number<select required disabled={!canSchedule} className={input} value={form.sessionNumber} onChange={e=>setForm(f=>({...f,sessionNumber:Number(e.target.value)}))}>{Array.from({length:selected?.sessions||0},(_,i)=>i+1).map(n=><option key={n} value={n} disabled={sessionHasParticipation(selected,n,selectedRows)}>Session {n}{sessionHasParticipation(selected,n,selectedRows)?" — acknowledged, locked":""}</option>)}</select></label>
           <label className="min-w-0 text-sm font-semibold">Date and time (your local time)<input required disabled={!canSchedule||locked} type="datetime-local" step="60" min={minimum} aria-invalid={past} aria-describedby="session-time-help" className={input} value={form.scheduledAt} onFocus={()=>setClock(Date.now())} onChange={e=>setForm(f=>({...f,scheduledAt:e.target.value}))}/></label>
           <label className="min-w-0 text-sm font-semibold">End date and time (your local time)<input required disabled={!canSchedule||locked} type="datetime-local" step="60" min={form.scheduledAt||minimum} className={input} value={form.endsAt} onChange={e=>setForm(f=>({...f,endsAt:e.target.value}))}/></label>
           <label className="min-w-0 text-sm font-semibold">HTTPS meeting link (optional)<input disabled={!canSchedule||locked} type="url" placeholder="https://" className={input} value={form.meetingLink} onChange={e=>setForm(f=>({...f,meetingLink:e.target.value}))}/></label>
@@ -111,9 +124,10 @@ export default function CalendarPage() {
           <div className="flex flex-wrap gap-3 sm:col-span-2"><Button disabled={busy||!canSchedule||locked} className="bg-blue-600 text-white hover:bg-blue-700">{busy?"Saving...":"Save Session Schedule"}</Button><Button variant="outline" type="button" disabled={busy} onClick={()=>void load()}>Refresh calendar</Button></div>
         </form>
         <section aria-label="Scheduled sessions" className="space-y-3"><h2 className="text-lg font-bold">Scheduled sessions</h2>
-          {!sessions.length&&!error&&<p className="rounded-2xl border border-slate-200 bg-white p-5 text-sm dark:border-slate-700 dark:bg-slate-900">No sessions scheduled yet.</p>}
+          {!visibleSessions.length&&!error&&<p className="rounded-2xl border border-slate-200 bg-white p-5 text-sm dark:border-slate-700 dark:bg-slate-900">No sessions scheduled yet.</p>}
           {!!unscheduled.length&&<p className="break-words rounded-2xl border border-dashed border-slate-300 p-4 text-sm text-slate-600 dark:border-slate-700 dark:text-slate-300">Not scheduled yet: {unscheduled.map(number=>`Session ${number}`).join(", ")}. You can arrange these later.</p>}
-          {sessions.map(s=><article key={s.id} className="space-y-3 rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900"><h3 className="break-words font-semibold">Session {s.sessionNumber} with {s.partner?.name || "Swap partner"}</h3><p className="text-sm"><DateTimeText value={s.scheduledAt}/></p>{s.endsAt&&<p className="text-sm">Ends: <DateTimeText value={s.endsAt} fallback="End time unavailable"/></p>}<p className="text-sm text-slate-600 dark:text-slate-300">Exchange: {(s.exchangeStatus||"Unavailable").replaceAll("_"," ")} · You: {s.confirmedByMe?"acknowledged":"not acknowledged"} · Partner: {s.confirmedByPartner?"acknowledged":"not acknowledged"}</p>{s.meetingLink&&<a className="block break-all text-sm text-blue-700 underline dark:text-blue-300" href={s.meetingLink} target="_blank" rel="noopener noreferrer">Open meeting</a>}<p className="text-sm text-slate-600 dark:text-slate-300">{s.confirmationEligibility?.reason||"Open Swap Tracking to check confirmation availability."}{s.confirmationEligibility?.scheduledEndAt&&<> Scheduled end: <DateTimeText value={s.confirmationEligibility.scheduledEndAt} fallback="End time unavailable"/>.</>}</p><Link className="inline-block text-sm text-blue-700 underline dark:text-blue-300" to={`/swap-details/${s.swapId}`}>View exchange and confirmations</Link></article>)}
+          {!!recordedUnscheduled.length&&<p className="text-sm text-slate-600 dark:text-slate-300">Participation recorded without a schedule: {recordedUnscheduled.map(number=>`Session ${number}`).join(", ")}. These sessions cannot be scheduled or edited.</p>}
+          {visibleSessions.map(s=><article key={s.id} className="space-y-3 rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900"><h3 className="break-words font-semibold">Session {s.sessionNumber} with {s.partner?.name || "Swap partner"}</h3><p className="text-sm"><DateTimeText value={s.scheduledAt}/></p>{s.endsAt&&<p className="text-sm">Ends: <DateTimeText value={s.endsAt} fallback="End time unavailable"/></p>}<p className="text-sm text-slate-600 dark:text-slate-300">Exchange: {(s.exchangeStatus||"Unavailable").replaceAll("_"," ")} · You: {s.confirmedByMe?"acknowledged":"not acknowledged"} · Partner: {s.confirmedByPartner?"acknowledged":"not acknowledged"}</p>{s.meetingLink&&<a className="block break-all text-sm text-blue-700 underline dark:text-blue-300" href={s.meetingLink} target="_blank" rel="noopener noreferrer">Open meeting</a>}<p className="text-sm text-slate-600 dark:text-slate-300">{s.confirmationEligibility?.reason||"Open Swap Tracking to check confirmation availability."}{s.confirmationEligibility?.scheduledEndAt&&<> Scheduled end: <DateTimeText value={s.confirmationEligibility.scheduledEndAt} fallback="End time unavailable"/>.</>}</p><Link className="inline-block text-sm text-blue-700 underline dark:text-blue-300" to={`/swap-details/${s.swapId}`}>View exchange and confirmations</Link></article>)}
         </section>
       </>}
     </div>

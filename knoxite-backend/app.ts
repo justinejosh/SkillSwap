@@ -1,3 +1,5 @@
+import { EvidenceStorage, s3EvidenceStorage } from "./services/privateEvidenceStorage";
+import { ReportEvidenceService } from "./services/reportEvidence";
 import { academicOptions, eligibleStudentWhere } from "./services/academics";
 import { sessionsRouter } from "./routes/sessions";
 import express from "express";
@@ -37,7 +39,9 @@ export function createApp(
   mailer: VerificationMailer = configuredMailer(),
   maintenance: () => boolean = () => false,
   verifyGoogle: GoogleVerifier = googleVerifier(),
+  evidenceStorage?: EvidenceStorage,
 ) {
+  const evidence = config.reportEvidence ? new ReportEvidenceService(db, evidenceStorage ?? s3EvidenceStorage(config.reportEvidence), config.reportEvidence.retentionDays) : undefined;
   const app = express();
   app.disable("x-powered-by");
   app.use((_req, res, next) => {
@@ -158,12 +162,12 @@ export function createApp(
   app.use("/api/swap-requests", swaps.requests);
   app.use("/api/reputation", swaps.reputation);
   app.use("/api/assessments", assessmentsRouter(db));
-  app.use("/api/admin", adminRouter(db));
+  app.use("/api/admin", adminRouter(db, evidence));
   app.use("/api/chat", chatRouter(db));
   app.use("/api/analytics", analyticsRouter(db));
   app.use("/api/forum", forumRouter(db));
   app.use("/api/board", boardRouter(db));
-  app.use("/api/reports", reportsRouter(db));
+  app.use("/api/reports", reportsRouter(db, evidence));
   app.use((_req, res) => {
     res.status(404).json({ error: "Endpoint not found." });
   });

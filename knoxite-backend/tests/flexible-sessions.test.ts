@@ -115,7 +115,7 @@ test("actual completion migration adds only a nullable field without rewriting a
 });
 
 test("release preflight accepts only checksum-verified known migration prefixes",async()=>{
-  const names=["20261117000000_current_release","20261121000000_flexible_session_ranges","20261122000000_actual_session_completion"];
+  const names=["20261117000000_current_release","20261121000000_flexible_session_ranges","20261122000000_actual_session_completion","20261123000000_moderation_and_report_evidence"];
   const rows=names.map(migration_name=>({migration_name,checksum:createHash("sha256").update(readFileSync(resolve(__dirname,`../../prisma/release/migrations/${migration_name}/migration.sql`))).digest("hex"),finished_at:new Date(),rolled_back_at:null}));
   let history:any[]=rows;
   const db:any={$queryRaw:async(parts:TemplateStringsArray)=>String(parts).includes("information_schema.tables")?[{name:"_prisma_migrations"}]:history};
@@ -125,7 +125,7 @@ test("release preflight accepts only checksum-verified known migration prefixes"
 });
 
 test("CI disposable preflight accepts the complete release history and rejects tampering before running a command",async()=>{
-  const names=["20261117000000_current_release","20261121000000_flexible_session_ranges","20261122000000_actual_session_completion"];
+  const names=["20261117000000_current_release","20261121000000_flexible_session_ranges","20261122000000_actual_session_completion","20261123000000_moderation_and_report_evidence"];
   const rows=names.map(migration_name=>({migration_name,checksum:createHash("sha256").update(readFileSync(resolve(__dirname,`../../prisma/release/migrations/${migration_name}/migration.sql`))).digest("hex"),finished_at:new Date(),rolled_back_at:null}));
   let history=rows, commands=0;
   const m={container:"synthetic-ci",containerId:"synthetic-id",owner:"synthetic-owner",port:"39999",url:"mysql://synthetic:unused@127.0.0.1:39999/knoxite_four_abcdef_test",legacyUrl:"mysql://synthetic:unused@127.0.0.1:39999/knoxite_four_abcdef_legacy_test",appUrl:"mysql://synthetic:unused@127.0.0.1:39999/knoxite_four_abcdef_test"};

@@ -40,6 +40,7 @@ export default function DashboardPage() {
   const navigate = useNavigate();
   const [dashboardError, setDashboardError] = useState("");
   const [swaps, setSwaps] = useState<any[]>([]);
+  const [scheduledSwapIds, setScheduledSwapIds] = useState<Set<string> | null>(null);
   const [matches, setMatches] = useState<any[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [currentUserName, setCurrentUserName] = useState<string>("");
@@ -126,13 +127,18 @@ export default function DashboardPage() {
         "bypass-tunnel-reminder": "true",
       };
 
-      const [sRes, mRes, reqRes] = await Promise.all([
+      const [sRes, mRes, reqRes, calendarRes] = await Promise.all([
         authenticatedFetch(`${API_BASE_URL}/swaps`, { headers }),
         authenticatedFetch(`${API_BASE_URL}/matches`, { headers }),
         authenticatedFetch(`${API_BASE_URL}/swap-requests`, { headers }),
+        authenticatedFetch(`${API_BASE_URL}/sessions`, { headers }).catch(() => null),
       ]);
 
       if (sRes.ok) setSwaps(await sRes.json());
+      if (calendarRes?.ok) {
+        const calendar = await calendarRes.json();
+        setScheduledSwapIds(new Set(calendar.filter((row: any) => row.scheduledAt && Number.isFinite(Date.parse(row.scheduledAt))).map((row: any) => row.swapId)));
+      } else setScheduledSwapIds(null);
       if (mRes.ok) setMatches(await mRes.json());
       else {
         const data = await mRes.json();
@@ -491,6 +497,7 @@ export default function DashboardPage() {
                     key={swap.id}
                     swap={swap}
                     currentUserId={currentUserId}
+                    scheduled={scheduledSwapIds === null ? null : scheduledSwapIds.has(swap.id)}
                   />
                 ))
               )}
@@ -648,11 +655,22 @@ export default function DashboardPage() {
   );
 }
 
-function ActiveSwapCard({ swap, currentUserId }: any) {
+function ActiveSwapCard({ swap, currentUserId, scheduled }: any) {
   const isReq = swap.requesterId === currentUserId;
   const partner = isReq ? swap.receiver : swap.requester;
   const mySessions = isReq ? swap.requesterSessions : swap.receiverSessions;
   const totalSessions = swap.sessions || 1;
+  const partnerSessions = (isReq ? swap.receiverSessions : swap.requesterSessions) || 0;
+  const agreed = swap.status === "CONFIRMED" && swap.integrityVerified && swap.requesterApprovedAt && swap.receiverApprovedAt;
+  const progressApplies = agreed && (mySessions > 0 || partnerSessions > 0);
+  const phase = !agreed ? "Waiting for both parties to agree"
+    : mySessions >= totalSessions && partnerSessions >= totalSessions ? "Sessions confirmed — reviews pending"
+    : mySessions >= totalSessions ? "Waiting for your partner’s confirmation"
+    : partnerSessions >= totalSessions ? "Waiting for your confirmation"
+    : progressApplies ? "Exchange in progress"
+    : scheduled === true ? "Waiting for first session"
+    : scheduled === false ? "Agreement complete — scheduling pending"
+    : "Agreement complete";
 
   const mySkill = isReq
     ? swap.requesterSkill?.name || swap.offeredSkill?.name || "My Skill"
@@ -704,30 +722,14 @@ function ActiveSwapCard({ swap, currentUserId }: any) {
         </div>
       </div>
 
-      {/* SEGMENTED PROGRESS SLICES */}
       <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-800 space-y-2.5">
-        <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-          <span className="text-slate-500 dark:text-slate-400 font-medium">
-            Session Progress
-          </span>
-          <span className="font-bold text-slate-800 dark:text-slate-200">
-            {mySessions || 0} / {totalSessions} Confirmed by you
-          </span>
-        </div>
-
-        <div className="flex items-center gap-1.5 w-full">
-          {Array.from({ length: totalSessions }).map((_, index) => {
-            const isCompleted = index < (mySessions || 0);
-            return (
-              <div
-                key={index}
-                className={`h-2 flex-1 rounded-full transition-all duration-300 ${
-                  isCompleted ? "bg-blue-600" : "bg-slate-200 dark:bg-slate-700"
-                }`}
-              />
-            );
-          })}
-        </div>
+        <p className="text-xs font-semibold leading-relaxed text-slate-800 dark:text-slate-200">{phase}</p>
+        {progressApplies && <>
+          <p className="text-xs text-slate-600 dark:text-slate-300">Your confirmations: {mySessions || 0} / {totalSessions}</p>
+          <div role="progressbar" aria-label="Your session confirmations" aria-valuemin={0} aria-valuemax={totalSessions} aria-valuenow={mySessions || 0} className="flex items-center gap-1.5 w-full">
+            {Array.from({ length: totalSessions }).map((_, index) => <div key={index} className={`h-2 flex-1 rounded-full ${index < (mySessions || 0) ? "bg-blue-600" : "bg-slate-200 dark:bg-slate-700"}`} />)}
+          </div>
+        </>}
       </div>
     </Link>
   );

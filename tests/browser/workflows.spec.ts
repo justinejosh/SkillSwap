@@ -525,9 +525,8 @@ for (const path of ["/dashboard", "/knox-hub"]) {
         { exact: true },
       ),
     ).toBeVisible();
-    await expect(
-      page.getByRole("link", { name: "Awaiting evidence (1)", exact: true }),
-    ).toBeVisible();
+    await expect(page.getByText("1 match found", { exact: true })).toBeVisible();
+    await expect(page.getByRole("navigation", { name: "Match groups", exact: true })).toHaveCount(0);
     const request = group.getByRole("button", {
       name: "Request Swap",
       exact: true,
@@ -580,14 +579,10 @@ test("mixed cohorts keep unranked matches in a separate visible group without as
     page.getByRole("region", { name: "Matches awaiting enough evidence (1)" }),
   ).toBeVisible();
   await expect(
-    page.getByRole("region", { name: "Ranked Matches (1)" }),
+    page.getByRole("region", { name: "Peers with match scores (1)" }),
   ).toBeVisible();
-  await expect(
-    page.getByRole("link", { name: "Awaiting evidence (1)", exact: true }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("link", { name: "Ranked Matches (1)", exact: true }),
-  ).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Match groups" })).toHaveCount(0);
+  await expect(page.getByText("2 matches found", { exact: true })).toBeVisible();
   const unranked = page.getByRole("article", {
     name: "Synthetic Peer reciprocal match",
     exact: true,
@@ -612,7 +607,7 @@ for (const path of ["/dashboard", "/knox-hub"]) {
         uniqueRatingPartners: 1, proximity: { value: proximity, reason: "Synthetic academic fixture." }, missing: [] },
     })), unrankedPeer());
     await page.goto(path);
-    const scored = page.getByRole("region", { name: "Ranked Matches (3)", exact: true });
+    const scored = page.getByRole("region", { name: "Peers with match scores (3)", exact: true });
     await expect(scored.getByRole("article")).toHaveCount(3);
     await expect(scored.getByRole("article").getByRole("heading", { level: 3 })).toHaveText(["User B", "User D", "User C"]);
     for (const label of ["92.5% Match Score", "92.0% Match Score", "86.0% Match Score"])
@@ -620,10 +615,10 @@ for (const path of ["/dashboard", "/knox-hub"]) {
     await expect(page.locator("main")).not.toContainText("WRMR");
     const first = scored.getByRole("article").first();
     await expect(first).toContainText("Peer rating:");
-    await scored.getByText("How match scores work", { exact: true }).click();
-    await expect(scored).toContainText("peer ratings (50%), completion (30%), and academic similarity (20%)");
-    await expect(scored).toContainText("maximum 100-point ranking score");
-    await expect(scored).toContainText("not a probability of swap success");
+    await page.getByText("How matching works", { exact: true }).click();
+    await expect(page.locator("main")).toContainText("peer ratings (50%), completion (30%), and academic similarity (20%)");
+    await expect(page.locator("main")).toContainText("maximum 100-point ranking score");
+    await expect(page.locator("main")).toContainText("not a probability of swap success");
     await expect(first).toContainText("Limited evidence: peer feedback comes from one partner.");
     await expect(first.getByRole("button", { name: "Request Swap", exact: true })).toBeEnabled();
     const unranked = page.getByRole("region", { name: "Matches awaiting enough evidence (1)", exact: true });
@@ -637,7 +632,7 @@ for (const path of ["/dashboard", "/knox-hub"]) {
       ...unrankedPeer(`format-${i}`, `Formatting Peer ${i}`), matchScore: score,
     })));
     await page.goto(path);
-    const ranked = page.getByRole("region", { name: "Ranked Matches (4)", exact: true });
+    const ranked = page.getByRole("region", { name: "Peers with match scores (4)", exact: true });
     await expect(ranked.getByRole("article").getByRole("heading", { level: 3 })).toHaveText(["Formatting Peer 0", "Formatting Peer 1", "Formatting Peer 2", "Formatting Peer 3"]);
     for (const label of ["100.0% Match Score", "88.8% Match Score", "88.7% Match Score", "0.0% Match Score"])
       await expect(ranked.getByText(label, { exact: true })).toBeVisible();
@@ -757,9 +752,9 @@ test("public portfolios identify provisional colleges without presenting validat
       exact: false,
     }),
   ).toContainText("does not contribute to academic similarity in match scores");
-  await page.getByText("About peer ratings and exchange statistics", { exact: true }).click();
+  await page.getByText("About ratings and exchanges", { exact: true }).click();
   await expect(page.locator("main")).not.toContainText("WRMR");
-  await expect(page.locator("main")).toContainText("not a probability of swap success");
+  await expect(page.locator("main")).toContainText("averaged for each partner first");
   await expect(
     page.getByText("Department unavailable", { exact: false }),
   ).toBeVisible();
@@ -811,7 +806,7 @@ test("administrators import the provisional mapping without assigning official v
   });
   await page.goto("/admin/assessments?section=academic");
   await page
-    .getByText("Review the team's provisional mapping", { exact: true })
+    .getByText("Review Proposed Mappings", { exact: true })
     .click();
   await expect(
     page.getByText("College of Computer Studies: BSCS, BSIT", { exact: true }),
@@ -851,7 +846,7 @@ test("archived duplicate colleges are excluded from the official department sele
     } : [],
   }));
   await page.goto("/admin/assessments?section=academic");
-  await page.getByText("Update a program department mapping", { exact: true }).click();
+  await page.getByText("Change Program Department", { exact: true }).click();
   const options = page.getByRole("combobox", { name: /^Official department/ }).locator("option");
   await expect(options).toHaveText(["Select confirmed department", "College of Arts and Sciences", "College of Computer Studies"]);
 });
@@ -1037,4 +1032,26 @@ test("empty catalog responses never appear as usable registration choices", asyn
   await expect(
     page.getByRole("button", { name: "Retry Academic Options", exact: true }),
   ).toBeVisible();
+});
+
+
+for(const path of ["/dashboard","/knox-hub"]){
+  test(`minimal compatible peer header counts matches without a standalone tab at ${path}`,async({page})=>{
+    const state=await fixture(page);await page.addInitScript(()=>localStorage.setItem("knoxite_onboarding_completed","true"));
+    state.matches.push(unrankedPeer("only","Synthetic Only Peer"));await page.goto(path);
+    await expect(page.getByRole("heading",{name:"Compatible peers",exact:true})).toBeVisible();await expect(page.getByText("1 match found",{exact:true})).toBeVisible();await expect(page.getByRole("navigation",{name:"Match groups",exact:true})).toHaveCount(0);
+    await expect(page.getByText("0.0% Match Score",{exact:true})).toHaveCount(0);await expect(page.getByRole("button",{name:"Request Swap",exact:true})).toBeEnabled();
+    state.matches.push({...unrankedPeer("two","Synthetic Scored Peer"),matchScore:88.7},unrankedPeer("three","Synthetic Third Peer"));await page.reload();
+    await expect(page.getByText("3 matches found",{exact:true})).toBeVisible();await expect(page.getByText("88.7% Match Score",{exact:true})).toBeVisible();
+    await expect(page.getByRole("region",{name:"Matches awaiting enough evidence (2)",exact:true}).getByRole("article")).toHaveCount(2);
+    await expect(page.getByText("Ranked Matches",{exact:false})).toHaveCount(0);await page.getByText("How matching works",{exact:true}).click();await expect(page.getByText("Match scores combine peer ratings",{exact:false})).toBeVisible();
+    for(const width of [320,390,1280]){await page.setViewportSize({width,height:900});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);}
+  });
+}
+
+test("assessment navigation uses compact accessible buttons without changing destinations or empty history",async({page})=>{
+  const state=await fixture(page);state.offered.push({id:"skill",offeringId:"offering",name:"Fixture Supported",category:"technology",basicAvailable:true,tier:"NOT_ASSESSED"});
+  await page.goto("/my-skills");const history=page.getByRole("button",{name:"Assessment History",exact:true});await history.focus();await page.keyboard.press("Enter");await expect(page).toHaveURL(/assessments\/offerings\/offering$/);
+  await expect(page.getByRole("heading",{name:"Your assessment history",exact:true})).toBeVisible();await expect(page.getByText("No attempts yet.",{exact:true})).toBeVisible();
+  const back=page.getByRole("link",{name:"Back to My Skills",exact:true});await expect(back).toHaveAttribute("data-slot","button");await back.focus();await page.keyboard.press("Enter");await expect(page).toHaveURL(/my-skills$/);
 });

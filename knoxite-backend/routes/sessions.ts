@@ -109,7 +109,10 @@ export function sessionsRouter(db: PrismaClient) {
           409,
           "Schedule a session within a confirmed exchange.",
         );
+      // Preserve sequential historical participation counters as well as logs.
+      // This check shares the exchange lock with participation recording.
       if (
+        sessionNumber <= Math.max(swap.requesterSessions, swap.receiverSessions) ||
         await tx.sessionConfirmation.count({ where: { swapId, sessionNumber } })
       )
         throw new HttpError(

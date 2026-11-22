@@ -1,3 +1,5 @@
+import { Button } from "@/app/components/ui/button";
+import { ArrowLeft } from "lucide-react";
 import { LoadingContent } from "@/app/components/PageSkeleton";
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router";
@@ -167,12 +169,7 @@ export default function PublicProfilePage() {
   return (
     <main className="min-h-screen knoxite-surface p-4 text-slate-900 dark:text-slate-100">
       <div className="mx-auto max-w-4xl space-y-5">
-        <Link
-          to="/knox-hub"
-          className="inline-block text-blue-700 underline dark:text-blue-300"
-        >
-          Back to KnoxHub
-        </Link>
+        <Button asChild variant="outline" size="sm" className="rounded-lg"><Link to="/knox-hub"><ArrowLeft className="size-4" aria-hidden="true" />Back to KnoxHub</Link></Button>
         <div className="rounded-2xl border bg-white p-5 sm:p-8 dark:border-slate-800 dark:bg-slate-900">
           {error ? (
             <p role="alert">{error}</p>

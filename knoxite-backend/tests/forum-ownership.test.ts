@@ -28,3 +28,24 @@ test("forum deletion authorizes the authenticated owner or ADMIN and preserves o
     assert.equal(deletes, 2);
   } finally { server.close(); await once(server, "close"); }
 });
+
+
+test("reply removal checks exact ownership, thread membership, ADMIN role and concurrent/repeated requests",async()=>{
+  let userId:string|undefined="owner",role="USER";
+  const posts=new Map([["one",{id:"one"}],["two",{id:"two"}]]);
+  const comments=new Map([['owned',{id:'owned',postId:'one',authorId:'owner'}],['peer',{id:'peer',postId:'one',authorId:'peer'}],['other',{id:'other',postId:'two',authorId:'peer'}]]);
+  const audits:any[]=[];
+  const db:any={adminAudit:{create:async({data}:any)=>{audits.push(data);return data;}},$transaction:async(fn:any)=>fn(db),$queryRaw:async()=>[],post:{findUnique:async({where}:any)=>posts.get(where.id)||null},comment:{findFirst:async({where}:any)=>{const row=comments.get(where.id);return row?.postId===where.postId?row:null;},deleteMany:async({where}:any)=>{const row=comments.get(where.id);if(!row||row.postId!==where.postId||(where.authorId&&row.authorId!==where.authorId))return{count:0};comments.delete(row.id);return{count:1};}}};
+  const app=express();app.use(express.json());app.use((req,_res,next)=>{req.userId=userId;req.userRole=role as any;next();});app.use(forumRouter(db));app.use(errorHandler);
+  const server=app.listen(0,"127.0.0.1");await once(server,"listening");const url=`http://127.0.0.1:${(server.address() as any).port}/posts/`;
+  const remove=(post:string,id:string,body?:unknown)=>fetch(`${url}${post}/comments/${id}`,{method:"DELETE",headers:{"Content-Type":"application/json"},body:body===undefined?undefined:JSON.stringify(body)});
+  try{
+    userId=undefined;assert.equal((await remove('one','owned')).status,401);userId='owner';
+    assert.equal((await remove('two','owned')).status,404);assert.equal((await remove('missing','owned')).status,404);
+    assert.equal((await remove('one','peer')).status,403);assert.equal((await remove('one','peer',{authorId:'peer',role:'ADMIN'})).status,422);
+    assert.equal(comments.size,3);
+    const results=await Promise.all([remove('one','owned'),remove('one','owned')]);assert.deepEqual(results.map(r=>r.status).sort(),[200,404]);
+    assert.equal((await remove('one','owned')).status,404);assert.equal(comments.has('peer'),true);assert.equal(comments.has('other'),true);assert.equal(posts.size,2);
+    userId='moderator';role='ADMIN';assert.equal((await remove('one','peer',{reason:'SPAM'})).status,200);assert.equal(comments.size,1);assert.equal(posts.size,2);assert.equal(audits.length,1);assert.equal(audits[0].administratorId,"moderator");assert.equal(audits[0].commentAuthorId,"peer");
+  }finally{server.close();await once(server,'close');}
+});

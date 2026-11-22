@@ -1,3 +1,4 @@
+import { schedulableSessionNumbers } from "@/app/lib/sessionScheduling";
 import { PageSkeleton } from "@/app/components/PageSkeleton";
 import { ExchangeSummary } from "@/app/components/ExchangeSummary";
 import { api } from "@/app/lib/api";
@@ -19,7 +20,7 @@ import {
   AvatarImage,
 } from "@/app/components/ui/avatar";
 import { Checkbox } from "@/app/components/ui/checkbox";
-import { ArrowLeft, Check, Loader2, Repeat } from "lucide-react";
+import { ArrowLeft, Check, Loader2, Minus, Plus, Repeat } from "lucide-react";
 
 export default function SwapAgreementPage() {
   const navigate = useNavigate();
@@ -29,7 +30,7 @@ export default function SwapAgreementPage() {
   const [debugError, setDebugError] = useState<string | null>(null);
   const [notice, setNotice] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [agreement, setAgreement] = useState({skillA:"",skillB:"",sessions:"4",agreedToTerms:false});
+  const [agreement, setAgreement] = useState({skillA:"",skillB:"",sessions:"1",agreedToTerms:false});
   const agreementVersion = swap?.agreementVersion;
   const requester = swap?.requesterId === swap?.me?.id;
   const participants = { me: swap?.me || {}, partner: swap?.partner || {} };
@@ -41,10 +42,20 @@ export default function SwapAgreementPage() {
     : "Both students must approve the same terms. Changing pending terms clears earlier approvals.";
   useEffect(() => {
     if (!swap) return;
-    setAgreement({sessions:String(swap.sessions),agreedToTerms:false,
+    // Start a fresh, unsigned plan at one; never replace saved/approved terms.
+    const freshPlan = swap.status === "PENDING_AGREEMENT" && swap.agreementVersion === 1 &&
+      !swap.requesterApprovedAt && !swap.receiverApprovedAt && swap.duration == null;
+    setAgreement({sessions:freshPlan ? "1" : String(swap.sessions),agreedToTerms:false,
       skillA:requester?swap.offeredSkill.name:swap.wantedSkill.name,
       skillB:requester?swap.wantedSkill.name:swap.offeredSkill.name});
   }, [swap?.id, swap?.agreementVersion, swap?.status]);
+  const sessionCount = Number(agreement.sessions);
+  const validSessionCount = Number.isInteger(sessionCount) && sessionCount >= 1 && sessionCount <= 30;
+  const stepSessions = (delta: number) => setAgreement(previous => {
+    const current = Number(previous.sessions);
+    const count = Number.isFinite(current) ? Math.trunc(current) : 1;
+    return { ...previous, sessions: String(Math.min(30, Math.max(1, count + delta))), agreedToTerms: false };
+  });
   const canEdit = swap?.status === "PENDING_AGREEMENT" && swap.integrityVerified === true && !syncError;
   const handleSubmit = async () => {
     if (isSubmitting) return;
@@ -78,7 +89,7 @@ export default function SwapAgreementPage() {
             {swap&&<>
               <ExchangeSummary swap={swap} />
               <p role="status" className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-950 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-100">{swap.status==="CONFIRMED" ? "Agreement confirmed. Your exchange is still in progress; these terms are read-only." : swap.status==="COMPLETED" ? "Exchange completed. Your agreement and approvals are kept for your records." : swap.status==="CANCELLED" ? "Exchange cancelled. The saved terms and approvals remain available." : "This agreement is read-only. Contact an administrator if its status needs review."}</p>
-              {swap.status==="CONFIRMED"&&<div className="flex flex-wrap gap-3"><Button onClick={()=>navigate(`/calendar?swapId=${swap.id}`)}>Schedule Sessions</Button><Button variant="outline" onClick={()=>navigate(`/swap-details/${swap.id}`)}>Schedule Later</Button></div>}
+              {swap.status==="CONFIRMED"&&<div className="flex flex-wrap gap-3"><Button onClick={()=>navigate(`/calendar?swapId=${swap.id}`)}>{schedulableSessionNumbers(swap).length ? "Schedule Sessions" : "View Sessions"}</Button>{schedulableSessionNumbers(swap).length>0&&<Button variant="outline" onClick={()=>navigate(`/swap-details/${swap.id}`)}>Schedule Later</Button>}</div>}
               <section aria-label="Recorded agreement approvals" className="space-y-3">
                 <h2 className="text-lg font-semibold">Participant approvals</h2>
                 <p className="text-sm text-slate-600 dark:text-slate-300">Agreement version {swap.agreementVersion}</p>
@@ -292,10 +303,10 @@ export default function SwapAgreementPage() {
                   </span>
                 </div>
                 <div className="border-t border-slate-200/60 dark:border-slate-800 pt-3 space-y-1">
-                  <Label className="text-[10px] font-bold text-slate-400 dark:text-slate-400 uppercase tracking-wider block">
+                  <Label className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider block">
                     You Learn
                   </Label>
-                  <span className="text-sm font-bold text-emerald-700 dark:text-emerald-400 block">
+                  <span className="text-sm font-bold text-emerald-800 dark:text-emerald-400 block">
                     {agreement.skillB}
                   </span>
                 </div>
@@ -306,28 +317,35 @@ export default function SwapAgreementPage() {
                   <Label htmlFor="agreement-sessions" className="text-[11px] font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider">
                     Total Sessions
                   </Label>
+                  <div role="group" aria-label="Total session controls" className="flex w-fit max-w-full items-center gap-2">
+                  <Button type="button" variant="outline" aria-label="Decrease total sessions" disabled={isSubmitting || sessionCount <= 1}
+                    onClick={() => stepSessions(-1)} className="size-11 shrink-0 rounded-xl border-slate-200 text-slate-700 dark:border-slate-700 dark:text-slate-200">
+                    <Minus className="size-4" aria-hidden="true" />
+                  </Button>
                   <Input
                     type="number"
+                    inputMode="numeric"
+                    step="1"
                     min="1"
                     max="30"
                     required
                     id="agreement-sessions"
+                    aria-describedby="session-commitment"
                     value={agreement.sessions}
                     onChange={(e) =>
                       setAgreement({ ...agreement, sessions: e.target.value, agreedToTerms: false })
                     }
-                    className="h-11 rounded-xl border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm"
+                    className="h-11 w-16 rounded-xl border-slate-200 bg-white text-center text-sm tabular-nums text-slate-900 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
                   />
+                  <Button type="button" variant="outline" aria-label="Increase total sessions" disabled={isSubmitting || sessionCount >= 30}
+                    onClick={() => stepSessions(1)} className="size-11 shrink-0 rounded-xl border-slate-200 text-slate-700 dark:border-slate-700 dark:text-slate-200">
+                    <Plus className="size-4" aria-hidden="true" />
+                  </Button>
+                  </div>
+                  <p id="session-commitment" aria-live="polite" aria-atomic="true" className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                    {validSessionCount ? `${sessionCount} ${sessionCount === 1 ? "session" : "sessions"} agreed` : "Choose 1–30 sessions."}
+                  </p>
                 </div>
-              </div>
-
-              <div className="bg-slate-900 dark:bg-slate-800 text-white p-4 rounded-2xl mt-4 text-center space-y-0.5 border border-transparent dark:border-slate-700">
-                <p className="text-[10px] uppercase font-bold tracking-widest text-slate-400">
-                  Agreed Session Commitment
-                </p>
-                <p className="text-2xl font-black">
-                  {agreement.sessions || "—"} Sessions
-                </p>
               </div>
               {swap.duration != null && <p className="text-sm text-slate-600 dark:text-slate-300">These pending terms previously used fixed hours. Approving this session plan replaces that requirement with individually scheduled times and clears earlier approvals.</p>}
             </CardContent>

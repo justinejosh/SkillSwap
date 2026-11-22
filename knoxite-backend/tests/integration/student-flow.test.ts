@@ -192,6 +192,24 @@ test("registered student journey and authorization review on isolated MySQL", as
         const ownPost = await db.post.create({ data: { authorId: aId, title: "Synthetic owner post", content: "Synthetic deletion fixture" } });
         const peerPost = await db.post.create({ data: { authorId: bId, title: "Synthetic peer post", content: "Synthetic preserved peer fixture" } });
         await db.comment.create({ data: { postId: ownPost.id, authorId: bId, content: "Synthetic reply" } });
+        const ownerReply = await db.comment.create({ data: { postId: ownPost.id, authorId: aId, content: "Synthetic owner reply" } });
+        const peerReply = await db.comment.create({ data: { postId: ownPost.id, authorId: bId, content: "Synthetic peer reply" } });
+        const path = `/forum/posts/${ownPost.id}/comments/${ownerReply.id}`;
+        await call("DELETE", path, 401);
+        await call("DELETE", `/forum/posts/${peerPost.id}/comments/${ownerReply.id}`, 404, ta);
+        await call("DELETE", `/forum/posts/${ownPost.id}/comments/${peerReply.id}`, 403, ta);
+        await call("DELETE", path, 422, ta, { authorId: bId, role: "ADMIN" });
+        await call("DELETE", path, 200, ta);
+        await call("DELETE", path, 404, ta);
+        await call("DELETE", `/forum/posts/${ownPost.id}/comments/${peerReply.id}`, 200, tad, {reason:"SPAM"});
+        assert.equal(await db.comment.count({ where: { postId: ownPost.id } }), 1);
+        assert.ok(await db.post.findUnique({ where: { id: ownPost.id } }));
+        const concurrent = await db.comment.create({ data: { postId: ownPost.id, authorId: aId, content: "Synthetic concurrent reply" } });
+        const concurrentPath = `/forum/posts/${ownPost.id}/comments/${concurrent.id}`;
+        const responses = await Promise.all([fetch(`http://127.0.0.1:${port}/api${concurrentPath}`, { method: "DELETE", headers: { Authorization: `Bearer ${ta}` } }), fetch(`http://127.0.0.1:${port}/api${concurrentPath}`, { method: "DELETE", headers: { Authorization: `Bearer ${ta}` } })]);
+        assert.deepEqual(responses.map(r=>r.status).sort(), [200,404]);
+        assert.equal(await db.comment.count({ where: { postId: ownPost.id } }), 1);
+
         await call("DELETE", `/forum/posts/${ownPost.id}`, 401);
         await call("DELETE", `/forum/posts/${peerPost.id}`, 403, ta);
         await call("DELETE", `/forum/posts/${peerPost.id}`, 422, ta, { authorId: bId, role: "ADMIN" });

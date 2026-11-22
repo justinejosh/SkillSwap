@@ -9,6 +9,8 @@ export async function assertRuntimeSchema(db: PrismaClient, config: AppConfig) {
   const completion = await db.$queryRaw<Array<{ count: bigint }>>`SELECT COUNT(*) AS count FROM information_schema.columns WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='SessionConfirmation' AND COLUMN_NAME='actualCompletedAt' AND DATA_TYPE='datetime' AND IS_NULLABLE='YES'`;
   if (Number(completion[0]?.count) !== 1)
     throw new Error("Actual session completion schema is unavailable. Reviewed additive migration required; startup refused.");
+  const moderation = await db.$queryRaw<Array<{ count: bigint }>>`SELECT COUNT(*) AS count FROM information_schema.tables WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME IN ('AdminAudit','ReportEvidence') AND TABLE_TYPE='BASE TABLE'`;
+  if (Number(moderation[0]?.count) !== 2) throw new Error("Moderation/evidence schema is unavailable. Reviewed additive migration required; startup refused.");
   if (config.sessionTimeouts) {
     const columns = await db.$queryRaw<Array<{ count: bigint }>>`SELECT COUNT(*) AS count FROM information_schema.columns WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='AuthSession' AND COLUMN_NAME='lastInteractiveAt' AND DATA_TYPE='datetime' AND IS_NULLABLE='YES'`;
     if (Number(columns[0]?.count) !== 1) throw new Error("Session policy schema is unavailable; startup refused.");

@@ -1,3 +1,4 @@
+import { schedulableSessionNumbers } from "@/app/lib/sessionScheduling";
 import { PageSkeleton } from "@/app/components/PageSkeleton";
 import { ExchangeSummary } from "@/app/components/ExchangeSummary";
 import { DateTimeText } from "@/app/components/DateTimeText";
@@ -124,7 +125,7 @@ export default function SwapDetailsPage() {
             <ExchangeSummary swap={swap} />
             <div className="flex flex-wrap gap-3 border-t border-slate-200 pt-4 dark:border-slate-700">
               <Button variant="outline" onClick={()=>navigate(`/swap-agreement/${swap.id}`)}>{swap.status==="PENDING_AGREEMENT"?"Review Agreement":"View Agreement"}</Button>
-              {swap.status==="CONFIRMED"&&swap.integrityVerified&&<Button variant="outline" onClick={()=>navigate(`/calendar?swapId=${swap.id}`)}>Schedule Sessions</Button>}
+              {swap.status==="CONFIRMED"&&swap.integrityVerified&&<Button variant="outline" onClick={()=>navigate(`/calendar?swapId=${swap.id}`)}>{schedulableSessionNumbers(swap).length ? "Schedule Sessions" : "View Sessions"}</Button>}
             </div>
           </CardContent>
         </Card>

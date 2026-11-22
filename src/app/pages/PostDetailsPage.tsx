@@ -1,3 +1,4 @@
+import { DeleteReplyButton } from "@/app/components/DeleteReplyButton";
 import { PageSkeleton } from "@/app/components/PageSkeleton";
 import { useVerifiedUser } from "@/app/components/AuthGuard";
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/app/components/ui/alert-dialog";
@@ -314,6 +315,7 @@ export default function PostDetailsPage() {
                       <p className="text-slate-700 dark:text-slate-300 text-sm whitespace-pre-wrap leading-relaxed">
                         {comment.content}
                       </p>
+                      {currentUser && (currentUser.role === "ADMIN" || currentUser.id === (comment.authorId || comment.author?.id)) && <DeleteReplyButton moderator={currentUser.role === "ADMIN"} postId={post.id} reply={comment} onDeleted={() => setPost((previous: any) => previous?.id === post.id ? { ...previous, comments: previous.comments.filter((row: any) => row.id !== comment.id) } : previous)} />}
                     </div>
                   </CardContent>
                 </Card>

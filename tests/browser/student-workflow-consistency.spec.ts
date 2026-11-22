@@ -7,7 +7,7 @@ async function forumFixture(page: Page, owner = true) {
     localStorage.setItem("knoxite_user", JSON.stringify({ id: "viewer", role: "USER", name: "Same Name" }));
     localStorage.setItem("knoxite_onboarding_completed", "true");
   });
-  const post = { id: "discussion", authorId: owner ? "viewer" : "someone-else", author: { id: owner ? "viewer" : "someone-else", name: "Same Name" }, title: "Synthetic discussion", content: "Synthetic content only", category: "GENERAL", createdAt: "2026-01-01T00:00:00Z", comments: [] };
+  const post = { id: "discussion", authorId: owner ? "viewer" : "someone-else", author: { id: owner ? "viewer" : "someone-else", name: "Same Name" }, title: "Synthetic discussion", content: "Synthetic content only", category: "GENERAL", createdAt: "2026-01-01T00:00:00Z", comments: [] as any[] };
   await page.route("**/*", async route => {
     const u = new URL(route.request().url());
     if (u.origin === "http://127.0.0.1:5174") return route.continue();
@@ -15,6 +15,10 @@ async function forumFixture(page: Page, owner = true) {
     const p = u.pathname;
     if (p === "/api/profile") return route.fulfill({ json: { id: "viewer", role: "USER", name: "Same Name", offeredSkills: [], wantedSkills: [] } });
     if (p === "/api/auth/session-status") return route.fulfill({ json: { enabled: false } });
+    if (p.startsWith("/api/forum/posts/discussion/comments/") && route.request().method() === "DELETE") {
+      state.replies++;if(state.failDelete)return route.fulfill({status:503,json:{error:"Synthetic reply deletion unavailable"}});
+      post.comments=post.comments.filter(c=>c.id!==p.split("/").pop());return route.fulfill({json:{message:"Reply removed."}});
+    }
     if (p === "/api/forum/posts/discussion" && route.request().method() === "DELETE") {
       state.posts++;
       if (state.failDelete) return route.fulfill({ status: 503, json: { error: "Synthetic deletion unavailable" } });
@@ -115,4 +119,15 @@ test("forum cards are keyboard links and long author names stay inside the card"
     await card.focus();await expect(card).toBeFocused();
   }
   await page.keyboard.press("Enter");await expect(page).toHaveURL(/\/community-forum\/discussion$/);
+});
+
+
+test("students delete only their own reply through a compact confirmed action without deleting the thread",async({page})=>{
+  const state=await forumFixture(page,false);state.post.comments=[{id:"mine",authorId:"viewer",author:{id:"viewer",name:"Same Name"},content:"My synthetic reply",createdAt:"2026-01-01T00:00Z"},{id:"other",authorId:"peer",author:{id:"peer",name:"Same Name"},content:"Another student's reply",createdAt:"2026-01-01T00:00Z"}];
+  await page.goto("/community-forum/discussion");await expect(page.getByRole("button",{name:"Delete reply by Same Name",exact:true})).toHaveCount(1);
+  await page.getByRole("button",{name:"Delete reply by Same Name",exact:true}).click();await page.getByRole("button",{name:"Keep Reply",exact:true}).click();expect(state.replies).toBe(0);
+  await page.getByRole("button",{name:"Delete reply by Same Name",exact:true}).click();state.failDelete=true;await page.getByRole("alertdialog").getByRole("button",{name:"Delete Reply",exact:true}).click();await expect(page.getByRole("alertdialog").getByRole("alert")).toContainText("Synthetic reply deletion unavailable");
+  state.failDelete=false;await page.getByRole("alertdialog").getByRole("button",{name:"Delete Reply",exact:true}).click();await expect(page.getByRole("alertdialog")).toHaveCount(0);
+  await expect(page.getByText("My synthetic reply",{exact:true})).toHaveCount(0);await expect(page.getByText("Another student's reply",{exact:true})).toBeVisible();await expect(page.getByRole("heading",{name:"Synthetic discussion",exact:true})).toBeVisible();await expect(page.getByRole("heading",{name:"1 Replies",exact:true})).toBeVisible();expect(state.posts).toBe(0);expect(state.deleted).toBe(false);
+  await page.reload();await expect(page.getByText("My synthetic reply",{exact:true})).toHaveCount(0);
 });

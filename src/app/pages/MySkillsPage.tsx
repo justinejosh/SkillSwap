@@ -25,7 +25,7 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/app/components/ui/tabs";
-import { ArrowLeft, Trash2, Loader2 } from "lucide-react";
+import { ArrowLeft, Trash2, Loader2, History } from "lucide-react";
 import { api } from "@/app/lib/api";
 import {
   AssessmentBadge,
@@ -485,14 +485,14 @@ function SkillCard({
               </p>
             )
           )}
-          <button
-            className="text-xs text-blue-700 underline dark:text-blue-300"
+          <Button
+            type="button" size="sm" variant="outline" className="rounded-lg"
             onClick={() =>
               navigate(`/assessments/offerings/${skill.offeringId}`)
             }
           >
-            Assessment history
-          </button>
+            <History className="size-4" aria-hidden="true" />Assessment History
+          </Button>
         </div>
       )}
       <Button

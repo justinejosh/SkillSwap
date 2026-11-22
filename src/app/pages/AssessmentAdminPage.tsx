@@ -1,3 +1,5 @@
+import { descendingAcademicYears } from "@/app/lib/academicDisplay";
+import { AssessmentSkillPicker } from "@/app/components/admin/AssessmentSkillPicker";
 import { LoadingContent } from "@/app/components/PageSkeleton";
 import { AdminShell } from "@/app/components/admin/AdminShell";
 import { AssessmentDirectory } from "@/app/components/admin/AssessmentDirectory";
@@ -22,6 +24,7 @@ export default function AssessmentAdminPage() {
   const [params]=useSearchParams();
   const section=["academic","reports","import"].includes(params.get("section")||"")?params.get("section")!:"directory";
   const [loading,setLoading]=useState(true),[ready,setReady]=useState(false),[importCandidate,setImportCandidate]=useState<any>(null),[programSearch,setProgramSearch]=useState("");
+  const [selectedProgramId,setSelectedProgramId]=useState<string|null>(null);
   const loadSequence=useRef(0),actionLock=useRef(false);
 
   const [academicData, setAcademicData] = useState<{
@@ -33,6 +36,7 @@ export default function AssessmentAdminPage() {
       departments: { code: string; name: string; programCodes: string[] }[];
     };
   }>({ programs: [], departments: [], yearLevels: [] });
+  const selectedProgram=academicData.programs.find(p=>p.id===selectedProgramId);
   const [mapping, setMapping] = useState({
     programId: "",
     departmentId: "",
@@ -89,17 +93,17 @@ export default function AssessmentAdminPage() {
   const inputClass =
     "w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-700 dark:bg-slate-900";
   return <AdminShell title={section==="academic"?"Academic Configuration":section==="reports"?"Reports":"Assessment Management"}>
-    {["directory","import"].includes(section)&&<nav aria-label="Assessment workspace" className="admin-workspace-tabs flex flex-wrap gap-3 text-sm"><Link className="rounded-lg border border-blue-300 px-3 py-2 text-blue-700 dark:text-blue-300" aria-current={section==="directory"?"page":undefined} to="/admin/assessments">Question Bank Directory</Link><Link className="rounded-lg border border-blue-300 px-3 py-2 text-blue-700 dark:text-blue-300" aria-current={section==="import"?"page":undefined} to="/admin/assessments?section=import">Import Question Bank</Link></nav>}
+    {["directory","import"].includes(section)&&<nav aria-label="Assessment workspace" className="admin-workspace-tabs flex flex-wrap gap-3 text-sm"><Link className="rounded-lg border border-blue-300 px-3 py-2 text-blue-700 dark:text-blue-300" aria-current={section==="directory"?"page":undefined} to="/admin/assessments">Assessment Questions</Link><Link className="rounded-lg border border-blue-300 px-3 py-2 text-blue-700 dark:text-blue-300" aria-current={section==="import"?"page":undefined} to="/admin/assessments?section=import">Add Assessment Questions</Link></nav>}
     {error&&<p role="alert" className="admin-error">{error}</p>}{notice&&<p role="status" className="admin-panel">{notice}</p>}
     {loading?<LoadingContent layout={section==="import"?"form":"table"} label="Loading administration records..." />:!ready?<Button variant="outline" onClick={()=>void load().catch(e=>setError(e.message))}>Retry loading records</Button>:<>
       {section==="directory"&&<AssessmentDirectory banks={banks} busy={busy} action={action}/>}
       {section==="import"&&(        <section className="admin-panel space-y-4">
           <AdvancedAssessmentScope />
           <h2 className="text-xl font-semibold">
-            Import a curated question bank
+            Add Assessment Questions
           </h2>
           <p className="text-sm">The preset catalog contains 80 skills. Adding the catalog creates no question banks, approvals or assessment tiers.</p>
-          <AdminConfirm label="Initialize 80 Skill Presets" title="Initialize missing canonical skill records?" description="This idempotent setup adds or reuses canonical skills. It does not create banks, review approvals or tiers. Use only when catalog initialization is needed." disabled={busy} onConfirm={() => action(
+          <AdminConfirm label="Set Up Skill Catalog" title="Initialize missing canonical skill records?" description="This idempotent setup adds or reuses canonical skills. It does not create banks, review approvals or tiers. Use only when catalog initialization is needed." disabled={busy} onConfirm={() => action(
             () => api("/admin/skill-catalog/initialize", { method: "POST", body: "{}" }),
             "Preset skills added or reused. Existing skills and assessment history were retained.",
           )}/>
@@ -110,18 +114,11 @@ export default function AssessmentAdminPage() {
             immutable; import another version to revise content or thresholds.
             No arbitrary questions are generated.
           </p>
+          <AssessmentSkillPicker skills={skills} selectedId={(()=>{try{return JSON.parse(json).skillId||"";}catch{return "";}})()} onSelect={id=>{try{const value=JSON.parse(json);if(!value||typeof value!=="object"||Array.isArray(value))throw new Error("Use a JSON object.");setJson(JSON.stringify({...value,skillId:id},null,2));setError("");}catch{setError("Fix the assessment question data before selecting a skill. Your entered text has been retained.");}}}/>
           <details>
             <summary className="cursor-pointer font-semibold">
-              Catalogue IDs and item format
+              Import Format
             </summary>
-            <ul className="my-3 text-sm">
-              {skills.map((s) => (
-                <li key={s.id}>
-                  <span className="capitalize">{s.name}</span>:{" "}
-                  <code className="break-all">{s.id}</code>
-                </li>
-              ))}
-            </ul>
             <p className="text-sm">
               Each item contains kind (MULTIPLE_CHOICE for basic, APPLIED_CHOICE
               for advanced), prompt, competency, rubric, points, and options.
@@ -131,8 +128,9 @@ export default function AssessmentAdminPage() {
             </p>
           </details>
           <form onSubmit={e=>e.preventDefault()} className="space-y-3">
+            <details className="rounded-xl border border-slate-200 p-4 dark:border-slate-700"><summary className="cursor-pointer font-semibold">Advanced Import Options</summary>
             <label htmlFor="bank-json" className="block font-semibold">
-              Question bank JSON
+              Assessment Question Data
             </label>
             <textarea
               id="bank-json"
@@ -141,6 +139,7 @@ export default function AssessmentAdminPage() {
               onChange={(e) => setJson(e.target.value)}
               spellCheck={false}
             />
+            </details>
             <AdminConfirm label="Import Draft" disabled={busy} beforeOpen={prepareImport} title={`Import a draft for ${skills.find(s=>s.id===importCandidate?.skillId)?.name||importCandidate?.skillId||"the selected skill"} · ${importCandidate?.level||"level not supplied"}?`} description="Creates a new DRAFT version only. It is unavailable to students until a genuine review and separate publication. No existing version or question is overwritten." onConfirm={()=>action(()=>api("/admin/assessments/versions",{method:"POST",body:JSON.stringify(importCandidate)}),"Draft imported. It remains unavailable to students until validated and published.")}/>
           </form>
         </section>
@@ -152,7 +151,7 @@ export default function AssessmentAdminPage() {
             stable codes. Empty lists remain unavailable rather than receiving
             guessed values.
           </p>
-          <details className="rounded-xl border border-slate-200 p-4 dark:border-slate-700"><summary className="cursor-pointer font-semibold">Add an academic option</summary>
+          <details className="rounded-xl border border-slate-200 p-4 dark:border-slate-700"><summary className="cursor-pointer font-semibold">Add Academic Option</summary>
           <form
             className="grid gap-3 sm:grid-cols-2"
             onSubmit={(e) => {
@@ -237,7 +236,7 @@ export default function AssessmentAdminPage() {
           {academicData.provisionalDraft && (
             <details>
               <summary className="cursor-pointer font-semibold">
-                Review the team's provisional mapping
+                Review Proposed Mappings
               </summary>
               <p className="my-2 text-sm">
                 {academicData.provisionalDraft.source}
@@ -300,17 +299,15 @@ export default function AssessmentAdminPage() {
               <tbody>{academicData.programs.filter(p=>`${p.code} ${p.label} ${p.department?.name||""}`.toLowerCase().includes(programSearch.toLowerCase())).map(p=><tr key={p.id}>
                 <td><strong>{p.label}</strong></td>
                 <td>{p.department?.name||"Not assigned"}</td>
-                <td>{p.yearLevels.map((y:any)=>y.name).join(", ")||"Not configured"}</td>
+                <td>{descendingAcademicYears(p.yearLevels).map((y:any)=>y.name).join(", ")||"Not configured"}</td>
                 <td><AdminStatus status={p.mappingValidatedAt?"Validation recorded":p.department?"Provisional":"Not recorded"}/>{!p.mappingValidatedAt&&<p className="admin-record-caption">Excluded from WRMR</p>}</td>
-                <td><details className="admin-mapping-evidence"><summary aria-label={`Stored mapping evidence for ${p.label}`}>View details</summary>
-                  <p className="mt-3">{p.mappingValidatedAt?`Validation recorded: ${new Date(p.mappingValidatedAt).toLocaleString()}`:"No official validation recorded"}</p>
-                  <p className="mt-2">Mapping version {p.mappingVersion} · Reviewer ID {p.mappingValidatedById||"not recorded"}</p>
-                  <pre className="mt-3">{p.mappingNotes||"No mapping evidence supplied."}</pre>
-                </details></td>
+                <td><Button type="button" variant="outline" size="sm" aria-label={`Stored mapping evidence for ${p.label}`} aria-expanded={selectedProgramId===p.id} onClick={()=>setSelectedProgramId(selectedProgramId===p.id?null:p.id)}>View details</Button></td>
               </tr>)}</tbody>
             </table>
           </div>
-          <details className="rounded-xl border border-slate-200 p-4 dark:border-slate-700"><summary className="cursor-pointer font-semibold">Update a program department mapping</summary>
+          {selectedProgram&&<section aria-label="Program mapping details" className="space-y-3 rounded-xl border border-slate-200 p-4 dark:border-slate-700"><div className="flex flex-wrap items-center justify-between gap-3"><h3 className="font-semibold">{selectedProgram.label}</h3><Button type="button" variant="ghost" size="sm" onClick={()=>setSelectedProgramId(null)}>Close program details</Button></div><dl className="grid gap-3 text-sm sm:grid-cols-2"><div><dt>College / department</dt><dd>{selectedProgram.department?.name||"Not assigned"}</dd></div><div><dt>Eligible year levels</dt><dd>{descendingAcademicYears(selectedProgram.yearLevels).map((y:any)=>y.name).join(", ")||"Not configured"}</dd></div><div><dt>Stored mapping status</dt><dd>{selectedProgram.mappingValidatedAt?"Validation recorded":selectedProgram.department?"Provisional":"Not recorded"}</dd></div><div><dt>Validation date</dt><dd>{selectedProgram.mappingValidatedAt?new Date(selectedProgram.mappingValidatedAt).toLocaleString():"Not recorded"}</dd></div></dl><p className="text-sm">Recorded evidence is shown as stored; this view does not establish university approval.</p><pre className="whitespace-pre-wrap break-words text-sm">{selectedProgram.mappingNotes||"No mapping evidence supplied."}</pre><details><summary className="cursor-pointer text-sm">Technical review details</summary><p className="mt-2 break-all text-sm">Program ID: {selectedProgram.id} · Mapping version {selectedProgram.mappingVersion} · Reviewer ID: {selectedProgram.mappingValidatedById||"not recorded"}</p></details></section>}
+          <h3 className="text-lg font-semibold">Program Management</h3>
+          <details className="rounded-xl border border-slate-200 p-4 dark:border-slate-700"><summary className="cursor-pointer font-semibold">Change Program Department</summary>
           <form
             className="space-y-3"
             onSubmit={(e) => {
@@ -429,7 +426,7 @@ export default function AssessmentAdminPage() {
           </form>
           </details>
           <p className="text-sm text-slate-600 dark:text-slate-300">BSIT, BSIHM-CA and BSIHM-HACLO intentionally remain first-year-only. Viewing this workspace does not change mappings or year levels; changes require the existing approval process.</p>
-          <details className="rounded-xl border border-slate-200 p-4 dark:border-slate-700"><summary className="cursor-pointer font-semibold">Configure permitted program year levels</summary>
+          <details className="rounded-xl border border-slate-200 p-4 dark:border-slate-700"><summary className="cursor-pointer font-semibold">Manage Eligible Year Levels</summary>
           <form
             className="space-y-3 border-t pt-4"
             onSubmit={(e) => {
@@ -474,7 +471,7 @@ export default function AssessmentAdminPage() {
               </select>
             </label>
             <div className="flex flex-wrap gap-4">
-              {academicData.yearLevels.map((y) => (
+              {descendingAcademicYears(academicData.yearLevels).map((y) => (
                 <label key={y.id} className="flex items-center gap-2">
                   <input
                     type="checkbox"

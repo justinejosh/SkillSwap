@@ -1,3 +1,4 @@
+import { ArrowLeft } from "lucide-react";
 import { LoadingContent } from "@/app/components/PageSkeleton";
 import { AdvancedAssessmentScope } from "@/app/components/AdvancedAssessmentScope";
 import { FormEvent, useContext, useEffect, useState } from "react";
@@ -205,12 +206,7 @@ export default function AssessmentPage() {
   return (
     <main className="min-h-screen bg-slate-50 p-4 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
       <div className="mx-auto max-w-3xl space-y-5">
-        <Link
-          to="/my-skills"
-          className="text-blue-700 underline dark:text-blue-300"
-        >
-          Back to My Skills
-        </Link>
+        <Button asChild variant="outline" size="sm" className="rounded-lg"><Link to="/my-skills"><ArrowLeft className="size-4" aria-hidden="true" />Back to My Skills</Link></Button>
         <div className="space-y-6 rounded-2xl border bg-white p-5 sm:p-8 dark:border-slate-800 dark:bg-slate-900">
           <h1 className="text-2xl font-bold capitalize">
             {attempt?.skillName ||

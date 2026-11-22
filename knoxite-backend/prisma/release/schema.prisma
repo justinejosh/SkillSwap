@@ -247,6 +247,8 @@ model UserReport {
   target       User      @relation("ReportTarget", fields: [targetId], references: [id], onDelete: Restrict)
 
   @@index([status, createdAt])
+  evidence     ReportEvidence?
+
 }
 
 datasource db {
@@ -524,4 +526,43 @@ model RegistrationConsent {
   user User @relation(fields: [userId], references: [id], onDelete: Restrict)
 
   @@unique([userId, noticeVersion])
+}
+
+
+// Administrator reply-moderation metadata only. Snapshot IDs intentionally have
+// no cascading relations; no deleted content, email, IP address or tokens.
+model AdminAudit {
+  id              String   @id @default(uuid())
+  administratorId String
+  threadId        String?
+  commentId       String?  @unique
+  commentAuthorId String?
+  reportId        String?
+  evidenceId      String?
+  action          String   @db.VarChar(32)
+  reason          String?  @db.VarChar(32)
+  explanation     String?  @db.VarChar(250)
+  createdAt       DateTime @default(now())
+
+  @@index([createdAt, id])
+  @@index([threadId, createdAt])
+  @@index([reportId, createdAt])
+}
+
+// PENDING rows survive interrupted uploads for guarded orphan cleanup.
+// Only ATTACHED rows have a report; the report and attachment commit together.
+model ReportEvidence {
+  id          String      @id @default(uuid())
+  reportId    String?     @unique
+  report      UserReport? @relation(fields: [reportId], references: [id], onDelete: Restrict)
+  objectKey   String      @unique @db.VarChar(191)
+  state       String      @default("PENDING") @db.VarChar(32)
+  mimeType    String      @db.VarChar(32)
+  byteLength  Int
+  width       Int
+  height      Int
+  sha256      String      @db.Char(64)
+  createdAt   DateTime    @default(now())
+
+  @@index([state, createdAt])
 }

@@ -1,4 +1,6 @@
+import { ReportEvidenceConfig, reportEvidenceConfig } from "../services/reportEvidenceConfig";
 export interface AppConfig {
+  reportEvidence?: ReportEvidenceConfig;
   jwtSecret: string;
   origins: string[];
   institutionDomains: string[];
@@ -19,6 +21,8 @@ export interface AppConfig {
   };
 }
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
+  if (env.KNOXITE_STAGING_STUDENT_VERIFICATION_ENABLED === "true")
+    throw new Error("Temporary staging student verification is an operator-only command. Never enable its flag in an API deployment.");
   const jwtSecret = env.JWT_SECRET || "";
   if (jwtSecret.length < 32 || /replace-with|change-me/i.test(jwtSecret))
     throw new Error(
@@ -167,6 +171,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     throw new Error("Production registration requires an approved notice version and durable consent storage.");
   return {
     jwtSecret,
+    reportEvidence: reportEvidenceConfig(env),
     origins,
     institutionDomains,
     verificationRequired,

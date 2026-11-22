@@ -1,0 +1,2 @@
+# Canonical bytes for this new, unapplied migration only. Preserve all older SQL.
+knoxite-backend/prisma/release/migrations/20261123000000_moderation_and_report_evidence/migration.sql text eol=lf
