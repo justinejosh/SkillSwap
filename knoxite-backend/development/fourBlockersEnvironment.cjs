@@ -38,15 +38,19 @@ function cli(m, args, url = m.url) {
   }
   return r.stdout;
 }
-async function create() {
+async function create({ privacy = false } = {}) {
   assertTestCheckout();
   const owner = crypto.randomUUID(), suffix = crypto.randomBytes(6).toString("hex");
   const m = { owner, container: "knoxite-four-" + suffix, directory: fs.mkdtempSync(path.join(os.tmpdir(), "knoxite-four-db-")),
     password: crypto.randomBytes(36).toString("base64url"), appPassword: crypto.randomBytes(36).toString("base64url") };
+  if (privacy && process.platform === "win32") execFileSync("icacls", [m.directory,"/inheritance:r","/grant:r",`${process.env.USERDOMAIN}\\${process.env.USERNAME}:(OI)(CI)F`], {stdio:"pipe",windowsHide:true});
   const envFile = path.join(m.directory, "mysql.private.env");
   fs.writeFileSync(envFile, `MYSQL_ROOT_PASSWORD=${m.password}\nMYSQL_ROOT_HOST=%\n`, { mode: 0o600 });
   docker(["image", "inspect", "mysql:8.4"]); // Reuse installed image; no implicit pull.
-  m.containerId = docker(["run", "--detach", "--name", m.container, "--label", label + "=" + owner, "--mount", "type=tmpfs,destination=/var/lib/mysql", "--publish", "127.0.0.1::3306", "--env-file", envFile, "mysql:8.4"]).trim();
+  // Restore verification can contain real data after separate authorization.
+  // Prevent Docker logs, writable image layers and container swap from retaining it.
+  const privacyArgs = privacy ? ["--log-driver", "none", "--read-only", "--tmpfs", "/tmp:rw,noexec,nosuid,nodev,mode=1777", "--tmpfs", "/var/run/mysqld:rw,noexec,nosuid,nodev,mode=0777", "--memory", "1g", "--memory-swap", "1g"] : [];
+  m.containerId = docker(["run", "--detach", ...privacyArgs, "--name", m.container, "--label", label + "=" + owner, "--mount", "type=tmpfs,destination=/var/lib/mysql", "--publish", "127.0.0.1::3306", "--env-file", envFile, "mysql:8.4"]).trim();
   const c = JSON.parse(docker(["inspect", m.container]))[0];m.port = c.NetworkSettings.Ports["3306/tcp"][0].HostPort;
   const base = `mysql://root:${m.password}@127.0.0.1:${m.port}/`;
   m.url = base + `knoxite_four_${suffix}_test`;m.legacyUrl = base + `knoxite_four_${suffix}_legacy_test`;
