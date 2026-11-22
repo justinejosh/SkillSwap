@@ -1,3 +1,4 @@
+import { PageSkeleton } from "@/app/components/PageSkeleton";
 import { ExchangeSummary } from "@/app/components/ExchangeSummary";
 import { api } from "@/app/lib/api";
 import { useLiveSwap } from "@/app/lib/useLiveSwap";
@@ -28,7 +29,7 @@ export default function SwapAgreementPage() {
   const [debugError, setDebugError] = useState<string | null>(null);
   const [notice, setNotice] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [agreement, setAgreement] = useState({skillA:"",skillB:"",duration:"1",sessions:"4",agreedToTerms:false});
+  const [agreement, setAgreement] = useState({skillA:"",skillB:"",sessions:"4",agreedToTerms:false});
   const agreementVersion = swap?.agreementVersion;
   const requester = swap?.requesterId === swap?.me?.id;
   const participants = { me: swap?.me || {}, partner: swap?.partner || {} };
@@ -40,7 +41,7 @@ export default function SwapAgreementPage() {
     : "Both students must approve the same terms. Changing pending terms clears earlier approvals.";
   useEffect(() => {
     if (!swap) return;
-    setAgreement({duration:String(swap.duration),sessions:String(swap.sessions),agreedToTerms:false,
+    setAgreement({sessions:String(swap.sessions),agreedToTerms:false,
       skillA:requester?swap.offeredSkill.name:swap.wantedSkill.name,
       skillB:requester?swap.wantedSkill.name:swap.offeredSkill.name});
   }, [swap?.id, swap?.agreementVersion, swap?.status]);
@@ -49,29 +50,21 @@ export default function SwapAgreementPage() {
     if (isSubmitting) return;
     setDebugError(null); setNotice("");
     if (!canEdit || !agreement.agreedToTerms) {setDebugError("Review the current agreement and accept the commitment before signing.");return;}
-    const duration=Number(agreement.duration), sessions=Number(agreement.sessions);
-    if (!Number.isInteger(duration)||duration<1||duration>8||!Number.isInteger(sessions)||sessions<1||sessions>30) {setDebugError("Choose 1–8 hours per session and 1–30 sessions.");return;}
+    const sessions=Number(agreement.sessions);
+    if (!Number.isInteger(sessions)||sessions<1||sessions>30) {setDebugError("Choose 1–30 sessions.");return;}
     setIsSubmitting(true);
     try {
       const latest=await refresh();
       if (!latest) {setDebugError("Unable to check the latest terms. Refresh before signing.");return;}
       if (latest.status!=="PENDING_AGREEMENT" || latest.agreementVersion!==agreementVersion) {setDebugError("This agreement changed. Review its latest status and terms before continuing.");return;}
-      const result=await api(`/swaps/${swapId}/agreement`,{method:"POST",body:JSON.stringify({duration,sessions,agreementVersion,agreedToTerms:true})});
+      const result=await api(`/swaps/${swapId}/agreement`,{method:"POST",body:JSON.stringify({sessions,agreementVersion,agreedToTerms:true})});
       setNotice(result.message);await refresh();
     } catch(e) {setDebugError(e instanceof Error?e.message:"Your approval could not be saved.");await refresh();}
     finally {setIsSubmitting(false);}
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex h-screen items-center justify-center knoxite-surface">
-        <Loader2 className="animate-spin text-blue-600 size-8 mb-3" />
-        <span className="text-slate-900 dark:text-slate-200 font-bold text-xs uppercase tracking-widest">
-          Loading Swap Agreement...
-        </span>
-      </div>
-    );
-  }
+  if (isLoading) return <PageSkeleton layout="form" label="Loading swap agreement..." />;
+
 
   if (!swap || !canEdit) {
     return <main className="knoxite-surface min-h-screen p-4 text-slate-900 dark:text-slate-100 sm:p-6">
@@ -85,6 +78,7 @@ export default function SwapAgreementPage() {
             {swap&&<>
               <ExchangeSummary swap={swap} />
               <p role="status" className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-950 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-100">{swap.status==="CONFIRMED" ? "Agreement confirmed. Your exchange is still in progress; these terms are read-only." : swap.status==="COMPLETED" ? "Exchange completed. Your agreement and approvals are kept for your records." : swap.status==="CANCELLED" ? "Exchange cancelled. The saved terms and approvals remain available." : "This agreement is read-only. Contact an administrator if its status needs review."}</p>
+              {swap.status==="CONFIRMED"&&<div className="flex flex-wrap gap-3"><Button onClick={()=>navigate(`/calendar?swapId=${swap.id}`)}>Schedule Sessions</Button><Button variant="outline" onClick={()=>navigate(`/swap-details/${swap.id}`)}>Schedule Later</Button></div>}
               <section aria-label="Recorded agreement approvals" className="space-y-3">
                 <h2 className="text-lg font-semibold">Participant approvals</h2>
                 <p className="text-sm text-slate-600 dark:text-slate-300">Agreement version {swap.agreementVersion}</p>
@@ -284,7 +278,7 @@ export default function SwapAgreementPage() {
                 Session Plan
               </CardTitle>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Confirm session duration and target swap commitments.
+                Agree on how many sessions to complete. Dates and times are optional now; schedule individual sessions later in the calendar.
               </p>
             </CardHeader>
             <CardContent className="pt-6 space-y-4">
@@ -307,23 +301,7 @@ export default function SwapAgreementPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 pt-2">
-                <div className="space-y-1.5">
-                  <Label htmlFor="agreement-duration" className="text-[11px] font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider">
-                    Hours Per Session
-                  </Label>
-                  <Input
-                    type="number"
-                    min="1"
-                    max="8"
-                    id="agreement-duration"
-                    value={agreement.duration}
-                    onChange={(e) =>
-                      setAgreement({ ...agreement, duration: e.target.value, agreedToTerms: false })
-                    }
-                    className="h-11 rounded-xl border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm"
-                  />
-                </div>
+              <div className="pt-2">
                 <div className="space-y-1.5">
                   <Label htmlFor="agreement-sessions" className="text-[11px] font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider">
                     Total Sessions
@@ -332,6 +310,7 @@ export default function SwapAgreementPage() {
                     type="number"
                     min="1"
                     max="30"
+                    required
                     id="agreement-sessions"
                     value={agreement.sessions}
                     onChange={(e) =>
@@ -344,13 +323,13 @@ export default function SwapAgreementPage() {
 
               <div className="bg-slate-900 dark:bg-slate-800 text-white p-4 rounded-2xl mt-4 text-center space-y-0.5 border border-transparent dark:border-slate-700">
                 <p className="text-[10px] uppercase font-bold tracking-widest text-slate-400">
-                  Mutual Time Commitment
+                  Agreed Session Commitment
                 </p>
                 <p className="text-2xl font-black">
-                  {Number(agreement.sessions) * Number(agreement.duration)}{" "}
-                  Hours Total
+                  {agreement.sessions || "—"} Sessions
                 </p>
               </div>
+              {swap.duration != null && <p className="text-sm text-slate-600 dark:text-slate-300">These pending terms previously used fixed hours. Approving this session plan replaces that requirement with individually scheduled times and clears earlier approvals.</p>}
             </CardContent>
           </Card>
         )}

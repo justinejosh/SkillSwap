@@ -1,3 +1,4 @@
+import { LoadingContent } from "@/app/components/PageSkeleton";
 import { AdminShell } from "@/app/components/admin/AdminShell";
 import { AssessmentDirectory } from "@/app/components/admin/AssessmentDirectory";
 import { AdminReports } from "@/app/components/admin/AdminReports";
@@ -90,7 +91,7 @@ export default function AssessmentAdminPage() {
   return <AdminShell title={section==="academic"?"Academic Configuration":section==="reports"?"Reports":"Assessment Management"}>
     {["directory","import"].includes(section)&&<nav aria-label="Assessment workspace" className="admin-workspace-tabs flex flex-wrap gap-3 text-sm"><Link className="rounded-lg border border-blue-300 px-3 py-2 text-blue-700 dark:text-blue-300" aria-current={section==="directory"?"page":undefined} to="/admin/assessments">Question Bank Directory</Link><Link className="rounded-lg border border-blue-300 px-3 py-2 text-blue-700 dark:text-blue-300" aria-current={section==="import"?"page":undefined} to="/admin/assessments?section=import">Import Question Bank</Link></nav>}
     {error&&<p role="alert" className="admin-error">{error}</p>}{notice&&<p role="status" className="admin-panel">{notice}</p>}
-    {loading?<p role="status" className="admin-panel">Loading administration records...</p>:!ready?<Button variant="outline" onClick={()=>void load().catch(e=>setError(e.message))}>Retry loading records</Button>:<>
+    {loading?<LoadingContent layout={section==="import"?"form":"table"} label="Loading administration records..." />:!ready?<Button variant="outline" onClick={()=>void load().catch(e=>setError(e.message))}>Retry loading records</Button>:<>
       {section==="directory"&&<AssessmentDirectory banks={banks} busy={busy} action={action}/>}
       {section==="import"&&(        <section className="admin-panel space-y-4">
           <AdvancedAssessmentScope />

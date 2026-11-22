@@ -18,6 +18,7 @@ async function fixture(page: Page, status="COMPLETED", theme?: "light"|"dark") {
     if(u.pathname.startsWith("/api/users/"))return route.fulfill({json:{...profile,id:u.pathname.split("/")[3]}});
     if(u.pathname==="/api/auth/session-status")return route.fulfill({json:{enabled:false}});
     if(u.pathname==="/api/swaps/swap-a")return route.fulfill({json:swap()});
+    if(u.pathname==="/api/swaps")return route.fulfill({json:state.swaps||[]});
     if(u.pathname==="/api/swap-requests")return route.fulfill({json:[{id:"request-a",requesterId:me.id,receiverId:partner.id,requester:me,receiver:partner,status:"ACCEPTED",offeredSkill:swap().offeredSkill,wantedSkill:swap().wantedSkill,linkedSwap:{id:"swap-a",status:state.status},createdAt:new Date().toISOString()}]});
     if(u.pathname==="/api/reputation/submit"&&method==="POST") {state.posts++;const body=route.request().postDataJSON();state.myReview={id:"review-a",rating:body.rating,comment:body.comment,isValidated:true};return route.fulfill({json:state.myReview});}
     if(u.pathname==="/api/swaps/swap-a/agreement"&&method==="POST"){state.agreementPosts++;return route.fulfill({status:409,json:{error:"Agreement is closed."}});}
@@ -27,9 +28,41 @@ async function fixture(page: Page, status="COMPLETED", theme?: "light"|"dark") {
     if(u.pathname==="/api/academic-options")return route.fulfill({json:{programs:[],yearLevels:[]}});
     if(u.pathname==="/api/swaps/request"){state.requestPosts++;return route.fulfill({status:409,json:{error:"An exchange with this student is already pending or active."}});}
     if(u.pathname==="/api/profile/skill-catalog")return route.fulfill({json:{presets:[]}});
+    if(u.pathname==="/api/swaps/cancel/swap/swap-a"&&method==="DELETE"){
+      state.cancellations=(state.cancellations||0)+1;
+      if(state.cancelFailure)return route.fulfill({status:409,json:{error:"Exchange changed. Refresh before trying again."}});
+      state.status="CANCELLED";return route.fulfill({json:{message:"Exchange cancelled"}});
+    }
     return route.fulfill({json:[]});
   });return state;
 }
+
+test("dashboard exchange links and account dropdown support keyboard navigation",async({page})=>{
+  const state=await fixture(page,"CONFIRMED","light");
+  state.swaps=[{id:"swap-a",status:"CONFIRMED",requesterId:"student-a",receiverId:"student-b",requester:state.activeUser,receiver:{id:"student-b",name:"Synthetic Partner"},sessions:3,requesterSessions:1,receiverSessions:0,offeredSkill:{name:"Python Programming Fundamentals"},wantedSkill:{name:"Java Programming Fundamentals"}}];
+  await page.goto("/dashboard");
+  const trigger=page.getByTitle("Account Menu",{exact:true});
+  await trigger.focus();await page.keyboard.press("Enter");await expect(trigger).toHaveAttribute("aria-expanded","true");
+  await page.keyboard.press("Tab");await page.keyboard.press("Escape");
+  await expect(trigger).toBeFocused();await expect(trigger).toHaveAttribute("aria-expanded","false");
+  const exchange=page.getByRole("link",{name:"Open exchange with Synthetic Partner",exact:true});
+  await expect(exchange).toBeVisible();await exchange.focus();await page.keyboard.press("Enter");await expect(page).toHaveURL(/\/swap-details\/swap-a$/);
+});
+
+test("exchange cancellation requires explicit confirmation and retains actionable errors",async({page})=>{
+  const state=await fixture(page,"CONFIRMED","dark");
+  let nativeDialogs=0;page.on("dialog",async dialog=>{nativeDialogs++;await dialog.dismiss();});
+  await page.goto("/swap-details/swap-a");
+  await page.getByRole("button",{name:"Cancel Exchange",exact:true}).click();
+  const dialog=page.getByRole("alertdialog");
+  await expect(dialog).toContainText("agreement, sessions and reviews will remain");expect(state.cancellations||0).toBe(0);
+  await dialog.getByRole("button",{name:"Keep Exchange",exact:true}).click();await expect(dialog).toHaveCount(0);await expect(page.getByRole("button",{name:"Cancel Exchange",exact:true})).toBeFocused();
+  await page.getByRole("button",{name:"Cancel Exchange",exact:true}).click();state.cancelFailure=true;
+  await dialog.getByRole("button",{name:"Cancel Exchange",exact:true}).click();await expect(dialog.getByRole("alert")).toContainText("Refresh before trying again");
+  await expect(dialog.getByRole("button",{name:"Cancel Exchange",exact:true})).toBeEnabled();state.cancelFailure=false;
+  await dialog.getByRole("button",{name:"Cancel Exchange",exact:true}).click();await expect(dialog).toHaveCount(0);
+  await expect(page.getByRole("button",{name:"Cancel Exchange",exact:true})).toHaveCount(0);expect(state.cancellations).toBe(2);expect(nativeDialogs).toBe(0);
+});
 test("closed agreement has no finalize wizard or signing controls",async({page})=>{
   await fixture(page);await page.goto("/swap-agreement/swap-a");
   await expect(page.getByText("Finalize Swap",{exact:true})).toHaveCount(0);
@@ -186,12 +219,16 @@ for(const theme of ["light","dark"] as const){
   });
 }
 
-test("chat loading state stays centered while conversations are pending",async({page})=>{
+test("chat loading skeleton preserves navigation and fits below its header",async({page})=>{
   await fixture(page);let release!:()=>void;const gate=new Promise<void>(r=>{release=r;});
   await page.route("**/api/swaps",async route=>{await gate;await route.fulfill({json:[]});});
   try{
-    await page.goto("/chat");const status=page.getByRole("status").filter({hasText:"Loading conversations..."});await expect(status).toBeVisible();
-    const box=(await status.boundingBox())!,viewport=page.viewportSize()!;expect(Math.abs(box.x+box.width/2-viewport.width/2)).toBeLessThan(2);expect(Math.abs(box.y+box.height/2-viewport.height/2)).toBeLessThan(2);
+    await page.goto("/chat");const status=page.getByRole("status",{name:"Loading conversations...",exact:true});await expect(status).toBeVisible();
+    await expect(page.getByRole("button",{name:"Return",exact:true})).toBeVisible();
+    await expect(status).toHaveAttribute("data-loading-layout","messages");
+    const box=(await status.boundingBox())!,header=(await page.locator("header").boundingBox())!,viewport=page.viewportSize()!;
+    expect(box.x).toBeGreaterThanOrEqual(0);expect(box.x+box.width).toBeLessThanOrEqual(viewport.width);expect(box.y).toBeGreaterThanOrEqual(header.y+header.height);
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
   }finally{release();}
   await expect(page.getByRole("heading",{name:"No Active Swaps Yet",exact:true})).toBeVisible();
 });
@@ -201,4 +238,66 @@ test("chat request failure is not presented as an empty inbox and can be retried
   await page.route("**/api/swaps",route=>route.fulfill({status:available?200:503,json:available?[]:{error:"Conversations are temporarily unavailable."}}));
   await page.goto("/chat");await expect(page.getByRole("heading",{name:"Unable to load conversations",exact:true})).toBeVisible();await expect(page.getByRole("alert")).toContainText("temporarily unavailable");await expect(page.getByRole("heading",{name:"No Active Swaps Yet",exact:true})).toHaveCount(0);
   available=true;await page.getByRole("button",{name:"Try again",exact:true}).click();await expect(page.getByRole("heading",{name:"No Active Swaps Yet",exact:true})).toBeVisible();
+});
+
+
+test("narrow-screen student UI review",async({page},info)=>{
+  await fixture(page,"COMPLETED","dark");
+  await page.setViewportSize({width:320,height:740});
+  const issues:any[]=[];
+  for(const path of ["/dashboard","/knox-hub","/my-skills","/notification","/swap-details/swap-a","/swap-agreement/swap-a","/reputation?swapId=swap-a","/profile","/students/student-b","/chat","/calendar","/leaderboard"]){
+    await page.goto(path);await page.waitForTimeout(150);
+    await page.screenshot({path:info.outputPath(path.replace(/[^a-z0-9]/gi,"_")+".png")});
+    const result=await page.evaluate(()=>({width:document.documentElement.scrollWidth,viewport:innerWidth,controls:[...document.querySelectorAll<HTMLElement>("button,a,input,select")].filter(el=>{const r=el.getBoundingClientRect();return r.width>0&&r.height>0&&(r.left<0||r.right>innerWidth+1)&&!el.closest("[class*=overflow-x-auto],.admin-scroll")}).map(el=>({text:el.textContent?.trim().slice(0,70),tag:el.tagName,x:el.getBoundingClientRect().x,width:el.getBoundingClientRect().width}))}));
+    if(result.width>result.viewport||result.controls.length)issues.push({path,...result});
+  }
+  expect(issues).toEqual([]);
+});
+
+
+test("responsive student polish keeps headings readable and full badge guidance accessible",async({page},info)=>{
+  await fixture(page,"COMPLETED");
+  for(const theme of ["light","dark"] as const){
+    await page.addInitScript(theme=>localStorage.setItem("theme_student-a",theme),theme);
+    for(const width of [320,390,1280]){
+      await page.setViewportSize({width,height:840});await page.goto("/dashboard");
+      const headings=page.locator(".dashboard-section-heading");await expect(headings).toHaveCount(2);
+      for(const row of await headings.all()){
+        const heading=await row.getByRole("heading").boundingBox(),button=await row.getByRole("button").boundingBox();
+        if(width<640)expect(button!.y).toBeGreaterThanOrEqual(heading!.y+heading!.height);
+        else expect(Math.abs(button!.y-heading!.y)).toBeLessThan(10);
+      }
+      expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+      if(width===320)await page.screenshot({path:info.outputPath(`dashboard-${theme}.png`)});
+      await page.goto("/profile");
+      await expect(page.getByText("Knoxite v1.0",{exact:true})).not.toHaveCSS("position","fixed");
+      await expect(page.getByRole("group",{name:"Exchange statistics"}).getByText("No reviews yet",{exact:true})).toBeVisible();
+      expect((await page.getByRole("group",{name:"Exchange statistics"}).getByText("No reviews yet",{exact:true}).boundingBox())!.height).toBeLessThan(44);
+      if(width===320)await page.screenshot({path:info.outputPath(`profile-${theme}.png`)});
+      await page.goto("/my-skills");
+      await expect(page.locator(".knoxite-surface").first()).toBeVisible();
+      const summary=page.getByText("About skill badges",{exact:true});await summary.click();
+      await expect(page.getByText(/not professional certifications/)).toBeVisible();
+      expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+      await page.goto("/community-forum");await expect(page.locator(".knoxite-surface").first()).toBeVisible();
+    }
+  }
+});
+
+
+test("remaining student workspaces keep visible content and controls inside narrow viewports",async({page},info)=>{
+  await fixture(page,"COMPLETED");
+  const errors:string[]=[];page.on("pageerror",error=>errors.push(error.message));
+  await page.route("**/api/analytics/me",route=>route.fulfill({json:{metrics:{completedSwaps:0,averageRating:null},skills:[],exchanges:[]}}));
+  await page.route("**/api/forum/posts/ui-post",route=>route.fulfill({json:{id:"ui-post",title:"Synthetic discussion for layout review",content:"Synthetic discussion content.",category:"GENERAL",author:{id:"student-b",name:"Synthetic Partner"},createdAt:"2026-11-01T00:00:00Z",comments:[],_count:{comments:0}}}));
+  await page.route("**/api/assessments/offerings/ui-offering",route=>route.fulfill({json:{offeringId:"ui-offering",skillName:"Python Programming Fundamentals",tier:"NOT_ASSESSED",isActive:true,levels:["BASIC","ADVANCED"].map(level=>({level,supported:false,eligible:false,reason:"Assessment unavailable",activeAttemptId:null,nextEligibleAt:null,passingPercent:null,questionCount:null,learningOutcomes:null,attemptCount:0})),attempts:[]}}));
+  for(const width of [320,1280]){
+    await page.setViewportSize({width,height:840});
+    for(const path of ["/achievements","/activity-timeline","/security","/report?userId=student-b","/community-forum/ui-post","/assessments/offerings/ui-offering"]){
+      await page.goto(path);await expect(page.locator("main").first()).toBeVisible();await page.waitForTimeout(100);
+      expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),path).toBe(true);
+      if(width===320)await page.screenshot({path:info.outputPath(path.replace(/[^a-z0-9]/gi,"_")+".png")});
+    }
+  }
+  expect(errors).toEqual([]);
 });

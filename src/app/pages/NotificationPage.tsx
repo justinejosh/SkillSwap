@@ -1,3 +1,4 @@
+import { LoadingContent } from "@/app/components/PageSkeleton";
 import { authenticatedFetch } from "@/app/lib/api";
 import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router";
@@ -234,15 +235,9 @@ export default function NotificationPage() {
             </TabsTrigger>
           </TabsList>
 
+          {loading ? <LoadingContent layout="list" label="Loading swap requests..." /> : <>
           <TabsContent value="incoming" className="space-y-4 mt-0">
-            {loading ? (
-              <div className="flex flex-col items-center justify-center py-20">
-                <Loader2 className="animate-spin text-blue-600 size-8 mb-2" />
-                <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
-                  Loading requests...
-                </span>
-              </div>
-            ) : incomingPending.length === 0 ? (
+            {incomingPending.length === 0 ? (
               renderEmptyState("No new skill swap requests.")
             ) : (
               incomingPending.map((swap) => (
@@ -296,6 +291,7 @@ export default function NotificationPage() {
               ))
             )}
           </TabsContent>
+          </>}
         </Tabs>
       </main>
     </div>

@@ -22,8 +22,10 @@ export function ExchangeSummary({ swap }: { swap: any }) {
     {learn && teach && <ReciprocalExchange learn={[learn]} teach={[teach]} />}
     <dl className="grid grid-cols-2 gap-3 rounded-xl bg-slate-50 p-4 text-sm dark:bg-slate-800/70 sm:grid-cols-3">
       <div><dt className="text-slate-600 dark:text-slate-300">{termsLabel}</dt><dd className="font-bold">{swap.sessions}</dd></div>
-      <div><dt className="text-slate-600 dark:text-slate-300">Hours per session</dt><dd className="font-bold">{swap.duration}</dd></div>
-      <div><dt className="text-slate-600 dark:text-slate-300">{swap.status === "PENDING_AGREEMENT" ? "Proposed commitment" : "Total commitment"}</dt><dd className="font-bold">{swap.sessions * swap.duration} hours per student</dd></div>
+      {swap.duration != null ? <>
+        <div><dt className="text-slate-600 dark:text-slate-300">Hours per session (historical terms)</dt><dd className="font-bold">{swap.duration}</dd></div>
+        <div><dt className="text-slate-600 dark:text-slate-300">Historical time commitment</dt><dd className="font-bold">{swap.sessions * swap.duration} hours per student</dd></div>
+      </> : <div className="col-span-2"><dt className="text-slate-600 dark:text-slate-300">Session times</dt><dd className="font-semibold">Schedule later. Arrange each session's start and end in the calendar.</dd></div>}
     </dl>
   </section>;
 }

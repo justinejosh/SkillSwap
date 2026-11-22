@@ -138,7 +138,7 @@
 .admin-console .recharts-default-tooltip { box-shadow: 0 6px 18px rgb(24 42 69 / 10%); font-size: .8125rem; }
 .admin-console .recharts-text { color: var(--admin-muted); font-family: inherit; }
 .admin-console .text-slate-600, .admin-console .text-slate-500 { color: var(--admin-muted); }
-.admin-console [role="status"]:not(.admin-panel), .admin-console p:only-child[role="status"] { padding: 1rem; border: 1px dashed var(--admin-line); border-radius: .75rem; background: var(--admin-soft); color: var(--admin-muted); }
+.admin-console [role="status"]:not(.admin-panel):not([data-loading-layout]), .admin-console p:only-child[role="status"] { padding: 1rem; border: 1px dashed var(--admin-line); border-radius: .75rem; background: var(--admin-soft); color: var(--admin-muted); }
 .admin-console .admin-error { border: 1px solid #fecaca; border-radius: .75rem; padding: 1rem; color: #991b1b; background: #fef2f2; }
 .dark .admin-console .admin-error { background: #351622; color: #fecaca; border-color: #7f1d1d; }
 .admin-dialog { background: var(--card); border: 1px solid var(--admin-line); border-radius: 1rem; padding: 1.6rem; box-shadow: 0 20px 65px rgb(0 0 0 / 18%); }
@@ -146,6 +146,9 @@
 .admin-dialog [data-slot="alert-dialog-description"] { color: var(--admin-muted); font-size: .875rem; line-height: 1.75; }
 .admin-dialog button:last-child { background: #2563eb; color: white; }
 @media (max-width: 767px) {
+  .admin-console .admin-header-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; gap: .65rem; }
+  .admin-console .admin-header-actions .admin-account { grid-column: 1 / -1; margin-right: 0; }
+  .admin-console .admin-header-actions > button { min-height: 44px; width: 100%; }
   .admin-console .admin-sidebar { padding: 1rem; }
   .admin-console .admin-sidebar > p { margin: .8rem 0 0; }
   .admin-console .admin-header { padding: 1.2rem 1rem; }

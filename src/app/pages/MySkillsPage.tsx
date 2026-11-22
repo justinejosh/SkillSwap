@@ -1,6 +1,8 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router";
+import { LoadingContent } from "@/app/components/PageSkeleton";
+import { useState, useEffect, useRef } from "react";
+import { Link, useNavigate } from "react-router";
 import { Button } from "@/app/components/ui/button";
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/app/components/ui/alert-dialog";
 import { Label } from "@/app/components/ui/label";
 import {
   Dialog,
@@ -47,6 +49,11 @@ export default function MySkillsPage() {
   const [newSkillCategory, setNewSkillCategory] = useState("technology");
   const [selectedPresetKey, setSelectedPresetKey] = useState<string>();
   const [activeTab, setActiveTab] = useState<"offered" | "wanted">("offered");
+  const [removal, setRemoval] = useState<{ id: string; type: "offer" | "want"; name: string } | null>(null);
+  const [removing, setRemoving] = useState(false);
+  const [removalError, setRemovalError] = useState("");
+  const removalTriggerRef = useRef<HTMLElement | null>(null);
+  const skillsTitleRef = useRef<HTMLHeadingElement>(null);
 
   useEffect(() => {
     fetchMySkills();
@@ -98,19 +105,19 @@ export default function MySkillsPage() {
       setSaving(false);
     }
   };
-  const handleDeleteSkill = async (id: string, type: "offer" | "want") => {
-    if (
-      !confirm(
-        "Remove this skill? Earned tiers and assessment history will be retained.",
-      )
-    )
-      return;
-    setError("");
+  const handleDeleteSkill = async () => {
+    if (!removal || removing) return;
+    setRemoving(true);
+    setRemovalError("");
     try {
-      await api(`/profile/skills/${type}/${id}`, { method: "DELETE" });
+      await api(`/profile/skills/${removal.type}/${removal.id}`, { method: "DELETE" });
       await fetchMySkills();
+      setRemoval(null);
+      setNotice("Skill removed. Earned tiers and assessment history are retained.");
     } catch (e: any) {
-      setError(e.message);
+      setRemovalError(e.message || "Unable to remove this skill. Please try again.");
+    } finally {
+      setRemoving(false);
     }
   };
 
@@ -147,21 +154,9 @@ export default function MySkillsPage() {
     </div>
   );
 
-  if (isLoading) {
-    return (
-      <div className="flex flex-col justify-center items-center min-h-screen bg-[#F8FAFC] dark:bg-slate-950">
-        <Loader2 className="animate-spin size-8 text-blue-600 mb-3" />
-        <span className="text-slate-900 dark:text-slate-200 font-bold text-xs uppercase tracking-widest">
-          Loading Skill Matrix...
-        </span>
-      </div>
-    );
-  }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#E5F2FA] via-[#E5F2FA] via-70% to-[#F8FAFC] dark:bg-none dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans flex flex-col relative overflow-x-hidden transition-colors duration-200">
-      {/* SUBTLE ARCHITECTURAL GRID */}
-      <div className="absolute inset-0 bg-[linear-gradient(to_right,#e2e8f080_1px,transparent_1px),linear-gradient(to_bottom,#e2e8f080_1px,transparent_1px)] dark:bg-[linear-gradient(to_right,#1e293b50_1px,transparent_1px),linear-gradient(to_bottom,#1e293b50_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_70%_50%_at_50%_0%,#000_70%,transparent_110%)] pointer-events-none" />
+    <div className="min-h-screen knoxite-surface text-slate-900 dark:text-slate-100 font-sans flex flex-col relative overflow-x-hidden transition-colors duration-200">
 
       {/* 1. FLOATING GLASS HEADER */}
       <div className="sticky top-4 z-30 px-4 sm:px-6">
@@ -179,9 +174,10 @@ export default function MySkillsPage() {
 
             <div className="h-5 w-[1px] bg-slate-200 dark:bg-slate-800 mx-0.5 hidden sm:block" />
 
-            <div
-              onClick={() => navigate("/dashboard")}
-              className="flex items-center gap-2.5 cursor-pointer"
+            <Link
+              to="/dashboard"
+              aria-label="Knoxite dashboard"
+              className="flex min-w-0 items-center gap-2.5 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 dark:focus-visible:outline-blue-300"
             >
               <div className="size-9 bg-blue-600 rounded-xl flex items-center justify-center text-white font-black text-lg shadow-md shadow-blue-600/25">
                 K
@@ -191,7 +187,7 @@ export default function MySkillsPage() {
                   My Skills
                 </span>
               </div>
-            </div>
+            </Link>
           </div>
 
           <Dialog open={isAddSkillOpen} onOpenChange={setIsAddSkillOpen}>
@@ -286,9 +282,11 @@ export default function MySkillsPage() {
       )}
       {/* 2. MAIN CONTENT */}
       <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 pt-8 pb-20 space-y-6 relative z-10">
+        {isLoading ? <LoadingContent layout="cards" label="Loading your skills..." /> : <>
+
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="space-y-1">
-            <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">
+            <h1 ref={skillsTitleRef} tabIndex={-1} className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">
               My Skills
             </h1>
             <p className="text-sm text-slate-500 dark:text-slate-400">
@@ -319,7 +317,10 @@ export default function MySkillsPage() {
             {notice}
           </p>
         )}
-        <AssessmentLegend />
+        <details className="rounded-2xl border border-slate-200 bg-white p-4 text-sm dark:border-slate-800 dark:bg-slate-900">
+          <summary className="cursor-pointer font-semibold text-slate-700 dark:text-slate-200 focus-visible:outline-2 focus-visible:outline-blue-600">About skill badges</summary>
+          <div className="mt-3"><AssessmentLegend /></div>
+        </details>
         <Tabs
           value={activeTab}
           onValueChange={(val: any) => setActiveTab(val)}
@@ -371,7 +372,7 @@ export default function MySkillsPage() {
                       key={skill.id}
                       skill={skill}
                       variant="blue"
-                      onDelete={() => handleDeleteSkill(skill.id, "offer")}
+                      onDelete={() => { removalTriggerRef.current = document.activeElement as HTMLElement; setRemovalError(""); setRemoval({ id: skill.id, type: "offer", name: skill.name }); }}
                     />
                   ))}
             </div>
@@ -389,13 +390,28 @@ export default function MySkillsPage() {
                       key={skill.id}
                       skill={skill}
                       variant="emerald"
-                      onDelete={() => handleDeleteSkill(skill.id, "want")}
+                      onDelete={() => { removalTriggerRef.current = document.activeElement as HTMLElement; setRemovalError(""); setRemoval({ id: skill.id, type: "want", name: skill.name }); }}
                     />
                   ))}
             </div>
           </TabsContent>
         </Tabs>
+
+        </>}
       </main>
+      <AlertDialog open={!!removal} onOpenChange={open => { if (!open && !removing) setRemoval(null); }}>
+        <AlertDialogContent onCloseAutoFocus={event => { event.preventDefault(); (removalTriggerRef.current?.isConnected ? removalTriggerRef.current : skillsTitleRef.current)?.focus(); }}>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove this skill?</AlertDialogTitle>
+            <AlertDialogDescription><span className="break-words font-semibold">{removal?.name}</span> will be removed from your portfolio. Earned tiers and assessment history will be retained.</AlertDialogDescription>
+          </AlertDialogHeader>
+          {removalError && <p role="alert" className="text-sm text-red-700 dark:text-red-300">{removalError}</p>}
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={removing}>Keep Skill</AlertDialogCancel>
+            <AlertDialogAction className="bg-red-600 text-white hover:bg-red-700" disabled={removing} onClick={event => { event.preventDefault(); void handleDeleteSkill(); }}>{removing ? "Removing..." : "Remove Skill"}</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -483,8 +499,9 @@ function SkillCard({
         variant="ghost"
         size="icon"
         onClick={onDelete}
-        className="text-slate-300 dark:text-slate-600 hover:text-rose-500 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors rounded-xl shrink-0"
+        className="text-slate-500 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-300 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors rounded-xl shrink-0"
         title="Remove Skill"
+        aria-label={`Remove ${skill.name}`}
       >
         <Trash2 className="size-4" />
       </Button>

@@ -1,3 +1,4 @@
+import { PageSkeleton } from "./PageSkeleton";
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { Link, Navigate } from "react-router";
 import { api } from "@/app/lib/api";
@@ -7,6 +8,7 @@ import { applyStoredTheme } from "@/app/lib/theme";
 
 type User = { id: string; role: "USER" | "ADMIN"; name: string; email: string; avatarUrl: string | null };
 const VerifiedIdentity = createContext<User | null>(null);
+export function useVerifiedUser() { return useContext(VerifiedIdentity); }
 function Authorized({ user, role, children }: { user: User; role?: User["role"]; children: ReactNode }) {
   if (role && user.role !== role)
     return <Navigate to={user.role === "ADMIN" ? "/admin-dashboard" : "/dashboard"} replace />;
@@ -57,7 +59,7 @@ function AuthenticatedSession({ children, role }: { children: ReactNode; role?: 
   }, [token, revision]);
   if (!token) return <Navigate to="/login" replace />;
   if (state.token !== token || (!state.user && !state.error))
-    return <p role="status" className="p-8">Checking your session...</p>;
+    return <PageSkeleton label="Checking your session..." />;
   if (state.error) return <div className="p-8 space-y-4">
     <p role="alert">{state.error}</p>
     <button type="button" className="rounded-xl bg-blue-700 px-4 py-2 text-white" onClick={() => { setState({}); setRevision(n => n + 1); }}>Retry session check</button>

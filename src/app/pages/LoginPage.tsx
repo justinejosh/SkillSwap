@@ -103,11 +103,11 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-blue-50 via-white to-blue-100 p-4">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-blue-50 via-white to-blue-100 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900 p-4">
       <div className="w-full max-w-md">
-        <Card className="shadow-xl border-blue-100 bg-white/90 backdrop-blur">
+        <Card className="shadow-xl border-blue-100 bg-white/90 dark:border-slate-800 dark:bg-slate-900/95 backdrop-blur">
           <CardHeader className="space-y-1 text-center">
-            <CardTitle className="text-2xl text-blue-900 font-bold">
+            <CardTitle className="text-2xl text-blue-900 dark:text-blue-100 font-bold">
               Knoxite
             </CardTitle>
             <CardDescription className="text-blue-600">
@@ -122,7 +122,7 @@ export default function LoginPage() {
                 onSubmit={handleSubmit}
                 className="space-y-4"
               >
-                <h2 className="text-sm font-semibold text-blue-900">Sign in with Email</h2>
+                <h2 className="text-sm font-semibold text-blue-900 dark:text-blue-100">Sign in with Email</h2>
                 {(error || retrySeconds > 0) && (
                   <div
                     role="alert"
@@ -151,7 +151,7 @@ export default function LoginPage() {
                 <div className="space-y-2">
                   <Label
                     htmlFor="email"
-                    className="text-blue-900 font-semibold"
+                    className="text-xs uppercase tracking-wider font-bold text-blue-600 dark:text-blue-400 ml-1"
                   >
                     Email Address
                   </Label>
@@ -164,14 +164,14 @@ export default function LoginPage() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
-                    className="border-blue-200 focus:ring-2 focus:ring-blue-400 focus:border-transparent"
+                    className="h-12 rounded-xl border-blue-100 bg-blue-50/30 focus:ring-blue-600 dark:border-blue-900 dark:bg-slate-950 dark:text-slate-100"
                   />
                 </div>
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <Label
                       htmlFor="password"
-                      className="text-blue-900 font-semibold"
+                      className="text-xs uppercase tracking-wider font-bold text-blue-600 dark:text-blue-400 ml-1"
                     >
                       Password
                     </Label>
@@ -193,13 +193,13 @@ export default function LoginPage() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
-                    className="border-blue-200 focus:ring-2 focus:ring-blue-400 focus:border-transparent"
+                    className="h-12 rounded-xl border-blue-100 bg-blue-50/30 focus:ring-blue-600 dark:border-blue-900 dark:bg-slate-950 dark:text-slate-100"
                   />
                 </div>
                 <Button
                   type="submit"
                   disabled={isLoading || retrySeconds > 0}
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-200 py-6 text-lg font-bold transition-all active:scale-[0.98] mt-2"
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white h-12 rounded-xl shadow-lg shadow-blue-100 dark:shadow-none text-base font-bold transition-all active:scale-[0.98] mt-2"
                 >
                   {isLoading ? "Authenticating..." : retrySeconds > 0 ? `Try again in ${retryLabel}` : "Sign in"}
                 </Button>

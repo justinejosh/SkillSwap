@@ -104,7 +104,7 @@ test("same-tab account replacement hides old content until fresh server verifica
   const f = await fixture(context); await page.goto("/dashboard"); await expect(page.getByTitle("Account Menu")).toBeVisible();
   f.hold();
   await page.evaluate(async () => (await import(String("/src/app/lib/session.ts"))).saveSession({ token: "synthetic-two", user: { id: "two", role: "USER" } }));
-  await expect(page.getByRole("status", { name: "", exact: true }).filter({ hasText: "Checking your session..." })).toBeVisible();
+  await expect(page.getByRole("status", { name: "Checking your session...", exact: true })).toBeVisible();
   await expect(page.getByTitle("Account Menu")).toHaveCount(0);
   f.release(); await expect(page.getByTitle("Account Menu")).toBeVisible(); await page.getByTitle("Account Menu").click();
   await expect(page.getByText("New Synthetic Student", { exact: true })).toBeVisible();

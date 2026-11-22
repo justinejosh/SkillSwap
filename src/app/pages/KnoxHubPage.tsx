@@ -1,7 +1,8 @@
+import { LoadingContent } from "@/app/components/PageSkeleton";
 import { authenticatedFetch } from "@/app/lib/api";
 import { MatchResults } from "@/app/components/MatchResults";
 import { useState, useEffect, useMemo } from "react";
-import { useNavigate } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { Button } from "@/app/components/ui/button";
 import { Badge } from "@/app/components/ui/badge";
 import {
@@ -175,16 +176,6 @@ export default function KnoxHubPage() {
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex flex-col justify-center items-center min-h-screen knoxite-surface">
-        <Loader2 className="animate-spin size-8 text-blue-600 mb-3" />
-        <p className="text-slate-900 dark:text-slate-200 font-bold text-xs uppercase tracking-widest">
-          Loading KnoxHub Directory...
-        </p>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen knoxite-surface text-slate-900 dark:text-slate-100 font-sans flex flex-col relative overflow-x-hidden transition-colors duration-200">
@@ -207,9 +198,10 @@ export default function KnoxHubPage() {
 
             <div className="h-5 w-[1px] bg-slate-200 dark:bg-slate-800 mx-0.5 hidden sm:block" />
 
-            <div
-              onClick={() => navigate("/dashboard")}
-              className="flex items-center gap-2.5 cursor-pointer"
+            <Link
+              to="/dashboard"
+              aria-label="Knoxite dashboard"
+              className="flex min-w-0 items-center gap-2.5 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 dark:focus-visible:outline-blue-300"
             >
               <div className="size-9 bg-blue-600 rounded-xl flex items-center justify-center text-white font-black text-lg shadow-md shadow-blue-600/25">
                 K
@@ -219,7 +211,7 @@ export default function KnoxHubPage() {
                   KnoxHub
                 </span>
               </div>
-            </div>
+            </Link>
           </div>
 
           {/* Right: Success Notification if sent */}
@@ -235,6 +227,8 @@ export default function KnoxHubPage() {
 
       {/* 2. MAIN HUB CONTENT */}
       <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 pt-8 pb-20 space-y-8 relative z-10">
+        {isLoading ? <LoadingContent layout="cards" label="Loading matches..." /> : <>
+
         {/* TOP INTRO & SEARCH / FILTER TOOLBAR */}
         <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-5">
           <div className="space-y-1">
@@ -529,6 +523,8 @@ export default function KnoxHubPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        </>}
       </main>
     </div>
   );

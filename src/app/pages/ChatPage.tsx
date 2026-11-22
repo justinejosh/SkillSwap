@@ -1,3 +1,4 @@
+import { LoadingContent } from "@/app/components/PageSkeleton";
 import { authenticatedFetch } from "@/app/lib/api";
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router";
@@ -174,50 +175,7 @@ export default function ChatPage() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-dvh flex items-center justify-center p-6 text-center knoxite-surface">
-        <div role="status" className="flex flex-col items-center gap-3">
-          <Loader2 aria-hidden="true" className="size-8 text-blue-600 animate-spin" />
-          <p className="text-slate-900 dark:text-slate-200 font-semibold text-sm">
-            Loading conversations...
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  if (loadError || conversations.length === 0) {
-    return (
-      <div className="relative min-h-dvh flex items-center justify-center p-6 text-center knoxite-surface">
-
-        <div className="relative z-10 w-full max-w-sm space-y-4">
-          <div className="size-16 rounded-3xl bg-blue-50 dark:bg-slate-900 text-blue-600 dark:text-blue-400 flex items-center justify-center mx-auto shadow-xs border border-blue-100 dark:border-slate-800">
-            <MessageSquare aria-hidden="true" className="size-8" />
-          </div>
-          <div className="space-y-1.5">
-            <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
-              {loadError ? "Unable to load conversations" : "No Active Swaps Yet"}
-            </h2>
-            <p role={loadError ? "alert" : undefined} className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
-              {loadError || "Start or accept a skill swap to chat with your partner."}
-            </p>
-          </div>
-          {loadError && <Button variant="outline" className="mr-2" onClick={() => setLoadAttempt(n => n + 1)}>Try again</Button>}
-          <Button
-            onClick={() => navigate("/dashboard")}
-            className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-6 h-11 text-xs font-bold shadow-md shadow-blue-600/20"
-          >
-            Return to Dashboard
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="h-screen max-h-screen knoxite-surface text-slate-900 dark:text-slate-100 flex flex-col overflow-hidden font-sans relative transition-colors duration-200">
-
+  const header = <>
       {/* FLOATING GLASS HEADER */}
       <div className="flex-none pt-4 px-4 sm:px-6 z-30">
         <header className="max-w-7xl mx-auto flex items-center justify-between px-4 sm:px-5 py-3 rounded-2xl bg-white/85 dark:bg-slate-900/85 backdrop-blur-md border border-slate-200/80 dark:border-slate-800 shadow-xs">
@@ -252,6 +210,48 @@ export default function ChatPage() {
       </div>
 
       {/* CHAT CONTAINER */}
+  </>;
+
+  if (loading && conversations.length === 0) return (
+    <div className="min-h-dvh knoxite-surface flex flex-col">
+      {header}
+      <main className="mx-auto w-full max-w-7xl p-4 sm:p-6"><LoadingContent layout="messages" label="Loading conversations..." /></main>
+    </div>
+  );
+
+  if (loadError || conversations.length === 0) {
+    return (
+      <div className="relative min-h-dvh flex items-center justify-center p-6 text-center knoxite-surface">
+
+        <div className="relative z-10 w-full max-w-sm space-y-4">
+          <div className="size-16 rounded-3xl bg-blue-50 dark:bg-slate-900 text-blue-600 dark:text-blue-400 flex items-center justify-center mx-auto shadow-xs border border-blue-100 dark:border-slate-800">
+            <MessageSquare aria-hidden="true" className="size-8" />
+          </div>
+          <div className="space-y-1.5">
+            <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+              {loadError ? "Unable to load conversations" : "No Active Swaps Yet"}
+            </h2>
+            <p role={loadError ? "alert" : undefined} className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+              {loadError || "Start or accept a skill swap to chat with your partner."}
+            </p>
+          </div>
+          {loadError && <Button variant="outline" className="mr-2" onClick={() => setLoadAttempt(n => n + 1)}>Try again</Button>}
+          <Button
+            onClick={() => navigate("/dashboard")}
+            className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-6 h-11 text-xs font-bold shadow-md shadow-blue-600/20"
+          >
+            Return to Dashboard
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-screen max-h-screen knoxite-surface text-slate-900 dark:text-slate-100 flex flex-col overflow-hidden font-sans relative transition-colors duration-200">
+
+      {header}
+
       <div className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 overflow-hidden min-h-0 relative z-10">
         <div className="grid grid-cols-12 gap-4 h-full min-h-0">
           {/* INBOX SIDEBAR */}

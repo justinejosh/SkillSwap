@@ -12,16 +12,16 @@ async function fixture(page: Page, theme: "light" | "dark" = "light") {
     const path=u.pathname.replace(/\/$/,"");
     if(path==="/api/profile"||path.startsWith("/api/users/"))return route.fulfill({json:{...a,email:"synthetic@fixture.test",bio:"Synthetic biography",programId:"p",yearLevelId:"y",program:{id:"p",label:"BSCS"},yearLevel:{id:"y",name:"1st Year"},department:null,offeredSkills:[],wantedSkills:[],metrics:{averageRating:null,ratingCount:0,completedSwaps:0}}});
     if(path==="/api/auth/session-status")return route.fulfill({json:{enabled:false}});
-    if(path==="/api/swaps/surface-swap")return route.fulfill({json:{...snapshot(),confirmationEligibility:{eligible:state.eligible,reason:state.eligible?"This session can now be confirmed.":"Schedule this session with your partner before confirming it.",scheduledEndAt:null}}});
+    if(path==="/api/swaps/surface-swap")return route.fulfill({json:{...snapshot(),confirmationEligibility:{eligible:state.eligible,reason:state.eligible?"This session can now be confirmed.":"Refresh status before confirming participation.",scheduledEndAt:null}}});
     if(path==="/api/swaps/surface-swap/log-session"){
       state.confirmationPosts++;
-      if(!state.eligible)return route.fulfill({status:409,json:{error:"Confirm this session after its agreed scheduled end time."}});
+      if(!state.eligible)return route.fulfill({status:409,json:{error:"Agreement changed. Refresh before confirming participation."}});
       state.mine++;return route.fulfill({json:snapshot()});
     }
     if(path==="/api/swaps")return route.fulfill({json:[snapshot()]});
     if(path==="/api/sessions"){
       if(route.request().method()==="POST"){const body=route.request().postDataJSON();state.posts.push(body);state.rows.push({...body,id:"schedule",partner:b,exchangeStatus:state.status,confirmedByMe:false,confirmedByPartner:false});return route.fulfill({status:201,json:body});}
-      return route.fulfill({json:state.rows.map((row:any)=>({...row,confirmationEligibility:{eligible:state.eligible,reason:state.eligible?"This session can now be confirmed.":"Confirm this session after its agreed scheduled end time.",scheduledEndAt:"2030-04-10T04:00:00Z"}}))});
+      return route.fulfill({json:state.rows.map((row:any)=>({...row,confirmationEligibility:{eligible:state.eligible,reason:state.eligible?"This session can now be confirmed.":"Agreement changed. Refresh before confirming participation.",scheduledEndAt:"2030-04-10T04:00:00Z"}}))});
     }
     if(path==="/api/leaderboard")return route.fulfill({json:{topMentors:[],viewer:{eligible:false,reasons:[]}}});
     if(path==="/api/academic-options")return route.fulfill({json:{programs:[{id:"p",label:"BSCS",yearLevels:[{id:"y",name:"1st Year"}]}],yearLevels:[{id:"y",name:"1st Year"}]}});
@@ -56,23 +56,23 @@ for(const theme of ["light","dark"] as const){
   test(`calendar ${theme}: local-time controls, saved history and readonly closed context`,async({page},info)=>{
     const state=await fixture(page,theme);state.rows=[{id:"past",swapId:"surface-swap",sessionNumber:4,scheduledAt:"2020-01-01T00:00:00Z",partner:{name:"Synthetic Historical Partner"},exchangeStatus:"CONFIRMED",confirmedByMe:true,confirmedByPartner:false}];
     await page.goto("/calendar?swapId=surface-swap");await expect(page.getByRole("heading",{name:"Session Calendar",exact:true})).toBeVisible();const date=page.getByLabel("Date and time (your local time)",{exact:true});await expect(date).toHaveAttribute("min","2030-04-10T10:31");await expect(page.getByText("Time zone: Asia/Manila.",{exact:false})).toBeVisible();await expect(page.getByRole("option",{name:"Session 4 — acknowledged, locked",exact:true})).toBeDisabled();
-    await date.fill("2030-04-10T12:00");await page.getByLabel("HTTPS meeting link (optional)",{exact:true}).fill("https://example.invalid/synthetic-session");await page.getByRole("button",{name:"Save Session Schedule",exact:true}).click();await expect.poll(()=>state.posts.length).toBe(1);expect(state.posts[0].scheduledAt).toBe("2030-04-10T04:00:00.000Z");await expect(page.getByText("Session schedule saved.",{exact:false})).toBeVisible();await expect(page.locator('time[datetime="2020-01-01T00:00:00Z"]')).toBeVisible();
+    await date.fill("2030-04-10T12:00");await page.getByLabel("End date and time (your local time)",{exact:true}).fill("2030-04-10T14:00");await page.getByLabel("HTTPS meeting link (optional)",{exact:true}).fill("https://example.invalid/synthetic-session");await page.getByRole("button",{name:"Save Session Schedule",exact:true}).click();await expect.poll(()=>state.posts.length).toBe(1);expect(state.posts[0].scheduledAt).toBe("2030-04-10T04:00:00.000Z");expect(state.posts[0].endsAt).toBe("2030-04-10T06:00:00.000Z");await expect(page.getByText("Session schedule saved.",{exact:false})).toBeVisible();await expect(page.locator('time[datetime="2020-01-01T00:00:00Z"]')).toBeVisible();
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await page.screenshot({path:info.outputPath(`calendar-${theme}.png`),fullPage:true});state.status="COMPLETED";await page.reload();await expect(page.getByRole("button",{name:"Save Session Schedule",exact:true})).toBeDisabled();await expect(page.getByText("This exchange is read-only.",{exact:false})).toBeVisible();expect(state.rows[0].scheduledAt).toBe("2020-01-01T00:00:00Z");
   });
 }
 
-test("Tracking blocks confirmation while the same exchange has no calendar sessions",async({page})=>{
-  const state=await fixture(page);
+test("Tracking permits actual participation when the same exchange has no calendar sessions",async({page})=>{
+  const state=await fixture(page);state.eligible=true;
   await page.goto("/swap-details/surface-swap");
-  await expect(page.getByRole("button",{name:"Confirm Session 1",exact:true})).toBeDisabled();
-  await expect(page.getByText("Schedule this session with your partner before confirming it.",{exact:true})).toBeVisible();
+  await expect(page.getByRole("button",{name:"Confirm Session 1",exact:true})).toBeEnabled();
+  await expect(page.getByText("This session can now be confirmed.",{exact:true})).toBeVisible();
   await page.getByRole("button",{name:"Schedule Sessions",exact:true}).click();
   await expect(page).toHaveURL(/calendar\?swapId=surface-swap/);
   await expect(page.getByText("No sessions scheduled yet.",{exact:true})).toBeVisible();
   await page.reload();
   await expect(page.getByText("No sessions scheduled yet.",{exact:true})).toBeVisible();
   await page.getByRole("link",{name:"Back to Swap Tracking",exact:true}).click();
-  await expect(page.getByRole("button",{name:"Confirm Session 1",exact:true})).toBeDisabled();
+  await expect(page.getByRole("button",{name:"Confirm Session 1",exact:true})).toBeEnabled();
   expect(state.rows).toHaveLength(0);expect(state.posts).toHaveLength(0);
 });
 
@@ -80,17 +80,17 @@ test("Tracking refreshes server eligibility and handles a stale confirmation wit
   const state=await fixture(page);await page.goto("/swap-details/surface-swap");
   const confirm=page.getByRole("button",{name:"Confirm Session 1",exact:true});await expect(confirm).toBeDisabled();
   state.eligible=true;await page.clock.fastForward(11000);await expect(confirm).toBeEnabled();
-  state.eligible=false;await confirm.click();
-  await expect(page.getByRole("alert")).toContainText("agreed scheduled end time");expect(state.mine).toBe(0);expect(state.confirmationPosts).toBe(1);
+  state.eligible=false;await confirm.click();await page.getByLabel("Actual completion date and time",{exact:true}).fill("2030-04-10T10:15");await page.getByRole("button",{name:"Confirm participation",exact:true}).click();
+  await expect(page.getByRole("dialog").getByRole("alert")).toContainText("Agreement changed");expect(state.mine).toBe(0);expect(state.confirmationPosts).toBe(1);
   await page.reload();await expect(confirm).toBeDisabled();
-  state.eligible=true;await page.clock.fastForward(11000);await expect(confirm).toBeEnabled();await confirm.click();
+  state.eligible=true;await page.clock.fastForward(11000);await expect(confirm).toBeEnabled();await confirm.click();await page.getByLabel("Actual completion date and time",{exact:true}).fill("2030-04-10T10:15");await page.getByRole("button",{name:"Confirm participation",exact:true}).click();
   await expect(page.getByRole("button",{name:"Confirm Session 2",exact:true})).toBeVisible();expect(state.mine).toBe(1);
 });
 
 test("Calendar refreshes authoritative confirmation eligibility without activity renewal",async({page})=>{
   const state=await fixture(page);state.rows=[{id:"scheduled",swapId:"surface-swap",sessionNumber:1,scheduledAt:"2030-04-10T02:00:00Z",partner:{name:"Synthetic Partner"},exchangeStatus:"CONFIRMED",confirmedByMe:false,confirmedByPartner:false}];
   let renewals=0;page.on("request",request=>{if(request.url().includes("session-activity"))renewals++;});
-  await page.goto("/calendar?swapId=surface-swap");await expect(page.getByText("Confirm this session after its agreed scheduled end time.",{exact:false})).toBeVisible();
+  await page.goto("/calendar?swapId=surface-swap");await expect(page.getByText("Agreement changed. Refresh before confirming participation.",{exact:false})).toBeVisible();
   state.eligible=true;await page.clock.fastForward(16000);await expect(page.getByText("This session can now be confirmed.",{exact:false})).toBeVisible();expect(renewals).toBe(0);
 });
 
@@ -111,6 +111,6 @@ test("calendar blocks expired today/past inputs and rechecks stale forms and fin
   const state=await fixture(page);await page.goto("/calendar?swapId=surface-swap");const date=page.getByLabel("Date and time (your local time)",{exact:true}),save=page.getByRole("button",{name:"Save Session Schedule",exact:true});
   for(const value of ["2030-04-09T12:00","2030-04-10T10:29","2030-04-10T10:30"]){await date.fill(value);await save.click();await expect(page.getByRole("alert").filter({hasText:"strictly in the future"})).toBeVisible();expect(state.posts).toHaveLength(0);}
   await date.fill("2030-04-10T10:31");await page.clock.fastForward(120000);await save.click();await expect(page.getByRole("alert").filter({hasText:"strictly in the future"})).toBeVisible();expect(state.posts).toHaveLength(0);
-  await date.fill("2030-04-10T12:00");state.approval="2030-04-10T05:00:00Z";await save.click();await expect(page.getByRole("alert")).toContainText("after both students approved");expect(state.posts).toHaveLength(0);
+  await date.fill("2030-04-10T12:00");await page.getByLabel("End date and time (your local time)",{exact:true}).fill("2030-04-10T14:00");state.approval="2030-04-10T05:00:00Z";await save.click();await expect(page.getByRole("alert")).toContainText("after both students approved");expect(state.posts).toHaveLength(0);
   state.approval="2030-04-10T01:30:00Z";state.status="CANCELLED";await save.click();await expect(page.getByRole("alert")).toContainText("no longer available");expect(state.posts).toHaveLength(0);
 });

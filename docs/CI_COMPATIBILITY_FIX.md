@@ -1,5 +1,14 @@
 # CI compatibility and staging administrator handoff
 
+**Historical policy note — 2026-11-22:** Scheduled-end confirmation checks in
+this report describe the earlier implementation/test baseline. The current local
+rules allow explicit actual-completion logging for early or unscheduled sessions,
+with a non-future time after bilateral agreement approval. Independent participant
+confirmations, sequential limits, closed-exchange protections and bilateral reviews
+remain required. See [current behavior and migration dependencies](FLEXIBLE_SESSION_AGREEMENTS.md).
+Earlier test counts are retained as historical evidence, not fresh validation of
+the current rules. No hosted schema or deployment change is implied.
+
 2026-11-16 · `dev-justine` · local verification only
 
 **2026-11-18 follow-up:** [staging release preparation](STAGING_RELEASE_PLAN.md) adds hash-checked private QA secret restoration/cleanup without dropping content tests. Three owner-configured Actions secrets and an actual hosted run remain required; the historical input limitation below is retained for context.

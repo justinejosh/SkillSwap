@@ -28,9 +28,9 @@ test("future, final-approval and one-year boundaries are strictly enforced witho
 test("scheduling API rejects direct bypasses, closed exchanges and locked sessions; preserves historical reads", async () => {
   let caller="a", writes=0, locked=0;
   const now=Date.now(), future=new Date(now+3600_000).toISOString();
-  const swap:any={id:"swap",requesterId:"a",receiverId:"b",status:"CONFIRMED",integrityVerified:true,sessions:2,requesterApprovedAt:new Date(now-60000),receiverApprovedAt:new Date(now-30000)};
+  const swap:any={id:"swap",requesterId:"a",receiverId:"b",status:"CONFIRMED",integrityVerified:true,sessions:2,duration:1,requesterApprovedAt:new Date(now-60000),receiverApprovedAt:new Date(now-30000)};
   const historical={id:"old",swapId:"swap",sessionNumber:1,scheduledAt:new Date("2020-01-01T00:00Z"),meetingLink:null,swap:{...swap,requester:{id:"a",name:"Synthetic A"},receiver:{id:"b",name:"Synthetic B"},sessionLogs:[]}};
-  const db:any={$transaction:async(fn:any)=>fn(db),$queryRaw:async()=>[],swap:{findUnique:async()=>swap},sessionConfirmation:{count:async()=>locked},swapSession:{upsert:async(args:any)=>{writes++;return args.create;},findMany:async()=>[historical]}};
+  const db:any={$transaction:async(fn:any)=>fn(db),$queryRaw:async()=>[],swap:{findUnique:async()=>swap},sessionConfirmation:{count:async()=>locked},swapSession:{findUnique:async()=>null,upsert:async(args:any)=>{writes++;return args.create;},findMany:async()=>[historical]}};
   const app=express();app.use(express.json());
   app.use((req,_res,next)=>{req.userId=caller;req.userRole="USER";next();}); // Test fixture only.
   app.use(sessionsRouter(db as PrismaClient));app.use(errorHandler);

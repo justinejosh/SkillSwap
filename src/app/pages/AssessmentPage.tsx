@@ -1,3 +1,4 @@
+import { LoadingContent } from "@/app/components/PageSkeleton";
 import { AdvancedAssessmentScope } from "@/app/components/AdvancedAssessmentScope";
 import { FormEvent, useContext, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
@@ -224,7 +225,7 @@ export default function AssessmentPage() {
               {error}
             </p>
           )}
-          {loading && <p role="status">Loading assessment...</p>}
+          {loading && <LoadingContent layout="form" label="Loading assessment..." />}
           {(attempt || availability) && (
             <AssessmentBadge tier={attempt?.tier || availability!.tier} />
           )}

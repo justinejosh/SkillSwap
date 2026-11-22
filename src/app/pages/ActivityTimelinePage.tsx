@@ -1,3 +1,4 @@
+import { LoadingContent } from "@/app/components/PageSkeleton";
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import { api } from "@/app/lib/api";
@@ -45,7 +46,7 @@ export default function ActivityTimelinePage() {
         </Link>
         <h1 className="text-2xl font-bold">Your exchange activity</h1>
         {error && <p role="alert">{error}</p>}
-        {!data && !error && <p role="status">Loading activity...</p>}
+        {!data && !error && <LoadingContent layout="list" label="Loading activity..." />}
         {data && !events.length && <p>No exchange activity yet.</p>}
         <ol className="space-y-3">
           {events.map((e: any) => (

@@ -1,3 +1,4 @@
+import { LoadingContent } from "@/app/components/PageSkeleton";
 import { Users, ArrowLeftRight, CircleCheck, MessageSquareText, RefreshCw, Info, ArrowUpRight } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router";
@@ -18,7 +19,7 @@ export default function AdminDashboardPage() {
   },[section,refresh]);
   const cards=[{title:"Registered Students",icon:Users,tone:"blue",value:data?.systemHealth?.totalUsers,description:"Registered STUDENT accounts, including suspended accounts; administrators excluded."},{title:"Active Ongoing Swaps",icon:ArrowLeftRight,tone:"amber",value:data?.swapMetrics?.activeSwaps,description:"CONFIRMED exchanges only. Pending agreements are shown separately."},{title:"Completed Swaps",icon:CircleCheck,tone:"green",value:data?.swapMetrics?.completedSwaps,description:"Validated completed outcomes using the existing exchange-integrity gate."},{title:"Peer Evaluations",icon:MessageSquareText,tone:"violet",value:data?.systemHealth?.totalReviews,description:"Validated review submissions on completed, integrity-marked exchanges; not unique reviewers."}];
   return <AdminShell title={titles[section]}><div className="flex flex-wrap items-center justify-between gap-3"><p className="text-sm text-slate-600 dark:text-slate-300">Live administrative records. Refresh reloads data only.</p><Button variant="outline" disabled={loading} onClick={()=>setRefresh(n=>n+1)}><RefreshCw className="size-4" aria-hidden="true"/>Refresh data</Button></div>
-    {error&&<p role="alert" className="admin-error">{error}</p>}{loading?<p role="status" className="admin-panel">Loading administrator data...</p>:<>
+    {error&&<p role="alert" className="admin-error">{error}</p>}{loading&&!data?<LoadingContent layout="dashboard" label="Loading administrator data..." />:<>
       {section==="overview"&&<>
         <div className="admin-metrics grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {cards.map(c=><section key={c.title} className={`admin-panel admin-metric admin-metric-${c.tone}`}>

@@ -1,5 +1,14 @@
 # Four production blockers — local resolution
 
+**Historical policy note — 2026-11-22:** Scheduled-end confirmation checks in
+this report describe the earlier implementation/test baseline. The current local
+rules allow explicit actual-completion logging for early or unscheduled sessions,
+with a non-future time after bilateral agreement approval. Independent participant
+confirmations, sequential limits, closed-exchange protections and bilateral reviews
+remain required. See [current behavior and migration dependencies](FLEXIBLE_SESSION_AGREEMENTS.md).
+Earlier test counts are retained as historical evidence, not fresh validation of
+the current rules. No hosted schema or deployment change is implied.
+
 2026-11-16 · `dev-justine` · supplements `KNOXITE_PRODUCTION_READINESS.md`
 
 **Not a production release or production-readiness certification.** No protected database, local approval file, hosting service, real identity or mailbox was used for these tests. No commit, push, merge or deployment occurred.

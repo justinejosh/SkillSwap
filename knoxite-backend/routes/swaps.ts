@@ -1,5 +1,5 @@
 import express from "express";
-import { confirmationEligibility } from "../services/sessionConfirmationEligibility";
+import { actualCompletionTime, confirmationEligibility } from "../services/sessionConfirmationEligibility";
 import { Prisma, PrismaClient } from "@prisma/client";
 import { actor, requireStudent } from "../middleware/authMiddleware";
 import { HttpError, integer, onlyKeys, text } from "../lib/http";
@@ -304,6 +304,11 @@ export function swapRouters(db: PrismaClient, config: AppConfig) {
     res.json({
       ...swap,
       confirmationEligibility: confirmationEligibility(swap, actor(req), nextNumber, schedule),
+      sessionConfirmations: await db.sessionConfirmation.findMany({
+        where: { swapId: swap.id },
+        select: { participantId: true, sessionNumber: true, confirmedAt: true, actualCompletedAt: true },
+        orderBy: [{ sessionNumber: "asc" }, { confirmedAt: "asc" }],
+      }),
       me: requester ? swap.requester : swap.receiver,
       partner: requester ? swap.receiver : swap.requester,
       canReview: partnerId !== actor(req) && swap.status === "CONFIRMED" && swap.integrityVerified &&
@@ -322,7 +327,9 @@ export function swapRouters(db: PrismaClient, config: AppConfig) {
       "agreementVersion",
     ]);
     const sessions = integer(req.body.sessions, "Sessions", 1, 30);
-    const duration = integer(req.body.duration, "Duration", 1, 8);
+    // Preserve the old API for legacy clients; new agreements omit fixed hours.
+    const suppliedDuration = req.body.duration === undefined ? undefined
+      : req.body.duration === null ? null : integer(req.body.duration, "Duration", 1, 8);
     const version = integer(
       req.body.agreementVersion,
       "Agreement version",
@@ -349,6 +356,8 @@ export function swapRouters(db: PrismaClient, config: AppConfig) {
           409,
           "Agreement terms changed. Reload and review before signing.",
         );
+      const duration = suppliedDuration === undefined
+        ? (s.status === "CONFIRMED" ? s.duration : null) : suppliedDuration;
       const changed = sessions !== s.sessions || duration !== s.duration;
       if (s.status === "CONFIRMED") {
         if (changed)
@@ -383,8 +392,9 @@ export function swapRouters(db: PrismaClient, config: AppConfig) {
     });
   });
   swaps.post("/:id/log-session", async (req, res) => {
-    onlyKeys(req.body, ["sessionNumber"]);
+    onlyKeys(req.body, ["sessionNumber", "completedAt"]);
     const number = integer(req.body.sessionNumber, "Session number", 1, 30);
+    const completedAt = actualCompletionTime(req.body.completedAt);
     const swap = await transaction(db, async (tx) => {
       const id = String(req.params.id);
       await lockSwap(tx, id);
@@ -416,8 +426,10 @@ export function swapRouters(db: PrismaClient, config: AppConfig) {
       const schedule = await tx.swapSession.findUnique({ where: { swapId_sessionNumber: { swapId: id, sessionNumber: number } } });
       const eligibility = confirmationEligibility(s, actor(req), number, schedule);
       if (!eligibility.eligible) throw new HttpError(409, eligibility.reason);
+      if (completedAt.getTime() < Math.max(s.requesterApprovedAt!.getTime(), s.receiverApprovedAt!.getTime()))
+        throw new HttpError(422, "Actual completion cannot predate final agreement approval.");
       await tx.sessionConfirmation.create({
-        data: { swapId: id, participantId: actor(req), sessionNumber: number },
+        data: { swapId: id, participantId: actor(req), sessionNumber: number, actualCompletedAt: completedAt },
       });
       return tx.swap.update({
         where: { id },

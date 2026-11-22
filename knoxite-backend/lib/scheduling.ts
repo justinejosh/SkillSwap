@@ -25,12 +25,27 @@ export function assertScheduleTime(start: Date, requesterApproval: Date | null, 
 
 // Enforced for new confirmations. Historical acknowledgements are not rewritten.
 // This is an elapsed-time prerequisite, not evidence of actual attendance.
-export function assertScheduledSessionEnded(start: Date | null, durationHours: number, now = Date.now()) {
-  if (!start || !Number.isFinite(start.getTime()) || !Number.isFinite(now))
+export function scheduledSessionEnd(start: Date | null, durationHours: number | null, endsAt?: Date | null): Date {
+  if (!start || !Number.isFinite(start.getTime()))
     throw new HttpError(409, "A valid schedule is required before confirming this session.");
+  if (endsAt != null) {
+    if (!Number.isFinite(endsAt.getTime()) || endsAt.getTime() <= start.getTime())
+      throw new HttpError(409, "The scheduled end must be after the session start.");
+    if (durationHours != null && endsAt.getTime() !== start.getTime() + durationHours * 3600_000)
+      throw new HttpError(409, "This historical agreement retains its fixed session duration.");
+    return endsAt;
+  }
+  // Only legacy agreements may derive an end from their preserved fixed hours.
+  if (durationHours == null)
+    throw new HttpError(409, "Schedule an end time for this session before confirming it.");
   if (!Number.isInteger(durationHours) || durationHours < 1 || durationHours > 8)
     throw new HttpError(409, "The agreed session duration needs review.");
   const end = start.getTime() + durationHours * 3600_000;
-  if (!Number.isFinite(end) || now < end)
+  return new Date(end);
+}
+
+export function assertScheduledSessionEnded(start: Date | null, durationHours: number | null, now = Date.now(), endsAt?: Date | null) {
+  const end = scheduledSessionEnd(start, durationHours, endsAt);
+  if (!Number.isFinite(now) || !Number.isFinite(end.getTime()) || now < end.getTime())
     throw new HttpError(409, "Confirm this session after its agreed scheduled end time.");
 }

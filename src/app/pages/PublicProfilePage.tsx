@@ -1,3 +1,4 @@
+import { LoadingContent } from "@/app/components/PageSkeleton";
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router";
 import { api } from "@/app/lib/api";
@@ -178,7 +179,7 @@ export default function PublicProfilePage() {
           ) : profile ? (
             <PortfolioContent profile={profile} />
           ) : (
-            <p role="status">Loading student portfolio...</p>
+            <LoadingContent layout="profile" label="Loading student portfolio..." />
           )}
         </div>
         {profile && profile.id !== currentAccountId() && (

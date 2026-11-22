@@ -189,3 +189,35 @@ for (const theme of ["light", "dark"]) {
     expect(state.mutations).toHaveLength(0);
   });
 }
+
+
+test("narrow-screen admin UI review",async({page},info)=>{
+  const state=await fixture(page,{theme:"dark"});await page.setViewportSize({width:320,height:740});
+  const issues:any[]=[];
+  for(const path of ["/admin-dashboard","/admin-dashboard?section=analytics","/admin-dashboard?section=students","/admin-dashboard?section=forum","/admin-dashboard?section=leaderboard","/admin/assessments","/admin/assessments?section=academic","/admin/assessments?section=reports","/admin/integrity"]){
+    await page.goto(path);await page.getByRole("heading",{level:1}).waitFor();await page.waitForTimeout(100);
+    await page.screenshot({path:info.outputPath(path.replace(/[^a-z0-9]/gi,"_")+".png")});
+    const result=await page.evaluate(()=>({width:document.documentElement.scrollWidth,viewport:innerWidth,controls:[...document.querySelectorAll<HTMLElement>("button,a,input,select")].filter(el=>{const r=el.getBoundingClientRect();return r.width>0&&r.height>0&&(r.left<0||r.right>innerWidth+1)&&!el.closest(".admin-scroll")}).map(el=>({text:el.textContent?.trim().slice(0,70),tag:el.tagName,x:el.getBoundingClientRect().x,width:el.getBoundingClientRect().width}))}));
+    if(result.width>result.viewport||result.controls.length)issues.push({path,...result});
+  }
+  expect(issues).toEqual([]);expect(state.mutations).toHaveLength(0);
+});
+
+
+test("admin header actions align on narrow screens and preserve theme and sign-out confirmation",async({page},info)=>{
+  const state=await fixture(page);
+  for(const width of [320,390,1280]){
+    await page.setViewportSize({width,height:840});await page.goto("/admin-dashboard");
+    const theme=page.getByRole("button",{name:"Dark Mode",exact:true});
+    const signout=page.getByRole("button",{name:"Sign Out",exact:true});
+    for(const mode of ["light","dark"]){
+      if((await theme.getAttribute("aria-pressed"))===(mode==="dark"?"false":"true"))await theme.click();
+      const a=await theme.boundingBox(),b=await signout.boundingBox();
+      if(width<768){expect(a!.y).toBeCloseTo(b!.y,0);expect(a!.height).toBeGreaterThanOrEqual(44);expect(b!.height).toBeGreaterThanOrEqual(44);}
+      expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+      if(width===320)await page.screenshot({path:info.outputPath(`header-${mode}.png`)});
+    }
+    await signout.click();await expect(page.getByRole("alertdialog")).toBeVisible();await page.getByRole("button",{name:"Cancel",exact:true}).click();
+  }
+  expect(state.mutations).toHaveLength(0);
+});

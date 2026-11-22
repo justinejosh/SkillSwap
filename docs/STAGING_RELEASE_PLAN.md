@@ -1,5 +1,14 @@
 # Staging release candidate and operator order
 
+**Historical policy note — 2026-11-22:** Scheduled-end confirmation checks in
+this report describe the earlier implementation/test baseline. The current local
+rules allow explicit actual-completion logging for early or unscheduled sessions,
+with a non-future time after bilateral agreement approval. Independent participant
+confirmations, sequential limits, closed-exchange protections and bilateral reviews
+remain required. See [current behavior and migration dependencies](FLEXIBLE_SESSION_AGREEMENTS.md).
+Earlier test counts are retained as historical evidence, not fresh validation of
+the current rules. No hosted schema or deployment change is implied.
+
 2026-11-18 · `C:\KNOXITE\SkillSwap` · `dev-justine`
 
 **Prepared locally; no hosted release authorized or performed.** Railway `knoxite-staging` online status and Render/Vercel setup are owner-reported. No Railway URL, certificate or live database was accessed. Existing main/production, recovery-1, OAuth pilot, assessment content, academic evidence and historical data remain unchanged.

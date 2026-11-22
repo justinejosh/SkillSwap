@@ -70,3 +70,30 @@
 .knoxite-tour-popover .driver-popover-arrow-side-right { border-top-color: transparent; border-left-color: transparent; border-bottom-color: transparent; }
 .knoxite-tour-popover .driver-popover-arrow-side-top { border-left-color: transparent; border-right-color: transparent; border-bottom-color: transparent; }
 .knoxite-tour-popover .driver-popover-arrow-side-bottom { border-left-color: transparent; border-right-color: transparent; border-top-color: transparent; }
+
+/* Driver interpolates the SVG spotlight itself. Do not transition its path or
+   fixed-position coordinates: that would lag behind targets on scroll/resize.
+   Popovers are recreated per step, so use a short entry rather than auto-to-px
+   positioning transitions. This replaces Driver's default popover fade. */
+.driver-fade .knoxite-tour-popover.driver-popover {
+  animation: knoxite-tour-enter 200ms ease-out both;
+}
+@keyframes knoxite-tour-enter {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.driver-fade .driver-active-element[id^="tour-"] {
+  animation: knoxite-tour-outline 300ms ease-out;
+}
+@keyframes knoxite-tour-outline {
+  from { outline-color: transparent; }
+  to { outline-color: #3b82f6; }
+}
+[id^="tour-"] { scroll-margin-top: 80px; scroll-margin-bottom: 24px; }
+@media (prefers-reduced-motion: reduce) {
+  .driver-fade .driver-overlay,
+  .driver-fade .knoxite-tour-popover.driver-popover,
+  .driver-fade .driver-active-element[id^="tour-"] {
+    animation: none;
+  }
+}

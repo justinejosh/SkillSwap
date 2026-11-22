@@ -1,3 +1,4 @@
+import { PageSkeleton } from "@/app/components/PageSkeleton";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { Button } from "@/app/components/ui/button";
@@ -56,16 +57,8 @@ export default function LeaderboardPage() {
     return "bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 border-blue-100 dark:border-blue-900/40";
   };
 
-  if (isLoading) {
-    return (
-      <div className="h-screen flex flex-col items-center justify-center knoxite-surface">
-        <Loader2 className="animate-spin size-8 text-blue-600 mb-3" />
-        <p className="text-slate-900 dark:text-slate-200 font-bold text-xs uppercase tracking-widest">
-          Loading leaderboard...
-        </p>
-      </div>
-    );
-  }
+  if (isLoading) return <PageSkeleton layout="table" label="Loading leaderboard..." />;
+
 
   return (
     <div className="min-h-screen knoxite-surface text-slate-900 dark:text-slate-100 font-sans flex flex-col relative overflow-x-hidden transition-colors duration-200">

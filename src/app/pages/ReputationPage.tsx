@@ -1,3 +1,4 @@
+import { LoadingContent } from "@/app/components/PageSkeleton";
 import { FormEvent, useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router";
 import { api } from "@/app/lib/api";
@@ -37,7 +38,7 @@ export default function ReputationPage() {
         <h1 className="text-2xl font-bold text-blue-900 dark:text-blue-100">Rate Your Swap Partner</h1>
         {swap?.partner&&<p className="mt-2 break-words text-sm text-slate-600 dark:text-slate-300">Your exchange with {swap.partner.name}</p>}
         {(error||loadError)&&<p role="alert" className="my-4 rounded-xl border border-red-300 bg-red-50 p-3 text-sm text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-200">{error||loadError}</p>}
-        {loading?<p role="status" className="mt-5">Loading your review status...</p>:ownReview?<div className="mt-5 space-y-4">
+        {loading?<LoadingContent className="mt-5" layout="form" label="Loading your review status..." />:ownReview?<div className="mt-5 space-y-4">
           <h2 className="text-lg font-semibold">Your review submitted</h2>
           <p>{ownReview.rating}/5 stars</p>
           {ownReview.comment&&<p className="whitespace-pre-wrap break-words rounded-xl bg-slate-50 p-4 dark:bg-slate-800">{ownReview.comment}</p>}

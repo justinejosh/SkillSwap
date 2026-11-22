@@ -38,6 +38,7 @@ test("registered student journey and authorization review on isolated MySQL", as
     token?: string,
     body?: unknown,
   ) {
+    if (path.endsWith("/log-session") && body && typeof body === "object" && !Object.hasOwn(body,"completedAt")) body = {...body,completedAt:new Date().toISOString()};
     const response = await fetch(`http://127.0.0.1:${port}/api${path}`, {
       method,
       headers: {
@@ -488,7 +489,7 @@ test("registered student journey and authorization review on isolated MySQL", as
           },
         );
         assert.equal(confirmed.swap.status, "CONFIRMED");
-        await call("POST",`/swaps/${swapId}/log-session`,409,ta,{sessionNumber:1});
+        await call("POST",`/swaps/${swapId}/log-session`,422,ta,{sessionNumber:1,completedAt:new Date(Date.now()+60000).toISOString()});
         const scheduledStart=Date.now()+60000;
         await call("POST", "/sessions", 201, ta, {
           swapId,
@@ -496,10 +497,10 @@ test("registered student journey and authorization review on isolated MySQL", as
           scheduledAt: new Date(scheduledStart).toISOString(),
           meetingLink: "https://example.invalid/synthetic-session",
         });
-        await call("POST",`/swaps/${swapId}/log-session`,409,ta,{sessionNumber:1});
+        await call("POST",`/swaps/${swapId}/log-session`,422,ta,{sessionNumber:1,completedAt:new Date(Date.now()+60000).toISOString()});
         step.mock.timers.enable({apis:["Date"],now:scheduledStart+3600_000-1});
         step.after(()=>step.mock.timers.reset());
-        await call("POST",`/swaps/${swapId}/log-session`,409,ta,{sessionNumber:1});
+        await call("POST",`/swaps/${swapId}/log-session`,422,ta,{sessionNumber:1,completedAt:new Date(Date.now()+60000).toISOString()});
         step.mock.timers.setTime(scheduledStart+3600_000);
         await call("POST", "/reputation/submit", 409, ta, {
           swapId,

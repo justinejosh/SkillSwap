@@ -1,5 +1,108 @@
 # Student UI bug fixes and refinement
 
+## Current local quality review — 2026-11-22
+
+This pass reviews the existing frontend on `dev-justine`; the earlier evidence
+below is historical. Existing registration, skeletons, optional scheduling,
+flexible agreements, actual-completion logging and forum ownership were reused.
+
+### Confirmed issues and fixes
+
+- Dashboard exchange cards, forum cards and five page-brand controls were
+  mouse-only containers. They now use normal router links with keyboard focus.
+  Dashboard account actions expose expanded state, close with Escape/keyboard
+  departure and return focus to the trigger. No authentication guard was replaced.
+- Forum titles could truncate and long unbroken author names pushed replies out
+  of narrow cards. Titles/names wrap, reply counts remain visible, and link cards
+  retain block layout. Search, clear, category and posting fields have accessible
+  names. Screenshots were inspected, not only page-width assertions.
+- Dialog close targets were 16px. Shared close targets are now 36px. Shared
+  Dialog/AlertDialog entry/exit animations now honor reduced motion using variants
+  specific enough to override their state animation rules.
+- Skill removal and exchange cancellation used native confirmation prompts.
+  Existing AlertDialogs now identify the action, retain backend errors for retry,
+  disable duplicate requests while pending, and restore focus on cancellation.
+  Forum deletion uses the same destructive action color and focus restoration.
+  Requests and permissions are unchanged; all test mutations use synthetic APIs.
+- Actual-completion controls used a generic dark primary action. They now use
+  the existing blue primary/rounded secondary styles. Narrow date/time forms
+  have `min-w-0`; a 14px, 44px-high native date/time field keeps its calendar
+  affordance inside the 320px dialog without dropping seconds or validation.
+- Profile's fixed version label overlapped form fields on short viewports. It
+  now follows the content in normal flow. Dashboard progress labels can wrap.
+- Calendar helper text still implied the former scheduled-end restriction. It
+  now directs students to log actual participation in Swap Tracking and explains
+  that a schedule alone does not confirm attendance. Earlier implementation
+  reports explicitly label the old rule as historical; historical tests remain.
+
+### Exact files touched by this review
+
+Frontend: `src/app/components/ui/dialog.tsx`,
+`src/app/components/ui/alert-dialog.tsx`,
+`src/app/pages/DashboardPage.tsx`, `src/app/pages/CommunityForumPage.tsx`,
+`src/app/pages/KnoxHubPage.tsx`, `src/app/pages/MySkillsPage.tsx`,
+`src/app/pages/ProfilePage.tsx`, `src/app/pages/PostDetailsPage.tsx`,
+`src/app/pages/SwapDetailsPage.tsx`, `src/app/pages/CalendarPage.tsx`.
+
+Tests: `tests/browser/student-ui.spec.ts`,
+`tests/browser/student-workflow-consistency.spec.ts`,
+`tests/browser/flexible-sessions.spec.ts`, `tests/browser/preset-skills.spec.ts`.
+
+Documentation: this file, `docs/FLEXIBLE_SESSION_AGREEMENTS.md`,
+`docs/CI_COMPATIBILITY_FIX.md`, `docs/KNOXITE_FOUR_BLOCKERS_RESOLUTION.md`,
+`docs/KNOXITE_PRE_EMAIL_STAGING_READINESS.md`, `docs/STAGING_RELEASE_PLAN.md`.
+These files already contained prior local work; the list is this pass's scope,
+not an instruction to commit their entire accumulated diffs.
+
+### Validation and remaining limits
+
+- Initial targeted browser regression: **93 passed / 98**. Five failures exposed
+  reduced-motion precedence, missing focus restoration, and test assumptions
+  about CSS color serialization/modal-hidden controls. Those were corrected.
+- Final focused regression: **36/36 passed** on desktop/mobile. This includes all
+  five formerly failing cases and the affected shared admin/registration readers.
+- Final date/time-field rendering recheck after its last sizing adjustment:
+  **2/2 passed**. Final mobile forum rendering recheck: **1/1 passed**,
+  with the resulting screenshot visually inspected.
+- Frontend `npm run typecheck` and `npm run build`: **passed** on final source.
+- Targeted `git diff --check`: **passed**; nothing staged.
+
+Tests ran only against the local Vite server and synthetic intercepted API
+responses. No backend or database test was needed for these frontend changes;
+prior backend evidence is retained, not claimed as a new run.
+
+Coverage includes light/dark views, 320/375/390/430/1280px layouts, keyboard
+navigation, modal dismissal/focus, registration consent and identical legal
+readers, provider retry, loading/error/empty states, closed agreements, flexible
+ranges, actual participation, independent reviews and theme/account isolation.
+Two shared-admin dialog workflows were checked with synthetic fixtures as well.
+
+Physical Android Chrome testing remains an owner check; these are Chromium
+browser/viewport tests, not a real-device certification. The existing roughly
+1.19MB minified frontend bundle still triggers Vite's size warning. Legal-content
+reconciliation requiring human approval remains in `REGISTRATION_LEGAL_UI_REVIEW.md`;
+this pass changes neither wording nor notice version.
+
+No backend file, private operator file, key, account, database, hosted service,
+authentication policy, assessment, academic mapping or scoring rule was changed
+by this review. No Railway connection, backup, restore, migration, commit, push
+or deployment occurred. Flexible-range and actual-completion migrations remain
+separate release prerequisites; browser fixtures do not verify hosted schema
+compatibility. Use the existing local frontend dev server's hot reload, or start
+it with `npm run dev` under the already approved local environment configuration.
+No hosted restart is requested.
+
+## Historical refinement evidence
+
+**Historical policy note — 2026-11-22:** Scheduled-end confirmation checks in
+this report describe the earlier implementation/test baseline. The current local
+rules allow explicit actual-completion logging for early or unscheduled sessions,
+with a non-future time after bilateral agreement approval. Independent participant
+confirmations, sequential limits, closed-exchange protections and bilateral reviews
+remain required. See [current behavior and migration dependencies](FLEXIBLE_SESSION_AGREEMENTS.md).
+Earlier test counts are retained as historical evidence, not fresh validation of
+the current rules. No hosted schema or deployment change is implied.
+
 Verified locally on 15 November 2026, on `dev-justine`, continuing from commit `2d02411` and the existing uncommitted work. No commit, push, merge, deployment, migration, schema synchronization, or persistent test-data import was performed.
 
 ## Findings and corrections

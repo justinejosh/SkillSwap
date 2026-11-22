@@ -5,7 +5,7 @@ import { actor, requireStudent } from "../middleware/authMiddleware";
 import { HttpError, integer, onlyKeys, text } from "../lib/http";
 import { assertParticipant } from "./swaps";
 import { lockSwap, transaction } from "../lib/transaction";
-import { assertScheduleTime, parseScheduledAt } from "../lib/scheduling";
+import { assertScheduleTime, parseScheduledAt, scheduledSessionEnd } from "../lib/scheduling";
 export function sessionsRouter(db: PrismaClient) {
   const router = express.Router();
   router.use(requireStudent);
@@ -39,6 +39,7 @@ export function sessionsRouter(db: PrismaClient) {
         swapId: row.swapId,
         sessionNumber: row.sessionNumber,
         scheduledAt: row.scheduledAt,
+        endsAt: row.endsAt,
         meetingLink: row.meetingLink,
         confirmationEligibility: confirmationEligibility(row.swap, actor(req), row.sessionNumber, row),
         partner:
@@ -64,6 +65,7 @@ export function sessionsRouter(db: PrismaClient) {
       "swapId",
       "sessionNumber",
       "scheduledAt",
+      "endsAt",
       "meetingLink",
     ]);
     const swapId = text(req.body.swapId, "Swap");
@@ -76,6 +78,7 @@ export function sessionsRouter(db: PrismaClient) {
     const scheduledAt = parseScheduledAt(
       text(req.body.scheduledAt, "Scheduled date", 50),
     );
+    const endsAt = req.body.endsAt == null ? null : parseScheduledAt(text(req.body.endsAt, "Session end", 50));
     const meetingLink = text(
       req.body.meetingLink ?? "",
       "Meeting link",
@@ -115,15 +118,22 @@ export function sessionsRouter(db: PrismaClient) {
         );
       // Recheck time after acquiring the exchange lock, not at form-open time.
       assertScheduleTime(scheduledAt, swap.requesterApprovedAt, swap.receiverApprovedAt);
+      const existing = await tx.swapSession.findUnique({ where: { swapId_sessionNumber: { swapId, sessionNumber } } });
+      if (!endsAt && (swap.duration == null || existing?.endsAt))
+        throw new HttpError(422, "Choose an end time for this session.");
+      if (endsAt && endsAt.getTime() <= scheduledAt.getTime())
+        throw new HttpError(422, "The scheduled end must be after the session start.");
+      scheduledSessionEnd(scheduledAt, swap.duration, endsAt);
       return tx.swapSession.upsert({
         where: { swapId_sessionNumber: { swapId, sessionNumber } },
         create: {
           swapId,
           sessionNumber,
           scheduledAt,
+          endsAt,
           meetingLink: meetingLink || null,
         },
-        update: { scheduledAt, meetingLink: meetingLink || null },
+        update: { scheduledAt, endsAt, meetingLink: meetingLink || null },
       });
     });
     res.status(201).json(result);

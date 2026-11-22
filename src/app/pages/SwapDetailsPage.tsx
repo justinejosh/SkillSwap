@@ -1,16 +1,22 @@
+import { PageSkeleton } from "@/app/components/PageSkeleton";
 import { ExchangeSummary } from "@/app/components/ExchangeSummary";
+import { DateTimeText } from "@/app/components/DateTimeText";
 import { authenticatedFetch } from "@/app/lib/api";
 import { api } from "@/app/lib/api";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useLiveSwap } from "@/app/lib/useLiveSwap";
 import { useParams, useNavigate } from "react-router";
 import { Button } from "@/app/components/ui/button";
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/app/components/ui/alert-dialog";
 import {
   Card,
   CardContent,
   CardHeader,
 } from "@/app/components/ui/card";
 import { Progress } from "@/app/components/ui/progress";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/app/components/ui/dialog";
+import { Input } from "@/app/components/ui/input";
+import { Label } from "@/app/components/ui/label";
 import {
   ArrowLeft,
   MessageSquare,
@@ -24,10 +30,19 @@ export default function SwapDetailsPage() {
   const [error, setError] = useState("");
   const { swap, loading, error: syncError, refresh: fetchDetails } = useLiveSwap(swapId);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const cancelTriggerRef = useRef<HTMLButtonElement>(null);
+  const [completedAt, setCompletedAt] = useState("");
   const currentUser = swap?.me;
 
   const logSession = async () => {
     if (isUpdating) return;
+    const actual = new Date(completedAt);
+    if (!completedAt || !Number.isFinite(actual.getTime()) || actual.getTime() > Date.now()) {
+      setError("Choose the actual completion date and time, not a future time.");
+      return;
+    }
     setIsUpdating(true);
     setError("");
     try {
@@ -40,6 +55,7 @@ export default function SwapDetailsPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
+          completedAt: actual.toISOString(),
           sessionNumber:
             (swap.requesterId === currentUser.id
               ? swap.requesterSessions
@@ -47,6 +63,7 @@ export default function SwapDetailsPage() {
         }),
       });
       if (res.ok) {
+        setConfirmOpen(false);
         await fetchDetails();
       } else {
         const data = await res.json();
@@ -59,12 +76,14 @@ export default function SwapDetailsPage() {
     }
   };
 
+  if (loading && !swap) return <PageSkeleton layout="form" label="Loading exchange..." />;
+
   if (!swap || !currentUser) {
     return (
       <div className="flex flex-col h-screen items-center justify-center knoxite-surface">
-        <Loader2 className="size-8 text-blue-600 animate-spin mb-3" />
-        <span className="text-slate-900 dark:text-slate-100 font-bold text-xs uppercase tracking-widest">
-          {error || syncError || "Loading exchange..."}
+
+        <span role="alert" className="text-slate-900 dark:text-slate-100 font-bold text-sm">
+          {error || syncError || "Exchange details are unavailable."}
         </span>
         {!loading && <Button variant="outline" onClick={()=>void fetchDetails()}>Refresh</Button>}
       </div>
@@ -123,16 +142,44 @@ export default function SwapDetailsPage() {
             <section role="status" className="space-y-2 rounded-2xl border border-blue-200 bg-blue-50 p-4 text-blue-950 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-100"><h3 className="font-semibold">{statusTitle}</h3><p className="text-sm">{statusMessage}</p></section>
             <div className="flex flex-wrap gap-3">
               {swap.status==="PENDING_AGREEMENT"&&<Button onClick={()=>navigate(`/swap-agreement/${swap.id}`)}>Review and Approve Agreement</Button>}
-              {swap.status==="CONFIRMED"&&swap.integrityVerified&&!iAmDone&&<Button disabled={isUpdating||!!syncError||swap.confirmationEligibility?.eligible!==true} onClick={logSession}>{isUpdating?"Saving confirmation...":`Confirm Session ${mySessions+1}`}</Button>}
+              {swap.status==="CONFIRMED"&&swap.integrityVerified&&!iAmDone&&<Button disabled={isUpdating||!!syncError||swap.confirmationEligibility?.eligible!==true} onClick={()=>{setCompletedAt("");setError("");setConfirmOpen(true);}}>{isUpdating?"Saving confirmation...":`Confirm Session ${mySessions+1}`}</Button>}
               {readyToReview&&<Button disabled={!!syncError} onClick={()=>navigate(`/reputation?swapId=${swap.id}&partnerId=${swap.partner.id}`)}>Rate Your Swap Partner</Button>}
               {ownReview&&<Button variant="outline" onClick={()=>navigate(`/reputation?swapId=${swap.id}`)}>View Your Review</Button>}
               <Button variant="outline" onClick={()=>void fetchDetails()}>Refresh status</Button>
             </div>
-            {swap.status==="CONFIRMED"&&!iAmDone&&<p className="text-sm text-slate-600 dark:text-slate-300">{swap.confirmationEligibility?.reason||"Refresh status to check when this session can be confirmed."}{swap.confirmationEligibility?.scheduledEndAt&&<> Scheduled end: <time dateTime={swap.confirmationEligibility.scheduledEndAt}>{new Date(swap.confirmationEligibility.scheduledEndAt).toLocaleString()}</time>.</>}</p>}
+            {swap.status==="CONFIRMED"&&!iAmDone&&<p className="text-sm text-slate-600 dark:text-slate-300">{swap.confirmationEligibility?.reason||"Refresh status to check when this session can be confirmed."}{swap.confirmationEligibility?.scheduledEndAt&&<> Scheduled end: <DateTimeText value={swap.confirmationEligibility.scheduledEndAt} fallback="End time unavailable"/>.</>}</p>}
+            {swap.sessionConfirmations?.length>0&&<section aria-label="Session confirmation history" className="space-y-2 border-t border-slate-200 pt-4 dark:border-slate-700"><h3 className="font-semibold">Recorded participation</h3>{swap.sessionConfirmations.map((entry:any,index:number)=><p key={`${entry.participantId}-${entry.sessionNumber}-${index}`} className="text-sm text-slate-600 dark:text-slate-300">Session {entry.sessionNumber} · {entry.participantId===currentUser.id?"You":"Your partner"} · {entry.actualCompletedAt&&Number.isFinite(Date.parse(entry.actualCompletedAt))?`Completed ${new Date(entry.actualCompletedAt).toLocaleString()}`:"Historical confirmation; actual completion time was not recorded"}</p>)}</section>}
           </CardContent>
         </Card>
-        {active&&<section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-dashed border-slate-300 p-4 dark:border-slate-700"><p className="text-sm text-slate-600 dark:text-slate-300">Need to end this exchange? Its history will be kept.</p><Button variant="outline" disabled={isUpdating||!!syncError} className="border-red-200 text-red-700 dark:border-red-800 dark:text-red-300" onClick={async()=>{if(!window.confirm("Cancel this exchange? Its history will be retained."))return;setIsUpdating(true);setError("");try{await api(`/swaps/cancel/swap/${swap.id}`,{method:"DELETE"});await fetchDetails();}catch(e){setError(e instanceof Error?e.message:"Unable to cancel this exchange.");}finally{setIsUpdating(false);}}}>Cancel Exchange</Button></section>}
+        {active&&<section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-dashed border-slate-300 p-4 dark:border-slate-700"><p className="text-sm text-slate-600 dark:text-slate-300">Need to end this exchange? Its history will be kept.</p><Button variant="outline" disabled={isUpdating||!!syncError} className="border-red-200 text-red-700 dark:border-red-800 dark:text-red-300" ref={cancelTriggerRef} onClick={()=>{setError("");setCancelOpen(true);}}>Cancel Exchange</Button></section>}
       </main>
+      <AlertDialog open={cancelOpen} onOpenChange={open=>{if(!isUpdating)setCancelOpen(open);}}>
+        <AlertDialogContent onCloseAutoFocus={event=>{event.preventDefault();cancelTriggerRef.current?.focus();}}>
+          <AlertDialogHeader><AlertDialogTitle>Cancel this exchange?</AlertDialogTitle><AlertDialogDescription>Your exchange with {swap.partner?.name || "your partner"} will end. Its agreement, sessions and reviews will remain in your history.</AlertDialogDescription></AlertDialogHeader>
+          {error&&<p role="alert" className="text-sm text-red-700 dark:text-red-300">{error}</p>}
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isUpdating}>Keep Exchange</AlertDialogCancel>
+            <AlertDialogAction className="bg-red-600 text-white hover:bg-red-700" disabled={isUpdating||!!syncError||!active} onClick={async event=>{
+              event.preventDefault();
+              if(isUpdating||syncError||!active)return;
+              setIsUpdating(true);setError("");
+              try{await api(`/swaps/cancel/swap/${swap.id}`,{method:"DELETE"});setCancelOpen(false);await fetchDetails();}
+              catch(e){setError(e instanceof Error?e.message:"Unable to cancel this exchange.");}
+              finally{setIsUpdating(false);}
+            }}>{isUpdating?"Cancelling...":"Cancel Exchange"}</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <Dialog open={confirmOpen} onOpenChange={open=>{if(!isUpdating)setConfirmOpen(open);}}>
+        <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-2xl">
+          <DialogHeader><DialogTitle>Confirm Session {mySessions+1}</DialogTitle><DialogDescription>Record when you actually completed this session. Your partner confirms their own participation separately. The original schedule stays unchanged.</DialogDescription></DialogHeader>
+          <form onSubmit={event=>{event.preventDefault();void logSession();}} className="min-w-0 space-y-4">
+            <div className="min-w-0 space-y-2"><Label htmlFor="actual-completion">Actual completion date and time</Label><Input id="actual-completion" className="h-11 rounded-xl px-2 text-sm" type="datetime-local" step="1" required value={completedAt} onChange={event=>setCompletedAt(event.target.value)} disabled={isUpdating}/><p className="text-xs text-slate-600 dark:text-slate-300">Use your local time. It cannot be in the future or before both students approved the agreement.</p></div>
+            {error&&<p role="alert" className="text-sm text-red-700 dark:text-red-300">{error}</p>}
+            <DialogFooter><Button type="button" variant="outline" className="h-11 rounded-xl" disabled={isUpdating} onClick={()=>setConfirmOpen(false)}>Cancel</Button><Button type="submit" className="h-11 rounded-xl bg-blue-600 text-white hover:bg-blue-700" disabled={isUpdating||!completedAt||!!syncError}>{isUpdating?"Saving confirmation...":"Confirm participation"}</Button></DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

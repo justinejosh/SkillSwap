@@ -988,7 +988,8 @@ test("unavailable academic options disable registration until a successful retry
     });
   });
   await page.goto("/signup");
-  await expect(page.getByRole("alert")).toContainText(
+  const academicError = page.getByRole("alert").filter({ hasText: "College programs and year levels" });
+  await expect(academicError).toContainText(
     "temporarily unavailable",
   );
   await expect(
@@ -1005,7 +1006,7 @@ test("unavailable academic options disable registration until a successful retry
   await page
     .getByRole("button", { name: "Retry Academic Options", exact: true })
     .click();
-  await expect(page.getByRole("alert")).toHaveCount(0);
+  await expect(academicError).toHaveCount(0);
   await expect(page.getByLabel("Full Name", { exact: true })).toHaveValue(
     "Preserved Student Name",
   );
@@ -1029,7 +1030,7 @@ test("empty catalog responses never appear as usable registration choices", asyn
     route.fulfill({ json: { programs: [], yearLevels: [] } }),
   );
   await page.goto("/signup");
-  await expect(page.getByRole("alert")).toContainText("not been configured");
+  await expect(page.getByRole("alert").filter({ hasText: "College programs and year levels" })).toContainText("not been configured");
   await expect(
     page.getByRole("button", { name: "Create Account", exact: true }),
   ).toBeDisabled();

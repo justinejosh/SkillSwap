@@ -3,6 +3,12 @@ import { AppConfig } from "../lib/config";
 
 // Inspection only. Startup must never migrate, backfill, or approve notices.
 export async function assertRuntimeSchema(db: PrismaClient, config: AppConfig) {
+  const flexible = await db.$queryRaw<Array<{ count: bigint }>>`SELECT COUNT(*) AS count FROM information_schema.columns WHERE TABLE_SCHEMA=DATABASE() AND IS_NULLABLE='YES' AND ((TABLE_NAME='Swap' AND COLUMN_NAME='duration' AND DATA_TYPE='int') OR (TABLE_NAME='SwapSession' AND COLUMN_NAME='endsAt' AND DATA_TYPE='datetime'))`;
+  if (Number(flexible[0]?.count) !== 2)
+    throw new Error("Flexible-session schema is unavailable. Reviewed migration required; startup refused.");
+  const completion = await db.$queryRaw<Array<{ count: bigint }>>`SELECT COUNT(*) AS count FROM information_schema.columns WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='SessionConfirmation' AND COLUMN_NAME='actualCompletedAt' AND DATA_TYPE='datetime' AND IS_NULLABLE='YES'`;
+  if (Number(completion[0]?.count) !== 1)
+    throw new Error("Actual session completion schema is unavailable. Reviewed additive migration required; startup refused.");
   if (config.sessionTimeouts) {
     const columns = await db.$queryRaw<Array<{ count: bigint }>>`SELECT COUNT(*) AS count FROM information_schema.columns WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='AuthSession' AND COLUMN_NAME='lastInteractiveAt' AND DATA_TYPE='datetime' AND IS_NULLABLE='YES'`;
     if (Number(columns[0]?.count) !== 1) throw new Error("Session policy schema is unavailable; startup refused.");

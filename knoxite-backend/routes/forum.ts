@@ -1,6 +1,6 @@
 import express from "express";
 import { PrismaClient } from "@prisma/client";
-import { actor, requireAdmin } from "../middleware/authMiddleware";
+import { actor } from "../middleware/authMiddleware";
 import { HttpError, onlyKeys, text } from "../lib/http";
 export function forumRouter(db: PrismaClient) {
   const router = express.Router();
@@ -53,8 +53,17 @@ export function forumRouter(db: PrismaClient) {
         }),
       );
   });
-  router.delete("/posts/:id", requireAdmin, async (req, res) => {
-    await db.post.delete({ where: { id: String(req.params.id) } });
+  router.delete("/posts/:id", async (req, res) => {
+    const userId = actor(req);
+    onlyKeys(req.body ?? {}, []);
+    const id = String(req.params.id);
+    const post = await db.post.findUnique({ where: { id }, select: { authorId: true } });
+    if (!post) throw new HttpError(404, "Post not found.");
+    if (post.authorId !== userId && req.userRole !== "ADMIN")
+      throw new HttpError(403, "Only the author or an administrator can delete this post.");
+    // Existing schema cascades only this post's comments. There are no stored likes,
+    // attachments or forum-notification relations to invent or orphan.
+    await db.post.delete({ where: { id } });
     res.json({ message: "Thread removed." });
   });
   return router;

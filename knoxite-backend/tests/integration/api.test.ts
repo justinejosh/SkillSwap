@@ -35,6 +35,7 @@ test("isolated MySQL API, assessment and exchange regression suite", async (t) =
     token?: string,
     body?: unknown,
   ) {
+    if (path.endsWith("/log-session") && body && typeof body === "object" && !Object.hasOwn(body,"completedAt")) body = {...body,completedAt:new Date().toISOString()};
     const res = await fetch(`http://127.0.0.1:${port}/api${path}`, {
       method,
       headers: {
@@ -519,7 +520,7 @@ test("isolated MySQL API, assessment and exchange regression suite", async (t) =
           ).status,
           201,
         );
-        assert.equal((await call("POST",`/swaps/${swapId}/log-session`,ta,{sessionNumber:1})).status,409);
+        assert.equal((await call("POST",`/swaps/${swapId}/log-session`,ta,{sessionNumber:1,completedAt:new Date(Date.now()+60000).toISOString()})).status,422);
         const scheduledStart=Date.now()+60000;
         assert.equal(
           (
@@ -532,10 +533,10 @@ test("isolated MySQL API, assessment and exchange regression suite", async (t) =
           ).status,
           201,
         );
-        assert.equal((await call("POST",`/swaps/${swapId}/log-session`,ta,{sessionNumber:1})).status,409);
+        assert.equal((await call("POST",`/swaps/${swapId}/log-session`,ta,{sessionNumber:1,completedAt:new Date(Date.now()+60000).toISOString()})).status,422);
         step.mock.timers.enable({apis:["Date"],now:scheduledStart+3600_000-1});
         step.after(()=>step.mock.timers.reset());
-        assert.equal((await call("POST",`/swaps/${swapId}/log-session`,ta,{sessionNumber:1})).status,409);
+        assert.equal((await call("POST",`/swaps/${swapId}/log-session`,ta,{sessionNumber:1,completedAt:new Date(Date.now()+60000).toISOString()})).status,422);
         step.mock.timers.setTime(scheduledStart+3600_000);
         for (const token of [ta, tb]) {
           const results = await Promise.all([

@@ -1,8 +1,10 @@
+import { LoadingContent } from "@/app/components/PageSkeleton";
+import LegalNoticeDialog from "@/app/components/LegalNoticeDialog";
 import { authenticatedFetch } from "@/app/lib/api";
 import { api } from "@/app/lib/api";
 import { PortfolioContent } from "@/app/pages/PublicProfilePage";
 import { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
 import { Label } from "@/app/components/ui/label";
@@ -20,7 +22,6 @@ import {
   Repeat,
   Camera,
   FileText,
-  X,
 } from "lucide-react";
 import { API_BASE_URL } from "@/config";
 
@@ -187,16 +188,6 @@ export default function ProfilePage() {
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex flex-col justify-center items-center min-h-screen knoxite-surface">
-        <Loader2 className="animate-spin size-8 text-blue-600 mb-3" />
-        <span className="text-slate-900 dark:text-slate-200 font-bold text-xs uppercase tracking-widest">
-          Loading your profile...
-        </span>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen knoxite-surface text-slate-900 dark:text-slate-100 font-sans flex flex-col relative overflow-x-hidden transition-colors duration-200">
@@ -218,9 +209,10 @@ export default function ProfilePage() {
 
             <div className="h-4 w-[1px] bg-slate-200 dark:bg-slate-800 mx-0.5 hidden sm:block" />
 
-            <div
-              onClick={() => navigate("/dashboard")}
-              className="flex items-center gap-2 cursor-pointer"
+            <Link
+              to="/dashboard"
+              aria-label="Knoxite dashboard"
+              className="flex min-w-0 items-center gap-2 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 dark:focus-visible:outline-blue-300"
             >
               <div className="size-8 bg-blue-600 rounded-xl flex items-center justify-center text-white font-black text-base shadow-md shadow-blue-600/25">
                 K
@@ -228,13 +220,15 @@ export default function ProfilePage() {
               <span className="text-lg font-black text-slate-900 dark:text-white tracking-tight">
                 Account Settings
               </span>
-            </div>
+            </Link>
           </div>
         </header>
       </div>
 
       {/* 2. MAIN CONTENT CONTAINER */}
       <main className="max-w-2xl mx-auto w-full px-4 sm:px-6 pt-5 pb-12 space-y-4 relative z-10">
+        {isLoading ? <LoadingContent layout="profile" label="Loading your profile..." /> : <>
+
         <div className="space-y-0.5 text-center sm:text-left">
           <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
             Profile Configuration
@@ -277,32 +271,32 @@ export default function ProfilePage() {
               <h2 className="text-xl font-black text-slate-900 dark:text-white">
                 {profile?.name}
               </h2>
-              <p className="text-slate-500 dark:text-slate-400 text-[11px] font-medium mt-0.5">
+              <p className="text-slate-500 dark:text-slate-400 text-xs font-medium mt-0.5 max-w-full [overflow-wrap:anywhere]">
                 {profile?.email}
               </p>
 
               {/* Performance Stats */}
-              <div className="flex justify-center gap-8 mt-4 py-2 px-5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-800 w-full max-w-xs">
-                <div className="text-center">
-                  <span className="text-[9px] text-slate-400 uppercase font-bold tracking-widest block mb-0.5">
+              <div role="group" aria-label="Exchange statistics" className="grid grid-cols-2 gap-3 mt-4 py-3 px-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-800 w-full max-w-xs">
+                <div className="min-w-0 text-center">
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-bold tracking-widest block mb-0.5">
                     Peer Rating
                   </span>
                   <div className="flex items-center justify-center gap-1">
                     <Star className="size-3.5 fill-amber-400 text-amber-400" />
-                    <span className="text-lg font-black text-slate-900 dark:text-white">
+                    <span className={`${profile?.metrics?.averageRating == null ? "text-sm font-semibold" : "text-lg font-black"} text-slate-900 dark:text-white`}>
                       {profile?.metrics?.averageRating == null
                         ? "No reviews yet"
                         : Number(profile.metrics.averageRating).toFixed(1)}
                     </span>
                   </div>
                 </div>
-                <div className="text-center border-l border-slate-200/80 dark:border-slate-700 pl-8">
-                  <span className="text-[9px] text-slate-400 uppercase font-bold tracking-widest block mb-0.5">
+                <div className="min-w-0 text-center border-l border-slate-200/80 dark:border-slate-700 pl-3">
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-bold tracking-widest block mb-0.5">
                     Swaps
                   </span>
                   <div className="flex items-center justify-center gap-1">
                     <Repeat className="size-3.5 text-blue-600 dark:text-blue-400" />
-                    <span className="text-lg font-black text-slate-900 dark:text-white">
+                    <span className={`${profile?.metrics?.completedSwaps == null ? "text-sm font-semibold" : "text-lg font-black"} text-slate-900 dark:text-white`}>
                       {profile?.metrics?.completedSwaps == null
                         ? "Awaiting validation"
                         : profile.metrics.completedSwaps}
@@ -485,92 +479,14 @@ export default function ProfilePage() {
             </Button>
           </div>
         )}
+
+        </>}
       </main>
 
-      {/* Accessible Terms Modal */}
-      {showTermsModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 backdrop-blur-sm p-4 animate-in fade-in duration-150">
-          <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-lg w-full max-h-[80vh] flex flex-col shadow-2xl border border-slate-200 dark:border-slate-800 animate-in zoom-in-95 duration-150">
-            {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800">
-              <h3 className="font-bold text-slate-900 dark:text-white text-base">
-                Terms of Service & Privacy Policy
-              </h3>
-              <button
-                type="button"
-                onClick={() => setShowTermsModal(false)}
-                className="p-1 rounded-full text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-              >
-                <X className="size-5" />
-              </button>
-            </div>
-
-            {/* Content */}
-            <div className="p-6 overflow-y-auto space-y-4 text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
-              <section>
-                <h4 className="font-bold text-slate-800 dark:text-slate-100 text-sm mb-1">
-                  1. Platform Purpose & Campus Exclusivity
-                </h4>
-                <p>
-                  Knoxite is a campus-exclusive peer-to-peer knowledge and skill
-                  exchange platform. Its purpose is to connect student mentors
-                  and apprentices for collaborative, academic, and
-                  skill-building pursuits.
-                </p>
-              </section>
-
-              <section>
-                <h4 className="font-bold text-slate-800 dark:text-slate-100 text-sm mb-1">
-                  2. User Conduct & Safe Exchanges
-                </h4>
-                <p>
-                  All members must treat each other with respect. Harassment,
-                  dishonest skill representation, hate speech, unauthorized
-                  commercial solicitations, and academic integrity breaches are
-                  strictly prohibited.
-                </p>
-              </section>
-
-              <section>
-                <h4 className="font-bold text-slate-800 dark:text-slate-100 text-sm mb-1">
-                  3. Privacy & Data Handling
-                </h4>
-                <p>
-                  We collect your registered name, email address, and declared
-                  skills to facilitate matching, community forum participation,
-                  and the leaderboard. Your information is never sold or shared
-                  with outside commercial entities.
-                </p>
-              </section>
-
-              <section>
-                <h4 className="font-bold text-slate-800 dark:text-slate-100 text-sm mb-1">
-                  4. Account Suspension
-                </h4>
-                <p>
-                  Platform administrators reserve the right to review flagged
-                  accounts and suspend or terminate access for violations of
-                  these community guidelines.
-                </p>
-              </section>
-            </div>
-
-            {/* Footer */}
-            <div className="px-6 py-4 border-t border-slate-100 dark:border-slate-800 flex justify-end">
-              <Button
-                type="button"
-                onClick={() => setShowTermsModal(false)}
-                className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs px-4 py-2 font-semibold"
-              >
-                Close
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      <LegalNoticeDialog document={showTermsModal ? "summary" : null} onClose={() => setShowTermsModal(false)} />
 
       {/* Website Version */}
-      <div className="fixed bottom-3 right-4 z-40 pointer-events-none select-none text-[11px] font-mono tracking-wider text-slate-400 dark:text-slate-500">
+      <div className="px-4 pb-3 text-right select-none text-[11px] font-mono tracking-wider text-slate-500 dark:text-slate-400">
         Knoxite v1.0
       </div>
     </div>

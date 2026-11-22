@@ -1,3 +1,4 @@
+import { LoadingContent } from "@/app/components/PageSkeleton";
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import { api } from "@/app/lib/api";
@@ -61,7 +62,7 @@ export default function AchievementsPage() {
             </Link>
           </>
         ) : (
-          !error && <p role="status">Loading progress...</p>
+          !error && <LoadingContent layout="cards" label="Loading progress..." />
         )}
       </div>
     </main>

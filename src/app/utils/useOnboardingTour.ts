@@ -31,9 +31,26 @@ export function useOnboardingTour(){
       element:()=>renderedTarget(step.element as string)!,
     }));
     if(!available.length)return;
+    const motion=window.matchMedia("(prefers-reduced-motion: reduce)");
+    let transitioning=false;
+    const syncControls=()=>{
+      const popover=tour.getState().popover;
+      if(!popover)return;
+      popover.nextButton.disabled=transitioning;
+      popover.previousButton.disabled=transitioning||!tour.hasPreviousStep();
+    };
+    const syncMotion=()=>{
+      tour.setConfig({...tour.getConfig(),animate:!motion.matches,smoothScroll:!motion.matches});
+      // Driver hides the outgoing popover until halfway through its animation.
+      // Restart this same step without movement when the preference changes,
+      // rather than ending that animation before its new popover was created.
+      if(motion.matches&&transitioning)tour.moveTo(tour.getActiveIndex()??0);
+    };
     const tour=driver({
       steps:available,
-      animate:false,
+      animate:!motion.matches,
+      duration:300,
+      smoothScroll:!motion.matches,
       allowClose:true,
       allowKeyboardControl:true,
       skipMissingElement:true,
@@ -48,12 +65,20 @@ export function useOnboardingTour(){
       doneBtnText:"Finish",
       closeBtnLabel:"Skip tutorial",
       popoverClass:"knoxite-tour-popover",
-      onPopoverRender:popover=>{popover.closeButton.textContent="Skip";},
+      onHighlightStarted:()=>{transitioning=true;syncControls();},
+      // A viewport change during Driver's first animation can precede its
+      // settled target state. Re-measure once through Driver's own RAF queue.
+      onHighlighted:()=>{tour.refresh();transitioning=false;syncControls();},
+      onNextClick:()=>{if(!transitioning)tour.moveNext();},
+      onPrevClick:()=>{if(!transitioning)tour.movePrevious();},
+      onPopoverRender:popover=>{popover.closeButton.textContent="Skip";syncControls();},
       onDestroyed:()=>{
+        motion.removeEventListener("change",syncMotion);
         if(active.current===tour)active.current=null;
         try{localStorage.setItem(COMPLETED_KEY,"true");}catch{/* Navigation and Escape still work without storage. */}
       },
     });
+    motion.addEventListener("change",syncMotion);
     active.current=tour;
     tour.drive();
   },[]);

@@ -1,0 +1,64 @@
+{
+  "summary": [
+    {
+      "heading": "1. Platform Purpose & Campus Exclusivity",
+      "paragraphs": [
+        "Knoxite is a campus-exclusive peer-to-peer knowledge and skill exchange platform. Its purpose is to connect student mentors and apprentices for collaborative, academic, and skill-building pursuits."
+      ]
+    },
+    {
+      "heading": "2. User Conduct & Safe Exchanges",
+      "paragraphs": [
+        "All members must treat each other with respect. Harassment, dishonest skill representation, hate speech, unauthorized commercial solicitations, and academic integrity breaches are strictly prohibited."
+      ]
+    },
+    {
+      "heading": "3. Privacy & Data Handling",
+      "paragraphs": [
+        "We collect your registered name, email address, and declared skills to facilitate matching, community forum participation, and the leaderboard. Your information is never sold or shared with outside commercial entities."
+      ]
+    },
+    {
+      "heading": "4. Account Suspension",
+      "paragraphs": [
+        "Platform administrators reserve the right to review flagged accounts and suspend or terminate access for violations of these community guidelines."
+      ]
+    }
+  ],
+  "account": [
+    {
+      "heading": "Your student portfolio",
+      "paragraphs": [
+        "Other eligible, signed-in students can view your display name, avatar, biography, academic program and year, offered and wanted skills, assessment badges, and available peer ratings and swap totals. Include only information you are comfortable sharing with them.",
+        "Your email address, password, sign-in credentials, assessment answers, scores, and private attempt history are excluded from student portfolios."
+      ]
+    },
+    {
+      "heading": "Information used for exchanges",
+      "paragraphs": [
+        "Knoxite stores your account and academic selections, skill associations, assessment records, swap requests and agreements, session records, reviews, messages, and submitted reports. These support reciprocal matching, exchanges, progress tracking, and account protection.",
+        "Swap conversations and session details are available to the participants. Administrators can access account-management information and reports needed for moderation. An email-delivery service receives the address and verification link needed to send your verification message."
+      ]
+    },
+    {
+      "heading": "Institutional Google sign-in",
+      "paragraphs": [
+        "When enabled by the project team under approved institutional rules, Google sign-in shares identity information needed to authenticate you. Knoxite stores your linked Google account identifier, verified institutional email, Workspace domain, and verification dates privately. Google sign-in does not give Knoxite access to your Gmail messages or Drive files.",
+        "Linking Google preserves your Knoxite profile and exchange history. You can manage the link in Account security. Set up a verified email/password fallback before unlinking your only sign-in method."
+      ]
+    },
+    {
+      "heading": "Protecting your account",
+      "paragraphs": [
+        "Your sign-in session is stored in this browser. Sign out on shared devices. You can review active sessions and change your password on the account security page. A password change signs out existing sessions."
+      ]
+    },
+    {
+      "heading": "Corrections and privacy requests",
+      "paragraphs": [
+        "You can edit your profile and skills in the application. For other requests, contact the Knoxite project team through the contact details provided for your student study. Account deletion and data export are not currently self-service features.",
+        "Removing an offered skill preserves earned tiers and assessment history. Cancelling an exchange or suspending an account preserves historical records. The project team must provide the approved study privacy notice, retention arrangements, and responsible contact before collecting student study data."
+      ]
+    }
+  ]
+}

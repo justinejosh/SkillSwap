@@ -1,3 +1,4 @@
+import { LoadingContent } from "@/app/components/PageSkeleton";
 import { AdminStatus } from "@/app/components/admin/AdminUI";
 import { AdminShell } from "@/app/components/admin/AdminShell";
 import { useEffect, useState } from "react";
@@ -63,7 +64,7 @@ export default function IntegrityAdminPage() {
           </p>
         )}
         <div className="admin-filters"><label>Search student pairs<input type="search" value={search} onChange={e=>setSearch(e.target.value)}/></label><label>Review case status<select value={status} onChange={e=>setStatus(e.target.value)}><option value="">All statuses</option><option>PENDING</option><option>RESOLVED</option><option>DISMISSED</option></select></label></div>
-        {loading&&<p role="status">Loading integrity evidence...</p>}
+        {loading&&<LoadingContent layout="table" label="Loading integrity evidence..." />}
         <section className="space-y-4" aria-label="Observed partner patterns">
           <h2 className="text-xl font-semibold">Observed partner patterns</h2>
           {!loading && !error && !data.signals.length && (

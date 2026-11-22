@@ -167,6 +167,7 @@ model SessionConfirmation {
   participantId String
   sessionNumber Int
   confirmedAt   DateTime @default(now())
+  actualCompletedAt DateTime?
   swap          Swap     @relation(fields: [swapId], references: [id], onDelete: Restrict)
 
   @@unique([swapId, participantId, sessionNumber])
@@ -422,7 +423,8 @@ model Swap {
   completedAt         DateTime?
   cancelledAt         DateTime?
   sessionLogs         SessionConfirmation[]
-  duration            Int                   @default(1)
+  // Historical fixed hours. Null means each session has its own scheduled range.
+  duration            Int?
   sessions            Int                   @default(4)
 
   // Bilateral Session Tracking
@@ -476,6 +478,7 @@ model SwapSession {
   swapId        String
   sessionNumber Int
   scheduledAt   DateTime
+  endsAt        DateTime?
   meetingLink   String?  @db.Text
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt

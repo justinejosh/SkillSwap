@@ -1,9 +1,10 @@
+import { LoadingContent } from "@/app/components/PageSkeleton";
 import { useAccountTheme } from "@/app/lib/theme";
 import { authenticatedFetch } from "@/app/lib/api";
 import { MatchResults } from "@/app/components/MatchResults";
 import { logoutSession } from "@/app/lib/api";
 import { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { Button } from "@/app/components/ui/button";
 import { Badge } from "@/app/components/ui/badge";
 import {
@@ -48,6 +49,7 @@ export default function DashboardPage() {
   const [hasNewNotifications, setHasNewNotifications] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement>(null);
+  const profileTriggerRef = useRef<HTMLButtonElement>(null);
   const { startTour } = useOnboardingTour();
 
   const [isDarkMode, toggleDarkMode] = useAccountTheme();
@@ -102,6 +104,18 @@ export default function DashboardPage() {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    if (!isProfileMenuOpen) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsProfileMenuOpen(false);
+        profileTriggerRef.current?.focus();
+      }
+    };
+    document.addEventListener("keydown", closeOnEscape);
+    return () => document.removeEventListener("keydown", closeOnEscape);
+  }, [isProfileMenuOpen]);
 
   const fetchDashboardData = async () => {
     setDashboardError("");
@@ -204,16 +218,6 @@ export default function DashboardPage() {
 
 
 
-  if (isLoading) {
-    return (
-      <div className="flex flex-col h-screen items-center justify-center knoxite-surface">
-        <Loader2 className="animate-spin text-blue-600 size-8 mb-3" />
-        <p className="text-slate-900 dark:text-slate-200 font-bold text-xs uppercase tracking-widest">
-          Syncing Knoxite Workspace...
-        </p>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen knoxite-surface text-slate-900 dark:text-slate-100 font-sans flex flex-col relative overflow-x-hidden transition-colors duration-200">
@@ -275,13 +279,19 @@ export default function DashboardPage() {
             {/* PROFILE TRIGGER & DROPDOWN */}
             <div
               ref={profileMenuRef}
+              onBlur={event => {
+                if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setIsProfileMenuOpen(false);
+              }}
               className="relative pl-1"
             >
               <button
                 id="tour-nav-profile"
+                ref={profileTriggerRef}
                 type="button"
+                aria-expanded={isProfileMenuOpen}
+                aria-controls={isProfileMenuOpen ? "dashboard-account-actions" : undefined}
                 onClick={() => setIsProfileMenuOpen((prev) => !prev)}
-                className="relative flex items-center justify-center rounded-full transition-transform active:scale-95 focus:outline-none"
+                className="relative flex items-center justify-center rounded-full motion-safe:transition-transform active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blue-600 dark:focus-visible:outline-blue-300"
                 title="Account Menu"
               >
                 <Avatar className="size-9 rounded-full ring-2 ring-slate-200/80 dark:ring-slate-700 hover:ring-blue-500 transition-all">
@@ -299,11 +309,11 @@ export default function DashboardPage() {
               </button>
 
               {isProfileMenuOpen && (
-                <div className="absolute right-0 mt-3 w-72 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-xl p-2.5 space-y-2 z-50 animate-in fade-in-50 zoom-in-95">
-                  <div
+                <div id="dashboard-account-actions" className="absolute right-0 mt-3 w-72 max-w-[calc(100vw-2rem)] rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-xl p-2.5 space-y-2 z-50 animate-in fade-in-50 zoom-in-95 motion-reduce:animate-none">
+                  <Link
+                    to="/profile"
                     onClick={() => {
                       setIsProfileMenuOpen(false);
-                      navigate("/profile");
                     }}
                     className="p-3 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/70 transition-colors cursor-pointer flex items-center gap-3 border-b border-slate-100 dark:border-slate-800"
                   >
@@ -324,7 +334,7 @@ export default function DashboardPage() {
                         {currentUserEmail}
                       </p>
                     </div>
-                  </div>
+                  </Link>
 
                   <div className="space-y-1">
                     <button
@@ -444,9 +454,11 @@ export default function DashboardPage() {
 
         {/* MAIN FEED: ACTIVE SWAPS & COMPATIBLE MATCHES */}
         <main className="md:col-span-9 space-y-10">
+        {isLoading ? <LoadingContent layout="dashboard" label="Loading dashboard..." /> : <>
+
           {/* SECTION 1: ACTIVE BILATERAL SWAPS */}
           <section className="space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="dashboard-section-heading flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
                   Active Swaps
@@ -487,7 +499,7 @@ export default function DashboardPage() {
 
           {/* SECTION 2: COMPATIBLE PEER MATCHES (SKILL RADAR) */}
           <section className="space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="dashboard-section-heading flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
                   Compatible Peer Matches
@@ -533,7 +545,9 @@ export default function DashboardPage() {
               />
             )}
           </section>
-        </main>
+
+        </>}
+      </main>
       </div>
 
       {/* 3. CLEAN FOOTER */}
@@ -635,7 +649,6 @@ export default function DashboardPage() {
 }
 
 function ActiveSwapCard({ swap, currentUserId }: any) {
-  const navigate = useNavigate();
   const isReq = swap.requesterId === currentUserId;
   const partner = isReq ? swap.receiver : swap.requester;
   const mySessions = isReq ? swap.requesterSessions : swap.receiverSessions;
@@ -650,15 +663,10 @@ function ActiveSwapCard({ swap, currentUserId }: any) {
     : swap.requesterSkill?.name || swap.offeredSkill?.name || "Partner Skill";
 
   return (
-    <div
-      onClick={() =>
-        navigate(
-          swap.status === "PENDING_AGREEMENT"
-            ? `/swap-agreement/${swap.id}`
-            : `/swap-details/${swap.id}`,
-        )
-      }
-      className="relative mt-3 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/90 dark:border-slate-800 p-5 pt-6 shadow-xs hover:shadow-md hover:border-blue-300 dark:hover:border-blue-500/50 transition-all cursor-pointer flex flex-col justify-between space-y-4 group"
+    <Link
+      to={swap.status === "PENDING_AGREEMENT" ? `/swap-agreement/${swap.id}` : `/swap-details/${swap.id}`}
+      aria-label={`Open exchange with ${partner?.name || "your partner"}`}
+      className="relative mt-3 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/90 dark:border-slate-800 p-5 pt-6 shadow-xs hover:shadow-md hover:border-blue-300 dark:hover:border-blue-500/50 transition-colors motion-safe:transition-shadow focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 dark:focus-visible:outline-blue-300 flex flex-col justify-between space-y-4 group"
     >
       {/* PINNED RIM BADGE */}
       <div className="absolute -top-3.5 left-6 max-w-[calc(100%-3rem)] inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 text-slate-700 dark:text-slate-300 text-[11px] font-bold shadow-2xs group-hover:border-blue-300 dark:group-hover:border-blue-500/50 transition-colors">
@@ -698,7 +706,7 @@ function ActiveSwapCard({ swap, currentUserId }: any) {
 
       {/* SEGMENTED PROGRESS SLICES */}
       <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-800 space-y-2.5">
-        <div className="flex items-center justify-between text-xs">
+        <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
           <span className="text-slate-500 dark:text-slate-400 font-medium">
             Session Progress
           </span>
@@ -721,6 +729,6 @@ function ActiveSwapCard({ swap, currentUserId }: any) {
           })}
         </div>
       </div>
-    </div>
+    </Link>
   );
 }

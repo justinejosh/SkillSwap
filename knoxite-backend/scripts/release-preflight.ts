@@ -8,8 +8,13 @@ export async function inspectFreshReleaseTarget(db: PrismaClient) {
   if (!tables.length) return "EMPTY";
   if (!tables.some(t=>t.name==="_prisma_migrations")) throw new Error("Nonempty legacy target: fresh baseline is forbidden.");
   const rows=await db.$queryRaw<Array<{migration_name:string;checksum:string;finished_at:Date|null;rolled_back_at:Date|null}>>`SELECT migration_name,checksum,finished_at,rolled_back_at FROM _prisma_migrations`;
-  const sql=readFileSync(resolve(__dirname,"../../prisma/release/migrations/20261117000000_current_release/migration.sql"));
-  if(rows.length!==1||rows[0].migration_name!=="20261117000000_current_release"||!rows[0].finished_at||rows[0].rolled_back_at||rows[0].checksum!==createHash("sha256").update(sql).digest("hex"))
+  const names=["20261117000000_current_release","20261121000000_flexible_session_ranges","20261122000000_actual_session_completion"];
+  const sorted=[...rows].sort((a,b)=>a.migration_name.localeCompare(b.migration_name));
+  if(!sorted.length||sorted.length>names.length||sorted.some((row,i)=>{
+    if(row.migration_name!==names[i]||!row.finished_at||row.rolled_back_at)return true;
+    const sql=readFileSync(resolve(__dirname,`../../prisma/release/migrations/${names[i]}/migration.sql`));
+    return row.checksum!==createHash("sha256").update(sql).digest("hex");
+  }))
     throw new Error("Unknown, failed or changed migration history: stop for reviewed reconciliation.");
   return "RELEASE_HISTORY";
 }

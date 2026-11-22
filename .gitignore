@@ -13,6 +13,7 @@ playwright-report
 # Private deployment/operator state and local assessment content stay on disk.
 .vercel/
 *.private.json
+*.private.jsonl
 *.private.env
 *.private.log
 **/pilot-account.json
