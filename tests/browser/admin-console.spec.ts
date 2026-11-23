@@ -10,6 +10,8 @@ async function fixture(page:Page,{role="ADMIN",theme="light",empty=false}={}) {
   state.banks=empty?[]:catalog.slice(0,15).map((s:any,i:number)=>({id:`bank-${i}`,title:`Synthetic ${s.name}`,skill:{id:`s-${i}`,name:s.name,category:s.category},level:i%2?"ADVANCED":"BASIC",versions:[2,1].map(v=>({id:`v-${i}-${v}`,version:v,status:v===2?"PUBLISHED":"RETIRED",questionCount:i%2?6:10,passingPercent:80,durationMinutes:20,maxStarts:3,windowHours:168,cooldownHours:24,_count:{attempts:i},learningOutcomes:"Synthetic fixture learning objectives.",createdAt:"2026-11-01T00:00Z",validatedAt:"2026-11-02T00:00Z",validatedById:"synthetic-reviewer",publishedAt:"2026-11-03T00:00Z",validationNotes:JSON.stringify({scope:"Local project-owner/team pilot only; not faculty or university approval",sourceHash:"b".repeat(64)}),items:[{prompt:"SYNTHETIC PRIVATE PROMPT",competency:"Fixture only",rubric:"Synthetic grading rule",options:[{text:"PRIVATE KEY FIXTURE",isCorrect:true}]}]}))}));
   if(!empty)state.banks[0].versions.unshift({...state.banks[0].versions[0],id:"draft",version:3,status:"DRAFT",validatedAt:null,validationNotes:null});
   state.programs=academic.programs.map((p:any)=>{const d=departments.departments.find((d:any)=>d.programCodes.includes(p.code));return{...p,id:p.code,department:{id:d.code,name:d.name},mappingValidatedAt:"2026-11-01T00:00Z",mappingValidatedById:"synthetic-admin",mappingVersion:1,mappingNotes:"Synthetic mapping evidence; not an institutional approval.",yearLevels:academic.yearLevels.slice(0,["BSIT","BSIHM-CA","BSIHM-HACLO"].includes(p.code)?1:4).map((y:any)=>({...y,id:y.code}))};});
+  state.evaluations=empty?[]:Array.from({length:8},(_,i)=>({id:`evaluation-${i}`,reviewer:{name:`Synthetic Reviewer ${i}`},reviewee:{name:`Synthetic Partner ${i}`},rating:i%5+1,comment:i===0?null:`Synthetic feedback ${i}`,createdAt:`2026-11-${String(i+1).padStart(2,"0")}T12:00:00Z`,isValidated:true,countedInOverview:true,swap:{id:`exchange-${i}`,status:"COMPLETED",offeredSkill:{name:"Python Programming Fundamentals"},wantedSkill:{name:"SQL Fundamentals"}}}));
+  state.evalQueries=[];
   state.months=[{period:"2026-06",rate:null,completed:0,eligibleConcluded:0,excludedConcluded:0},{period:"2026-07",rate:null,completed:0,eligibleConcluded:0,excludedConcluded:2},{period:"2026-08",rate:0,completed:0,eligibleConcluded:1,excludedConcluded:0},{period:"2026-09",rate:null,completed:0,eligibleConcluded:0,excludedConcluded:0},{period:"2026-10",rate:null,completed:0,eligibleConcluded:0,excludedConcluded:0},{period:"2026-11",rate:80,completed:4,eligibleConcluded:5,excludedConcluded:0}];
   state.mentors=empty?[]:[{id:"ranked",name:"Synthetic Mentor",rating:4.5,reviews:4,uniqueCompletedPartners:2}];state.activity=empty?[]:[{id:"ranked",name:"Synthetic Mentor",uniqueCompletedPartners:2,completionRate:.8,totalSwaps:12}];
   state.replies=[{id:"reply",content:"Synthetic reply",author:{id:"replier",name:"Synthetic Replier"},createdAt:"2026-11-01T00:00Z"}];
@@ -20,7 +22,13 @@ async function fixture(page:Page,{role="ADMIN",theme="light",empty=false}={}) {
     if(m!=="GET"){const body=route.request().postDataJSON();state.mutations.push({path:p,method:m,body});if(state.failRetire&&p.endsWith("/retire"))return route.fulfill({status:503,json:{error:"Retirement unavailable in fixture"}});if(p.startsWith("/api/forum/posts/post/comments/")&&m==="DELETE"){state.replies=state.replies.filter((r:any)=>r.id!==p.split("/").pop());state.posts[0]._count.comments=state.replies.length;}if(p==="/api/auth/logout")return route.fulfill({json:{message:"Signed out"}});if(p==="/api/admin/reports/report"){state.reports[0]={...state.reports[0],status:body.status,resolution:body.resolution};}return route.fulfill({status:p.endsWith("/versions")?201:200,json:{id:"synthetic-new",message:"Synthetic action saved"}});}
     if(p==="/api/profile")return route.fulfill({json:{id:"admin",name:"Synthetic Admin",role:state.role,email:"private-admin@fixture.test",offeredSkills:[],wantedSkills:[],metrics:{}}});
     if(p==="/api/auth/session-status")return route.fulfill({json:{enabled:false}});
-    if(p==="/api/analytics")return route.fulfill({json:{systemHealth:{totalUsers:2,totalReviews:8,totalSwaps:5},swapMetrics:{completedSwaps:4,activeSwaps:0,pendingSwaps:1,legacyConcludedSwaps:0},monthlyCompletion:state.months,skillTrends:{catalog:state.catalog},reporting:{undatedConcluded:0}}});
+    if(p==="/api/analytics")return route.fulfill({json:{systemHealth:{totalUsers:2,totalReviews:state.evaluations.filter((r:any)=>r.countedInOverview).length,totalSwaps:5},swapMetrics:{completedSwaps:4,activeSwaps:0,pendingSwaps:1,legacyConcludedSwaps:0},monthlyCompletion:state.months,skillTrends:{catalog:state.catalog},reporting:{undatedConcluded:0}}});
+    if(p==="/api/admin/peer-evaluations"){
+      state.evalQueries.push(Object.fromEntries(u.searchParams));
+      const mode=u.searchParams.get("validation"),search=(u.searchParams.get("search")||"").toLowerCase(),rating=u.searchParams.get("rating");
+      const rows=state.evaluations.filter((r:any)=>(mode==="COUNTED"?r.countedInOverview:mode==="VALIDATED"?r.isValidated:mode==="UNVALIDATED"?!r.isValidated:true)&&(!rating||r.rating===Number(rating))&&`${r.reviewer.name} ${r.reviewee.name}`.toLowerCase().includes(search)).sort((a:any,b:any)=>(u.searchParams.get("sort")==="oldest"?1:-1)*a.createdAt.localeCompare(b.createdAt));
+      const page=Number(u.searchParams.get("page")),pageSize=Number(u.searchParams.get("pageSize"));return route.fulfill({json:{reviews:rows.slice((page-1)*pageSize,page*pageSize),page,pageSize,total:rows.length,validation:mode}});
+    }
     if(p==="/api/admin/dashboard-data")return route.fulfill({json:{stats:{totalUsers:3,reportedIssues:1},recentUsers:[]}});
     if(p==="/api/admin/users"){let rows=state.users.filter((a:any)=>(!u.searchParams.get("role")||a.role===u.searchParams.get("role"))&&(!u.searchParams.get("status")||a.isSuspended===(u.searchParams.get("status")==="SUSPENDED"))&&`${a.name} ${a.email}`.toLowerCase().includes((u.searchParams.get("search")||"").toLowerCase()));const page=Number(u.searchParams.get("page"));return route.fulfill({json:{users:rows.slice((page-1)*20,page*20),page,pageSize:20,total:rows.length}});}
     if(p==="/api/admin/assessments")return route.fulfill({json:state.banks});
@@ -36,16 +44,134 @@ async function fixture(page:Page,{role="ADMIN",theme="light",empty=false}={}) {
 }
 async function nav(page:Page,name:string){const toggle=page.getByRole("button",{name:"Administrator navigation",exact:true});if(await toggle.isVisible())await toggle.click();await page.getByRole("navigation",{name:"Admin navigation",exact:true}).getByRole("link",{name,exact:true}).click();}
 
+for (const theme of ["light", "dark"]) {
+  test(`${theme} peer evaluations link matches Overview and supports server filters and pagination`, async ({page},info) => {
+    const state=await fixture(page,{theme});
+    const exemplar=state.evaluations[0];
+    state.evaluations=Array.from({length:25},(_,i)=>({...exemplar,id:`review-${i}`,rating:i%5+1,createdAt:`2026-11-${String(i+1).padStart(2,"0")}T12:00:00Z`,comment:i===0?null:`Synthetic feedback ${i}`}));
+    state.evaluations.push({...exemplar,id:"excluded",isValidated:false,countedInOverview:false,comment:"Synthetic unvalidated feedback"});
+    await page.goto("/admin-dashboard");
+    const metric=page.locator(".admin-metric").filter({has:page.getByRole("heading",{name:"Peer Evaluations",exact:true})});
+    await expect(metric.locator(".admin-metric-value")).toHaveText("25");
+    await metric.getByRole("link",{name:"Peer Evaluations",exact:true}).click();
+    await expect(page).toHaveURL(/section=evaluations/);
+    const table=page.getByRole("table",{name:"Peer evaluations",exact:true});
+    await expect(table.locator("tbody tr")).toHaveCount(20);
+    await expect(page.getByRole("status")).toHaveText("Showing 20 of 25 matching evaluations.");
+    await expect(table).toContainText("Python Programming Fundamentals ⇄ SQL Fundamentals");
+    await expect(table.locator("tbody tr").first()).toContainText("Synthetic feedback 24");
+    await page.getByRole("button",{name:"Next",exact:true}).click();
+    await expect(table.locator("tbody tr")).toHaveCount(5);
+    await expect(table).toContainText("No written feedback.");
+    await page.getByLabel("Rating",{exact:true}).selectOption("4");
+    await expect(table.locator("tbody tr")).toHaveCount(5);
+    await expect(page.getByText("Page 1 of 1",{exact:false})).toBeVisible();
+    await page.getByLabel("Search student names",{exact:true}).fill("Synthetic Partner 0");
+    await page.getByLabel("Order evaluations",{exact:true}).selectOption("oldest");
+    await expect(table.locator("tbody tr").first()).toContainText("Synthetic feedback 3");
+    await expect.poll(()=>state.evalQueries.at(-1)).toMatchObject({page:"1",rating:"4",search:"Synthetic Partner 0",sort:"oldest",validation:"COUNTED",pageSize:"20"});
+    await page.getByLabel("Rating",{exact:true}).selectOption("");
+    await page.getByLabel("Validation status",{exact:true}).selectOption("UNVALIDATED");
+    await expect(table.locator("tbody tr")).toHaveCount(1);
+    await expect(table).toContainText("Not validated");await expect(table).toContainText("Excluded from Overview");
+    await expect(page.getByText("This view may include evaluations outside the Overview count.",{exact:false})).toBeVisible();
+    await page.getByLabel("Validation status",{exact:true}).selectOption("ALL");
+    await expect(page.getByRole("status")).toHaveText("Showing 20 of 26 matching evaluations.");
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+    await page.screenshot({path:info.outputPath(`evaluations-${theme}.png`),fullPage:true});
+    expect(state.mutations).toHaveLength(0);
+    await expect(page.getByRole("button",{name:/Delete evaluation|Edit evaluation/})).toHaveCount(0);
+  });
+}
+
+test("peer evaluation loading, failures, retry and empty results stay distinct", async ({page})=>{
+  const state=await fixture(page);let release:()=>void=()=>{};
+  const pending=new Promise<void>(resolve=>{release=resolve;});
+  await page.route("**/api/admin/peer-evaluations?**",async route=>{await pending;await route.fallback();});
+  await page.goto("/admin-dashboard?section=evaluations");
+  await expect(page.getByRole("status",{name:"Loading peer evaluations...",exact:true})).toBeVisible();
+  state.failure="/api/admin/peer-evaluations";release();
+  await expect(page.getByRole("alert")).toContainText("Synthetic endpoint unavailable");
+  await expect(page.getByText("No peer evaluations match this view.",{exact:true})).toHaveCount(0);
+  state.failure="";await page.getByRole("button",{name:"Retry evaluations",exact:true}).click();
+  await expect(page.getByRole("table",{name:"Peer evaluations",exact:true})).toBeVisible();
+  await page.getByLabel("Search student names",{exact:true}).fill("Absent Student");
+  await expect(page.getByText("No peer evaluations match this view.",{exact:true})).toBeVisible();
+  await expect(page.getByRole("alert")).toHaveCount(0);await expect(page.getByRole("table")).toHaveCount(0);
+  expect(state.mutations).toHaveLength(0);
+});
+
+test("compact academic controls retain values, evidence and validation when closed",async({page})=>{
+  const state=await fixture(page);await page.goto("/admin/assessments?section=academic");
+  const add=page.getByRole("button",{name:"Add Academic Option",exact:true});
+  await expect(add).toHaveAttribute("aria-expanded","false");await add.focus();await page.keyboard.press("Enter");
+  const option=page.getByRole("region",{name:"Academic Option",exact:true});
+  await expect(add).toHaveAttribute("aria-controls",await option.getAttribute("id")||"");
+  await option.getByLabel("Official code",{exact:true}).fill("SYNTHETIC");
+  await option.getByRole("button",{name:"Add Official Option",exact:true}).click();
+  expect(state.mutations).toHaveLength(0); // Required name validation still blocks submission.
+  await option.getByLabel("Official name",{exact:true}).fill("Synthetic option");
+  await page.getByRole("button",{name:"Close Academic Option",exact:true}).click();await expect(add).toBeFocused();
+  await expect(option).toBeHidden();await add.click();await expect(option.getByLabel("Official code",{exact:true})).toHaveValue("SYNTHETIC");
+  await expect(option.getByLabel("Official name",{exact:true})).toHaveValue("Synthetic option");
+  await option.getByRole("button",{name:"Add Official Option",exact:true}).click();
+  await expect.poll(()=>state.mutations.length).toBe(1);expect(state.mutations[0]).toMatchObject({path:"/api/admin/academic-options",body:{code:"SYNTHETIC",name:"Synthetic option"}});
+  const review=page.getByRole("button",{name:"Review Mappings",exact:true});await review.click();
+  await expect(page.getByRole("region",{name:"Proposed Mappings",exact:true})).toContainText("College of Computer Studies");
+  await page.getByRole("button",{name:"Close Proposed Mappings",exact:true}).click();await expect(review).toBeFocused();
+  const change=page.getByRole("button",{name:"Change Department",exact:true});await change.click();
+  const mapping=page.getByRole("region",{name:"Change Department",exact:true});
+  await mapping.getByRole("combobox",{name:/^Program/}).selectOption("BSIT");
+  await mapping.getByRole("combobox",{name:/^Official department/}).selectOption(state.programs.find((p:any)=>p.code==="BSIT").department.id);
+  await mapping.getByRole("textbox",{name:"Official mapping evidence",exact:true}).fill("Synthetic evidence draft");
+  await mapping.getByRole("button",{name:"Save Confirmed Mapping",exact:true}).click();expect(state.mutations).toHaveLength(1);
+  await page.getByRole("button",{name:"Close Change Department",exact:true}).click();await change.click();
+  await expect(mapping.getByRole("textbox",{name:"Official mapping evidence",exact:true})).toHaveValue("Synthetic evidence draft");
+  await expect(mapping.getByRole("checkbox")).not.toBeChecked();
+  await page.getByRole("button",{name:"Manage Year Levels",exact:true}).click();
+  const years=page.getByRole("region",{name:"Manage Year Levels",exact:true});
+  await years.getByLabel("Configure year levels for a program",{exact:false}).selectOption("BSCS");
+  await years.getByRole("checkbox",{name:"4th Year",exact:true}).uncheck();
+  await page.getByRole("button",{name:"Close Manage Year Levels",exact:true}).click();await page.getByRole("button",{name:"Manage Year Levels",exact:true}).click();
+  await expect(years.getByRole("checkbox",{name:"4th Year",exact:true})).not.toBeChecked();
+  await years.getByRole("button",{name:"Save Program Year Levels",exact:true}).click();
+  await expect.poll(()=>state.mutations.length).toBe(2);expect(state.mutations[1]).toMatchObject({path:"/api/admin/academic-programs/BSCS/year-levels",method:"PATCH"});
+  expect(state.mutations.map((m:any)=>m.path)).not.toContain("/api/admin/academic-options/initialize");
+  for(const width of [320,390,1280]){await page.setViewportSize({width,height:900});for(const dark of [false,true]){await page.evaluate(d=>document.documentElement.classList.toggle("dark",d),dark);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);const a=await change.boundingBox(),b=await page.getByRole("button",{name:"Manage Year Levels",exact:true}).boundingBox();expect(a!.x+a!.width).toBeLessThanOrEqual(width);expect(b!.x+b!.width).toBeLessThanOrEqual(width);}}
+});
+
+test("compact import guide and advanced editor preserve malformed JSON and import feedback",async({page})=>{
+  const state=await fixture(page);await page.goto("/admin/assessments?section=import");
+  const guide=page.getByRole("button",{name:"View Import Guide",exact:true});await guide.click();
+  await expect(page.getByRole("region",{name:"Import Guide",exact:true})).toBeVisible();await guide.click();
+  await expect(page.getByRole("region",{name:"Import Guide",exact:true})).toBeHidden();
+  const advanced=page.getByRole("button",{name:"Advanced Import Options",exact:true});await advanced.click();
+  const json=page.getByLabel("Assessment Question Data",{exact:true});await json.fill("{unfinished");
+  await advanced.click();await expect(json).toBeHidden();await expect(page.getByRole("button",{name:"Import Draft",exact:true})).toBeVisible();
+  await advanced.click();await expect(json).toHaveValue("{unfinished");await page.getByRole("button",{name:"Import Draft",exact:true}).click();
+  await expect(page.getByRole("alert")).toBeVisible();await expect(json).toHaveValue("{unfinished");expect(state.mutations).toHaveLength(0);
+});
+
+test("compact data-table toggle keeps the filtered accessible data and keyboard semantics",async({page})=>{
+  const state=await fixture(page);await page.goto("/admin-dashboard?section=analytics");
+  const toggle=page.getByRole("button",{name:"View Data Table",exact:true});await expect(toggle).toHaveAttribute("aria-expanded","false");
+  await page.getByLabel("Search skills",{exact:true}).fill("Python");await toggle.focus();await page.keyboard.press("Enter");
+  const table=page.getByRole("table",{name:"Current filtered preset skill supply and demand",exact:true});await expect(table.locator("tbody tr")).toHaveCount(1);
+  const hide=page.getByRole("button",{name:"Hide Data Table",exact:true});await expect(hide).toHaveAttribute("aria-expanded","true");
+  const id=await hide.getAttribute("aria-controls");expect(id).toBeTruthy();await expect(page.locator(`[id="${id}"]`)).toContainText("Python Programming Fundamentals");
+  await hide.click();await expect(table).toBeHidden();await page.getByRole("button",{name:"View Data Table",exact:true}).click();await expect(table.locator("tbody tr")).toHaveCount(1);expect(state.mutations).toHaveLength(0);
+});
+
 test("student server role cannot mount administrative workspaces or fetch private keys",async({page})=>{
-  const state=await fixture(page,{role:"USER"});for(const url of ["/admin-dashboard","/admin/assessments","/admin/integrity"]){await page.goto(url);await expect(page).toHaveURL(/\/dashboard$/);await expect(page.getByRole("navigation",{name:"Admin navigation",exact:true})).toHaveCount(0);}expect(state.requests.filter((p:string)=>p.includes("/admin/")||p.endsWith("/analytics"))).toEqual([]);
+  const state=await fixture(page,{role:"USER"});for(const url of ["/admin-dashboard","/admin-dashboard?section=evaluations","/admin/assessments","/admin/integrity"]){await page.goto(url);await expect(page).toHaveURL(/\/dashboard$/);await expect(page.getByRole("navigation",{name:"Admin navigation",exact:true})).toHaveCount(0);}expect(state.requests.filter((p:string)=>p.includes("/admin/")||p.endsWith("/analytics"))).toEqual([]);
 });
 test("shared admin navigation supports all workspaces, direct links, Back and truthful overview metrics",async({page},info)=>{
   const state=await fixture(page);await page.goto("/admin-dashboard");await expect(page.getByRole("heading",{name:"Registered Students",exact:true}).locator("..")).toContainText("2");await expect(page.getByRole("heading",{name:"Completed Swaps",exact:true}).locator("..")).toContainText("4");await expect(page.getByText("All registered accounts (includes ADMIN)",{exact:true}).locator("..")).toContainText("3");
-  for(const title of ["Analytics & Trends","Student Management","Assessment Management","Forum Moderation","Reports","Leaderboard Audit","Integrity Review","Academic Configuration","Overview"]){await nav(page,title);await expect(page.getByRole("heading",{level:1,name:title,exact:true})).toBeVisible();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);}
+  for(const title of ["Analytics & Trends","Peer Evaluations","Student Management","Assessment Management","Forum Moderation","Reports","Leaderboard Audit","Integrity Review","Academic Configuration","Overview"]){await nav(page,title);await expect(page.getByRole("heading",{level:1,name:title,exact:true})).toBeVisible();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);}
   await page.reload();await page.getByRole("button",{name:"Refresh data",exact:true}).click();expect(state.mutations).toHaveLength(0);await page.screenshot({path:info.outputPath("overview.png"),fullPage:true});await page.goto("/analytics");await expect(page).toHaveURL(/section=analytics/);await expect(page.getByRole("heading",{name:"Skill Supply vs. Demand",exact:true})).toBeVisible();
 });
 test("supply/demand filters, sorting, zero and missing values keep full skill names and readable chart data",async({page},info)=>{
-  await fixture(page);await page.goto("/admin-dashboard?section=analytics");await page.getByRole("combobox",{name:"Skill category",exact:true}).selectOption("technology");await page.getByRole("combobox",{name:"Entries shown",exact:true}).selectOption("all");await page.getByText("Accessible supply/demand data table",{exact:true}).click();const table=page.getByRole("table",{name:"Current filtered preset skill supply and demand",exact:true});await expect(table.locator("tbody tr")).toHaveCount(10);const python=table.getByRole("row").filter({hasText:"Python Programming Fundamentals"});await expect(python.locator("td")).toHaveText(["Python Programming Fundamentals","technology","0","8","+8"]);await page.getByLabel("Search skills",{exact:true}).fill("PYTHON");await expect(table.locator("tbody tr")).toHaveCount(1);await page.getByLabel("Search skills",{exact:true}).fill("");await page.getByRole("combobox",{name:"Sort skills",exact:true}).selectOption("supply");await expect(table.locator("tbody tr").first()).toContainText("Java Programming Fundamentals");await page.getByRole("combobox",{name:"Sort skills",exact:true}).selectOption("shortage");await expect(table.locator("tbody tr").first()).toContainText("Python Programming Fundamentals");
+  await fixture(page);await page.goto("/admin-dashboard?section=analytics");await page.getByRole("combobox",{name:"Skill category",exact:true}).selectOption("technology");await page.getByRole("combobox",{name:"Entries shown",exact:true}).selectOption("all");await page.getByRole("button",{name:"View Data Table",exact:true}).click();const table=page.getByRole("table",{name:"Current filtered preset skill supply and demand",exact:true});await expect(table.locator("tbody tr")).toHaveCount(10);const python=table.getByRole("row").filter({hasText:"Python Programming Fundamentals"});await expect(python.locator("td")).toHaveText(["Python Programming Fundamentals","technology","0","8","+8"]);await page.getByLabel("Search skills",{exact:true}).fill("PYTHON");await expect(table.locator("tbody tr")).toHaveCount(1);await page.getByLabel("Search skills",{exact:true}).fill("");await page.getByRole("combobox",{name:"Sort skills",exact:true}).selectOption("supply");await expect(table.locator("tbody tr").first()).toContainText("Java Programming Fundamentals");await page.getByRole("combobox",{name:"Sort skills",exact:true}).selectOption("shortage");await expect(table.locator("tbody tr").first()).toContainText("Python Programming Fundamentals");
   const moduleResult=await page.evaluate(async()=>{const {skillRows}=await import(String("/src/app/components/admin/AdminAnalytics.tsx"));const rows=[{key:"zero",name:"Z",category:"technology",supply:0,demand:0},{key:"b",name:"B",category:"technology",supply:3,demand:5},{key:"a",name:"A",category:"technology",supply:1,demand:4},{key:"missing",name:"Unknown",category:"technology",supply:null,demand:null}];return["demand","supply","shortage","alphabetical"].map(sort=>skillRows(rows,"","",sort).map((r:any)=>r.key));});expect(moduleResult).toEqual([["b","a","zero","missing"],["b","a","zero","missing"],["a","b","zero","missing"],["a","b","missing","zero"]]);
   await page.getByRole("combobox",{name:"Skill category",exact:true}).selectOption("business");await expect(table.locator("tbody tr")).toHaveCount(10);await expect(table).toContainText("Accounting Information Systems Basics");await page.screenshot({path:info.outputPath("analytics.png"),fullPage:true});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });
@@ -57,7 +183,7 @@ test("chart skill labels expose counts on keyboard focus and hover without squee
   await page.keyboard.press("Escape");await expect(label.getByRole("tooltip")).toHaveCount(0);
   await page.getByLabel("Search skills",{exact:true}).focus();await label.hover();
   await expect(label.getByRole("tooltip")).toContainText("Supply: 0; Demand: 8");
-  await page.getByText("Accessible supply/demand data table",{exact:true}).click();
+  await page.getByRole("button",{name:"View Data Table",exact:true}).click();
   expect(await page.getByRole("table",{name:"Current filtered preset skill supply and demand",exact:true}).evaluate(el=>el.getBoundingClientRect().width)).toBeGreaterThanOrEqual(640);
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });
@@ -77,7 +203,7 @@ test("import validates JSON and confirms DRAFT-only behavior without automatic s
 ).toContainText("unavailable to students");expect(state.mutations.map((m:any)=>m.path)).toEqual(["/api/admin/assessments/versions"]);
 });
 test("academic workspace preserves thirteen mappings and first-year-only program options without writes",async({page})=>{
-  const state=await fixture(page);await page.goto("/admin/assessments?section=academic");await page.getByLabel("Search academic programs",{exact:true}).fill("BSIT");const program=page.getByRole("table",{name:"Academic program directory",exact:true}).locator("tbody tr");await expect(program).toHaveCount(1);await expect(program).toContainText("1st Year");await expect(program).toContainText("Validation recorded");await page.getByLabel("Stored mapping evidence for BSIT",{exact:true}).click();await expect(page.getByText("Synthetic mapping evidence; not an institutional approval.",{exact:true})).toBeVisible();await page.getByText("Manage Eligible Year Levels",{exact:true}).click();await page.getByLabel("Configure year levels for a program",{exact:false}).selectOption("BSIT");await expect(page.getByRole("checkbox",{name:"1st Year",exact:true})).toBeChecked();for(const name of ["2nd Year","3rd Year","4th Year"])await expect(page.getByRole("checkbox",{name,exact:true})).not.toBeChecked();expect(state.programs).toHaveLength(13);expect(state.mutations).toHaveLength(0);
+  const state=await fixture(page);await page.goto("/admin/assessments?section=academic");await page.getByLabel("Search academic programs",{exact:true}).fill("BSIT");const program=page.getByRole("table",{name:"Academic program directory",exact:true}).locator("tbody tr");await expect(program).toHaveCount(1);await expect(program).toContainText("1st Year");await expect(program).toContainText("Validation recorded");await page.getByLabel("Stored mapping evidence for BSIT",{exact:true}).click();await expect(page.getByText("Synthetic mapping evidence; not an institutional approval.",{exact:true})).toBeVisible();await page.getByRole("button",{name:"Manage Year Levels",exact:true}).click();await page.getByLabel("Configure year levels for a program",{exact:false}).selectOption("BSIT");await expect(page.getByRole("checkbox",{name:"1st Year",exact:true})).toBeChecked();for(const name of ["2nd Year","3rd Year","4th Year"])await expect(page.getByRole("checkbox",{name,exact:true})).not.toBeChecked();expect(state.programs).toHaveLength(13);expect(state.mutations).toHaveLength(0);
 });
 test("academic directory shows canonical program labels without redundant internal codes",async({page})=>{
   const state=await fixture(page);
@@ -147,7 +273,7 @@ for (const theme of ["light", "dark"]) {
     await readableContrast(page,".admin-metric-description",".admin-metric");
     await readableContrast(page,".admin-metric h2",".admin-metric");
     await page.screenshot({ path: info.outputPath(`overview-${theme}.png`), fullPage: true });
-    const destinations = ["/admin-dashboard?section=analytics", "/admin/assessments", "/admin/assessments?section=academic", "/admin-dashboard?section=students", "/admin-dashboard?section=forum", "/admin/assessments?section=reports", "/admin-dashboard?section=leaderboard", "/admin/integrity"];
+    const destinations = ["/admin-dashboard?section=analytics", "/admin-dashboard?section=evaluations", "/admin/assessments", "/admin/assessments?section=academic", "/admin-dashboard?section=students", "/admin-dashboard?section=forum", "/admin/assessments?section=reports", "/admin-dashboard?section=leaderboard", "/admin/integrity"];
     for (const url of destinations) {
       await page.goto(url);
       await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
@@ -195,7 +321,7 @@ for (const theme of ["light", "dark"]) {
 test("narrow-screen admin UI review",async({page},info)=>{
   const state=await fixture(page,{theme:"dark"});await page.setViewportSize({width:320,height:740});
   const issues:any[]=[];
-  for(const path of ["/admin-dashboard","/admin-dashboard?section=analytics","/admin-dashboard?section=students","/admin-dashboard?section=forum","/admin-dashboard?section=leaderboard","/admin/assessments","/admin/assessments?section=academic","/admin/assessments?section=reports","/admin/integrity"]){
+  for(const path of ["/admin-dashboard","/admin-dashboard?section=analytics","/admin-dashboard?section=evaluations","/admin-dashboard?section=students","/admin-dashboard?section=forum","/admin-dashboard?section=leaderboard","/admin/assessments","/admin/assessments?section=academic","/admin/assessments?section=reports","/admin/integrity"]){
     await page.goto(path);await page.getByRole("heading",{level:1}).waitFor();await page.waitForTimeout(100);
     if(path==="/admin/assessments?section=academic") {
       const initialize=page.getByRole("button",{name:"Initialize Team-Approved Programs",exact:true});

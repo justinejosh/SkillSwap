@@ -1,3 +1,4 @@
+import { Plus, BookOpen, ChevronDown } from "lucide-react";
 import { descendingAcademicYears } from "@/app/lib/academicDisplay";
 import { AssessmentSkillPicker } from "@/app/components/admin/AssessmentSkillPicker";
 import { LoadingContent } from "@/app/components/PageSkeleton";
@@ -20,7 +21,14 @@ const blank = {
   durationMinutes: 20,
   items: [],
 };
+type Panel = "option" | "mappings" | "department" | "years" | "guide" | "advanced";
 export default function AssessmentAdminPage() {
+  const [panels,setPanels]=useState<Record<Panel,boolean>>({option:false,mappings:false,department:false,years:false,guide:false,advanced:false});
+  const panelRefs=useRef<Partial<Record<Panel,HTMLButtonElement|null>>>({});
+  function toggle(name:Panel){setPanels(old=>({...old,[name]:!old[name]}));}
+  function close(name:Panel){setPanels(old=>({...old,[name]:false}));panelRefs.current[name]?.focus();}
+  function panelButton(name:Panel,label:string,primary=false){return <Button type="button" size="sm" variant={primary?"default":"outline"} ref={node=>{panelRefs.current[name]=node;}} aria-expanded={panels[name]} aria-controls={`admin-${name}-panel`} className={`h-auto min-h-9 w-fit max-w-full whitespace-normal text-left ${primary?"bg-blue-600 text-white hover:bg-blue-700":""}`} onClick={()=>toggle(name)}>{name==="option"?<Plus className="size-4" aria-hidden="true"/>:name==="guide"?<BookOpen className="size-4" aria-hidden="true"/>:name==="advanced"?<ChevronDown className="size-4" aria-hidden="true"/>:null}{label}</Button>;}
+  function closeButton(name:Panel,label:string){return <Button type="button" size="sm" variant="ghost" aria-label={`Close ${label}`} onClick={()=>close(name)}>Close</Button>;}
   const [params]=useSearchParams();
   const section=["academic","reports","import"].includes(params.get("section")||"")?params.get("section")!:"directory";
   const [loading,setLoading]=useState(true),[ready,setReady]=useState(false),[importCandidate,setImportCandidate]=useState<any>(null),[programSearch,setProgramSearch]=useState("");
@@ -115,10 +123,7 @@ export default function AssessmentAdminPage() {
             No arbitrary questions are generated.
           </p>
           <AssessmentSkillPicker skills={skills} selectedId={(()=>{try{return JSON.parse(json).skillId||"";}catch{return "";}})()} onSelect={id=>{try{const value=JSON.parse(json);if(!value||typeof value!=="object"||Array.isArray(value))throw new Error("Use a JSON object.");setJson(JSON.stringify({...value,skillId:id},null,2));setError("");}catch{setError("Fix the assessment question data before selecting a skill. Your entered text has been retained.");}}}/>
-          <details>
-            <summary className="cursor-pointer font-semibold">
-              Import Format
-            </summary>
+          <div className="space-y-2">{panelButton("guide","View Import Guide")}<div id="admin-guide-panel" role="region" aria-label="Import Guide" hidden={!panels.guide} className="space-y-3 pt-4">
             <p className="text-sm">
               Each item contains kind (MULTIPLE_CHOICE for basic, APPLIED_CHOICE
               for advanced), prompt, competency, rubric, points, and options.
@@ -126,9 +131,9 @@ export default function AssessmentAdminPage() {
               correct. Advanced items must evaluate applied competency; a human
               validator must verify this before publishing.
             </p>
-          </details>
+          </div></div>
           <form onSubmit={e=>e.preventDefault()} className="space-y-3">
-            <details className="rounded-xl border border-slate-200 p-4 dark:border-slate-700"><summary className="cursor-pointer font-semibold">Advanced Import Options</summary>
+            <div className="space-y-2">{panelButton("advanced","Advanced Import Options")}<div id="admin-advanced-panel" role="region" aria-label="Advanced Import Options" hidden={!panels.advanced} className="space-y-3 pt-4">
             <label htmlFor="bank-json" className="block font-semibold">
               Assessment Question Data
             </label>
@@ -139,7 +144,7 @@ export default function AssessmentAdminPage() {
               onChange={(e) => setJson(e.target.value)}
               spellCheck={false}
             />
-            </details>
+            </div></div>
             <AdminConfirm label="Import Draft" disabled={busy} beforeOpen={prepareImport} title={`Import a draft for ${skills.find(s=>s.id===importCandidate?.skillId)?.name||importCandidate?.skillId||"the selected skill"} · ${importCandidate?.level||"level not supplied"}?`} description="Creates a new DRAFT version only. It is unavailable to students until a genuine review and separate publication. No existing version or question is overwritten." onConfirm={()=>action(()=>api("/admin/assessments/versions",{method:"POST",body:JSON.stringify(importCandidate)}),"Draft imported. It remains unavailable to students until validated and published.")}/>
           </form>
         </section>
@@ -151,7 +156,7 @@ export default function AssessmentAdminPage() {
             stable codes. Empty lists remain unavailable rather than receiving
             guessed values.
           </p>
-          <details className="rounded-xl border border-slate-200 p-4 dark:border-slate-700"><summary className="cursor-pointer font-semibold">Add Academic Option</summary>
+          <div className="space-y-2">{panelButton("option","Add Academic Option",true)}<div id="admin-option-panel" role="region" aria-label="Academic Option" hidden={!panels.option} className="space-y-3 pt-4">
           <form
             className="grid gap-3 sm:grid-cols-2"
             onSubmit={(e) => {
@@ -222,7 +227,7 @@ export default function AssessmentAdminPage() {
             )}
             <Button disabled={busy}>Add Official Option</Button>
           </form>
-          </details>
+          {closeButton("option","Academic Option")}</div></div>
         </section>
         <section className="admin-panel space-y-4">
           <h2 className="text-xl font-semibold">
@@ -234,10 +239,7 @@ export default function AssessmentAdminPage() {
             separately; the original team draft is available below.
           </p>
           {academicData.provisionalDraft && (
-            <details>
-              <summary className="cursor-pointer font-semibold">
-                Review Proposed Mappings
-              </summary>
+            <div className="space-y-2">{panelButton("mappings","Review Mappings")}<div id="admin-mappings-panel" role="region" aria-label="Proposed Mappings" hidden={!panels.mappings} className="space-y-3 pt-4">
               <p className="my-2 text-sm">
                 {academicData.provisionalDraft.source}
               </p>
@@ -272,12 +274,12 @@ export default function AssessmentAdminPage() {
               >
                 Import Provisional Mapping
               </Button>
-            </details>
+            {closeButton("mappings","Proposed Mappings")}</div></div>
           )}
           <Button
             disabled={busy}
             variant="outline"
-            className="h-auto min-h-11 max-w-full whitespace-normal break-words px-4 py-2 text-center"
+            className="h-auto min-h-11 w-fit max-w-full whitespace-normal break-words border-blue-300 bg-blue-50 px-4 py-2 text-center text-blue-800 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-200"
             onClick={() =>
               void action(
                 () =>
@@ -307,7 +309,8 @@ export default function AssessmentAdminPage() {
           </div>
           {selectedProgram&&<section aria-label="Program mapping details" className="space-y-3 rounded-xl border border-slate-200 p-4 dark:border-slate-700"><div className="flex flex-wrap items-center justify-between gap-3"><h3 className="font-semibold">{selectedProgram.label}</h3><Button type="button" variant="ghost" size="sm" onClick={()=>setSelectedProgramId(null)}>Close program details</Button></div><dl className="grid gap-3 text-sm sm:grid-cols-2"><div><dt>College / department</dt><dd>{selectedProgram.department?.name||"Not assigned"}</dd></div><div><dt>Eligible year levels</dt><dd>{descendingAcademicYears(selectedProgram.yearLevels).map((y:any)=>y.name).join(", ")||"Not configured"}</dd></div><div><dt>Stored mapping status</dt><dd>{selectedProgram.mappingValidatedAt?"Validation recorded":selectedProgram.department?"Provisional":"Not recorded"}</dd></div><div><dt>Validation date</dt><dd>{selectedProgram.mappingValidatedAt?new Date(selectedProgram.mappingValidatedAt).toLocaleString():"Not recorded"}</dd></div></dl><p className="text-sm">Recorded evidence is shown as stored; this view does not establish university approval.</p><pre className="whitespace-pre-wrap break-words text-sm">{selectedProgram.mappingNotes||"No mapping evidence supplied."}</pre><details><summary className="cursor-pointer text-sm">Technical review details</summary><p className="mt-2 break-all text-sm">Program ID: {selectedProgram.id} · Mapping version {selectedProgram.mappingVersion} · Reviewer ID: {selectedProgram.mappingValidatedById||"not recorded"}</p></details></section>}
           <h3 className="text-lg font-semibold">Program Management</h3>
-          <details className="rounded-xl border border-slate-200 p-4 dark:border-slate-700"><summary className="cursor-pointer font-semibold">Change Program Department</summary>
+          <div className="flex flex-wrap gap-3">{panelButton("department","Change Department")}{panelButton("years","Manage Year Levels")}</div>
+          <div id="admin-department-panel" role="region" aria-label="Change Department" hidden={!panels.department} className="space-y-3 pt-4"><h4 className="font-semibold">Change Department</h4>
           <form
             className="space-y-3"
             onSubmit={(e) => {
@@ -424,11 +427,11 @@ export default function AssessmentAdminPage() {
               Save as Provisional
             </Button>
           </form>
-          </details>
+          {closeButton("department","Change Department")}</div>
           <p className="text-sm text-slate-600 dark:text-slate-300">BSIT, BSIHM-CA and BSIHM-HACLO intentionally remain first-year-only. Viewing this workspace does not change mappings or year levels; changes require the existing approval process.</p>
-          <details className="rounded-xl border border-slate-200 p-4 dark:border-slate-700"><summary className="cursor-pointer font-semibold">Manage Eligible Year Levels</summary>
+          <div id="admin-years-panel" role="region" aria-label="Manage Year Levels" hidden={!panels.years} className="space-y-3 pt-4"><h4 className="font-semibold">Manage Year Levels</h4>
           <form
-            className="space-y-3 border-t pt-4"
+            className="space-y-3"
             onSubmit={(e) => {
               e.preventDefault();
               void action(
@@ -491,7 +494,7 @@ export default function AssessmentAdminPage() {
             </div>
             <Button disabled={busy}>Save Program Year Levels</Button>
           </form>
-          </details>
+          {closeButton("years","Manage Year Levels")}</div>
         </section>
 </div>}
       {section==="reports"&&<AdminReports reports={reports} busy={busy} action={action}/>}

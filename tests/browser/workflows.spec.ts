@@ -806,7 +806,7 @@ test("administrators import the provisional mapping without assigning official v
   });
   await page.goto("/admin/assessments?section=academic");
   await page
-    .getByText("Review Proposed Mappings", { exact: true })
+    .getByRole("button", { name: "Review Mappings", exact: true })
     .click();
   await expect(
     page.getByText("College of Computer Studies: BSCS, BSIT", { exact: true }),
@@ -846,7 +846,7 @@ test("archived duplicate colleges are excluded from the official department sele
     } : [],
   }));
   await page.goto("/admin/assessments?section=academic");
-  await page.getByText("Change Program Department", { exact: true }).click();
+  await page.getByRole("button", { name: "Change Department", exact: true }).click();
   const options = page.getByRole("combobox", { name: /^Official department/ }).locator("option");
   await expect(options).toHaveText(["Select confirmed department", "College of Arts and Sciences", "College of Computer Studies"]);
 });

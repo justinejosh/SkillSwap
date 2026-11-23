@@ -1,3 +1,4 @@
+import { PeerEvaluations } from "@/app/components/admin/PeerEvaluations";
 import { LoadingContent } from "@/app/components/PageSkeleton";
 import { Users, ArrowLeftRight, CircleCheck, MessageSquareText, RefreshCw, Info, ArrowUpRight } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -11,8 +12,8 @@ import { countLabel } from "@/app/components/admin/AdminUI";
 
 export default function AdminDashboardPage() {
   const [params]=useSearchParams();const requested=params.get("section")||"overview";
-  const section=["overview","analytics","students","forum","leaderboard"].includes(requested)?requested:"overview";
-  const titles:Record<string,string>={overview:"Overview",analytics:"Analytics & Trends",students:"Student Management",forum:"Forum Moderation",leaderboard:"Leaderboard Audit"};
+  const section=["overview","analytics","students","forum","leaderboard","evaluations"].includes(requested)?requested:"overview";
+  const titles:Record<string,string>={overview:"Overview",evaluations:"Peer Evaluations",analytics:"Analytics & Trends",students:"Student Management",forum:"Forum Moderation",leaderboard:"Leaderboard Audit"};
   const [data,setData]=useState<any>(null),[dashboard,setDashboard]=useState<any>(null),[loading,setLoading]=useState(true),[error,setError]=useState(""),[refresh,setRefresh]=useState(0);
   useEffect(()=>{let live=true;setError("");if(!["overview","analytics"].includes(section)){setLoading(false);return;}
     setLoading(true);Promise.all([api("/analytics"),section==="overview"?api("/admin/dashboard-data"):Promise.resolve(null)]).then(([a,d])=>{if(live){setData(a);setDashboard(d);}}).catch(e=>{if(live)setError(e.message);}).finally(()=>{if(live)setLoading(false);});return()=>{live=false;};
@@ -24,7 +25,7 @@ export default function AdminDashboardPage() {
         <div className="admin-metrics grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {cards.map(c=><section key={c.title} className={`admin-panel admin-metric admin-metric-${c.tone}`}>
             <div className="admin-metric-icon"><c.icon size={21} strokeWidth={1.8} aria-hidden="true"/></div>
-            <h2>{c.title}</h2>
+            <h2>{c.title==="Peer Evaluations"?<Link to="/admin-dashboard?section=evaluations" className="rounded focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blue-600 dark:focus-visible:outline-blue-300 after:absolute after:inset-0 after:rounded-2xl">{c.title}</Link>:c.title}</h2>
             <p className="admin-metric-value">{countLabel(c.value)}</p>
             <p className="admin-metric-description">{c.description}</p>
           </section>)}
@@ -42,6 +43,7 @@ export default function AdminDashboardPage() {
         </section>
       </>}
       {section==="analytics"&&data&&<AdminAnalytics data={data}/>}
+      {section==="evaluations"&&<PeerEvaluations refreshKey={refresh}/>}
       {section==="students"&&<StudentManagement refreshKey={refresh}/>}{section==="forum"&&<ForumModeration refreshKey={refresh}/>}{section==="leaderboard"&&<LeaderboardAudit refreshKey={refresh}/>}
     </>}
   </AdminShell>;

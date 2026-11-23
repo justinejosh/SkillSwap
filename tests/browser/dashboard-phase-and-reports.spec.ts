@@ -41,3 +41,20 @@ test("report form explains unavailable private image storage and still submits t
   await page.getByLabel("Description",{exact:true}).fill("Synthetic testing concern only.");await page.getByRole("button",{name:"Submit Report",exact:true}).click();await expect(page.getByRole("status").filter({hasText:"Report saved"})).toBeVisible();expect(state.posts).toEqual([{targetId:"peer",reason:"NO_SHOW",description:"Synthetic testing concern only."}]);
   for(const width of [320,390,1280]){await page.setViewportSize({width,height:900});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);}
 });
+
+for(const dark of [false,true])test(`report surface and compact back navigation match Dashboard in ${dark?"dark":"light"} mode`,async({page},info)=>{
+  const state=await fixture(page);
+  await page.addInitScript(d=>{localStorage.setItem("theme_viewer",d?"dark":"light");},dark);
+  await page.goto("/dashboard");await expect(page.getByRole("heading",{name:"Compatible Peer Matches",exact:true})).toBeVisible();
+  await page.evaluate(d=>document.documentElement.classList.toggle("dark",d),dark);
+  const expected=await page.locator(".knoxite-surface").first().evaluate(el=>({base:getComputedStyle(el).backgroundColor,image:getComputedStyle(el).backgroundImage,pattern:getComputedStyle(el,"::before").backgroundImage}));
+  await page.goto("/report?userId=peer");await expect(page.getByRole("heading",{name:"Report a concern",exact:true})).toBeVisible();
+  await page.evaluate(d=>document.documentElement.classList.toggle("dark",d),dark);
+  const surface=page.locator("main.knoxite-surface");
+  await expect.poll(()=>surface.evaluate(el=>({base:getComputedStyle(el).backgroundColor,image:getComputedStyle(el).backgroundImage,pattern:getComputedStyle(el,"::before").backgroundImage}))).toEqual(expected);
+  const back=page.getByRole("link",{name:"Back to Dashboard",exact:true});await expect(back).toHaveAttribute("href","/dashboard");await expect(back.locator("svg")).toHaveCount(1);
+  await expect(back).toHaveClass(/border/);await back.focus();await expect(back).toBeFocused();
+  for(const width of [320,375,390,430,1280]){await page.setViewportSize({width,height:844});await expect(page.getByLabel("Description",{exact:true})).toBeVisible();const bounds=await back.boundingBox();expect(bounds!.height).toBeLessThan(50);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);}
+  await page.screenshot({path:info.outputPath(`report-${dark?"dark":"light"}.png`),fullPage:true});
+  await back.focus();await page.keyboard.press("Enter");await expect(page).toHaveURL(/\/dashboard$/);expect(state.posts).toHaveLength(0);
+});

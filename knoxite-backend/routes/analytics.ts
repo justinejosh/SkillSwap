@@ -1,3 +1,4 @@
+import { overviewReviewWhere } from "../services/reviewReporting";
 import express from "express";
 import { PrismaClient } from "@prisma/client";
 import { actor, requireAdmin } from "../middleware/authMiddleware";
@@ -71,10 +72,7 @@ export function analyticsRouter(db: PrismaClient) {
         },
       }),
       db.review.count({
-        where: {
-          isValidated: true,
-          swap: { integrityVerified: true, status: "COMPLETED" },
-        },
+        where: overviewReviewWhere,
       }),
     ]);
     const metrics = [

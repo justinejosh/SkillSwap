@@ -1,6 +1,7 @@
+import { overviewReviewWhere } from "../services/reviewReporting";
 import { ReportEvidenceService } from "../services/reportEvidence";
 import express from "express";
-import { PrismaClient } from "@prisma/client";
+import { Prisma, PrismaClient } from "@prisma/client";
 import { actor, requireAdmin } from "../middleware/authMiddleware";
 import { HttpError, integer, onlyKeys, text } from "../lib/http";
 import { transaction } from "../lib/transaction";
@@ -17,6 +18,31 @@ import { INTEGRITY_REVIEW_REASON } from "../services/exchangeIntegrity";
 export function adminRouter(db: PrismaClient, evidence?: ReportEvidenceService) {
   const router = express.Router();
   router.use(requireAdmin);
+  router.get("/peer-evaluations", async (req, res) => {
+    const page = integer(Number(req.query.page ?? 1), "Page", 1, 100000);
+    const pageSize = integer(Number(req.query.pageSize ?? 20), "Page size", 1, 50);
+    const search = text(req.query.search ?? "", "Student name", 100, true);
+    const validation = req.query.validation ?? "COUNTED", sort = req.query.sort ?? "newest";
+    if (!["COUNTED", "VALIDATED", "UNVALIDATED", "ALL"].includes(String(validation)) || typeof validation !== "string") throw new HttpError(422, "Choose a supported validation view.");
+    if (!["newest", "oldest"].includes(String(sort)) || typeof sort !== "string") throw new HttpError(422, "Choose newest or oldest order.");
+    const rating = req.query.rating === undefined ? undefined : integer(Number(req.query.rating), "Rating", 1, 5);
+    const where: Prisma.ReviewWhereInput = {
+      ...(validation === "COUNTED" ? overviewReviewWhere : validation === "VALIDATED" ? { isValidated: true } : validation === "UNVALIDATED" ? { isValidated: false } : {}),
+      ...(rating === undefined ? {} : { rating }),
+      ...(search ? { OR: [{ reviewer: { name: { contains: search } } }, { reviewee: { name: { contains: search } } }] } : {}),
+    };
+    const direction = sort === "oldest" ? "asc" : "desc";
+    const [total, reviews] = await Promise.all([
+      db.review.count({ where }),
+      db.review.findMany({ where, orderBy: [{ createdAt: direction }, { id: direction }], skip: (page - 1) * pageSize, take: pageSize,
+        select: { id: true, rating: true, comment: true, createdAt: true, isValidated: true,
+          reviewer: { select: { name: true } }, reviewee: { select: { name: true } },
+          swap: { select: { id: true, status: true, integrityVerified: true, offeredSkill: { select: { name: true } }, wantedSkill: { select: { name: true } } } },
+        },
+      }),
+    ]);
+    res.json({ page, pageSize, total, validation, reviews: reviews.map(review => ({ ...review, countedInOverview: review.isValidated && review.swap.integrityVerified && review.swap.status === "COMPLETED" })) });
+  });
   router.get("/users", async (req, res) => {
     const page = integer(Number(req.query.page ?? 1), "Page", 1, 100000);
     const pageSize = integer(Number(req.query.pageSize ?? 20), "Page size", 1, 50);

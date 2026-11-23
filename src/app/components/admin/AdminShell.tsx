@@ -1,6 +1,6 @@
 import { ReactNode, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
-import { Menu, Moon, Sun, LogOut, LayoutDashboard, ChartNoAxesCombined, Users, BookOpenCheck, MessagesSquare, Flag, Trophy, ShieldCheck, GraduationCap, ChevronRight } from "lucide-react";
+import { Menu, Moon, Sun, LogOut, LayoutDashboard, ChartNoAxesCombined, Star, Users, BookOpenCheck, MessagesSquare, Flag, Trophy, ShieldCheck, GraduationCap, ChevronRight } from "lucide-react";
 import { useAccountTheme } from "@/app/lib/theme";
 import { logoutSession } from "@/app/lib/api";
 import { Button } from "@/app/components/ui/button";
@@ -8,12 +8,13 @@ import { AdminConfirm } from "./AdminUI";
 
 export const adminNavigation = [
   ["Overview", "/admin-dashboard"], ["Analytics & Trends", "/admin-dashboard?section=analytics"],
+  ["Peer Evaluations", "/admin-dashboard?section=evaluations"],
   ["Student Management", "/admin-dashboard?section=students"], ["Assessment Management", "/admin/assessments"],
   ["Forum Moderation", "/admin-dashboard?section=forum"], ["Reports", "/admin/assessments?section=reports"],
   ["Leaderboard Audit", "/admin-dashboard?section=leaderboard"], ["Integrity Review", "/admin/integrity"],
   ["Academic Configuration", "/admin/assessments?section=academic"],
 ] as const;
-const navigationIcons = [LayoutDashboard, ChartNoAxesCombined, Users, BookOpenCheck, MessagesSquare, Flag, Trophy, ShieldCheck, GraduationCap];
+const navigationIcons = [LayoutDashboard, ChartNoAxesCombined, Star, Users, BookOpenCheck, MessagesSquare, Flag, Trophy, ShieldCheck, GraduationCap];
 export function AdminShell({title,children}:{title:string;children:ReactNode}) {
   const [open,setOpen]=useState(false),[error,setError]=useState("");
   const [dark,toggle]=useAccountTheme();const location=useLocation(),navigate=useNavigate();

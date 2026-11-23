@@ -1,3 +1,4 @@
+import { ArrowLeft } from "lucide-react";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router";
 import { API_BASE_URL } from "@/config";
@@ -56,14 +57,9 @@ export default function ReportUserPage() {
     }
   }
   return (
-    <main className="min-h-screen bg-slate-50 p-5 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
+    <main className="knoxite-surface min-h-screen p-5 text-slate-900 dark:text-slate-100">
       <div className="mx-auto max-w-2xl space-y-6">
-        <Link
-          to="/dashboard"
-          className="text-blue-700 underline dark:text-blue-300"
-        >
-          Back to Dashboard
-        </Link>
+        <Button asChild variant="outline" size="sm" className="rounded-lg"><Link to="/dashboard"><ArrowLeft className="size-4" aria-hidden="true"/>Back to Dashboard</Link></Button>
         <h1 className="text-2xl font-bold">Report a concern</h1>
         {error && (
           <p role="alert" className="text-red-700 dark:text-red-300">
