@@ -474,7 +474,13 @@ test("email signup legal reader preserves data and requires independent consent"
   }
   await page.getByRole("checkbox").check();
   await page.getByRole("button", { name: "Privacy Policy", exact: true }).click();
+
+  await expect(page.getByRole("dialog")).toBeVisible();
+
   await page.keyboard.press("Escape");
+
+  await expect(page.getByRole("dialog")).toBeHidden();
+
   await expect(page.getByRole("checkbox")).toBeChecked();
   expect(f.calls.some(c => c.path.endsWith("/register"))).toBe(false);
   expect(refWarnings).toEqual([]);
