@@ -1,5 +1,6 @@
 import { ReportEvidenceConfig, reportEvidenceConfig } from "../services/reportEvidenceConfig";
 export interface AppConfig {
+  suspensionCreationEnabled?: boolean;
   reportEvidence?: ReportEvidenceConfig;
   jwtSecret: string;
   origins: string[];
@@ -21,6 +22,8 @@ export interface AppConfig {
   };
 }
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
+  if (env.SUSPENSION_CREATION_ENABLED !== undefined && !["true", "false"].includes(env.SUSPENSION_CREATION_ENABLED))
+    throw new Error("SUSPENSION_CREATION_ENABLED must be true or false.");
   if (env.KNOXITE_STAGING_STUDENT_VERIFICATION_ENABLED === "true")
     throw new Error("Temporary staging student verification is an operator-only command. Never enable its flag in an API deployment.");
   const jwtSecret = env.JWT_SECRET || "";
@@ -171,6 +174,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     throw new Error("Production registration requires an approved notice version and durable consent storage.");
   return {
     jwtSecret,
+    suspensionCreationEnabled: env.SUSPENSION_CREATION_ENABLED === "true",
     reportEvidence: reportEvidenceConfig(env),
     origins,
     institutionDomains,

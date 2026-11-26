@@ -8,7 +8,7 @@ export async function inspectFreshReleaseTarget(db: PrismaClient) {
   if (!tables.length) return "EMPTY";
   if (!tables.some(t=>t.name==="_prisma_migrations")) throw new Error("Nonempty legacy target: fresh baseline is forbidden.");
   const rows=await db.$queryRaw<Array<{migration_name:string;checksum:string;finished_at:Date|null;rolled_back_at:Date|null}>>`SELECT migration_name,checksum,finished_at,rolled_back_at FROM _prisma_migrations`;
-  const names=["20261117000000_current_release","20261121000000_flexible_session_ranges","20261122000000_actual_session_completion","20261123000000_moderation_and_report_evidence"];
+  const names=["20261117000000_current_release","20261121000000_flexible_session_ranges","20261122000000_actual_session_completion","20261123000000_moderation_and_report_evidence","20261126000000_temporary_student_suspensions"];
   const sorted=[...rows].sort((a,b)=>a.migration_name.localeCompare(b.migration_name));
   if(!sorted.length||sorted.length>names.length||sorted.some((row,i)=>{
     if(row.migration_name!==names[i]||!row.finished_at||row.rolled_back_at)return true;

@@ -11,7 +11,8 @@ import { AppConfig, studentEmailAllowed, pilotAccountAllowed } from "../lib/conf
 import { HttpError, onlyKeys, text } from "../lib/http";
 import { actor, authentication } from "../middleware/authMiddleware";
 import { VerificationMailer } from "../services/email";
-import { issueSession, assertAccountAllowed } from "../services/authSessions";
+import { verifiedIdentityLogin, assertAccountAllowed } from "../services/authSessions";
+import { reconcileStudentSuspension, reconcileSuspensionById } from "../services/studentSuspensions";
 import { loginThrottle } from "../lib/loginThrottle";
 import { lastInteraction, sessionDeadlines, SESSION_POLICY, timeoutsEnabled } from "../services/sessionPolicy";
 
@@ -197,16 +198,18 @@ export function authRouter(
     onlyKeys(req.body, ["email"]);
     const email = emailAddress(req.body.email);
     requireDelivery();
-    const user = await db.user.findUnique({
+    let user = await db.user.findUnique({
       where: { email },
       select: {
         id: true,
         email: true,
         emailVerifiedAt: true,
         isSuspended: true,
+        activeSuspensionId: true,
         role: true,
       },
     });
+    if (user?.activeSuspensionId) user = await reconcileSuspensionById(db, user.id);
     if (
       user &&
       !user.emailVerifiedAt &&
@@ -228,10 +231,11 @@ export function authRouter(
     onlyKeys(req.body, ["email"]);
     const email = emailAddress(req.body.email);
     requireDelivery();
-    const user = await db.user.findUnique({
+    let user = await db.user.findUnique({
       where: { email },
-      select: { id: true, email: true, role: true, isSuspended: true },
+      select: { id: true, email: true, role: true, isSuspended: true, activeSuspensionId: true },
     });
+    if (user?.activeSuspensionId) user = await reconcileSuspensionById(db, user.id);
     if (user && recoverable(user)) {
       const token = randomBytes(32).toString("base64url");
       const saved = await db.emailVerificationToken.create({
@@ -280,10 +284,11 @@ export function authRouter(
     await db.$transaction(async (tx) => {
       // Serialize resets for the same account, including different valid links.
       await tx.$queryRaw`SELECT id FROM User WHERE id = ${saved.userId} FOR UPDATE`;
-      const user = await tx.user.findUnique({
+      let user = await tx.user.findUnique({
         where: { id: saved.userId },
-        select: { email: true, role: true, isSuspended: true },
+        select: { id: true, email: true, role: true, isSuspended: true, activeSuspensionId: true, tokenVersion: true },
       });
+      if (user) user = await reconcileStudentSuspension(tx, user);
       if (!user || !recoverable(user)) throw invalid();
       const consumed = await tx.emailVerificationToken.updateMany({
         where: { id: saved.id, usedAt: null, expiresAt: { gt: new Date() } },
@@ -353,13 +358,14 @@ export function authRouter(
       });
       if (current.passwordHash !== user.passwordHash)
         throw new HttpError(401, "Credentials changed. Please sign in again.");
-      return issueSession(
+      return verifiedIdentityLogin(
         tx,
         config,
         current,
         req.get("User-Agent") || "Unknown device",
       );
     });
+    if ("suspension" in result) { res.status(403).json({ error: "Your account access is suspended.", details: { code: "ACCOUNT_SUSPENDED", suspension: result.suspension } }); return; }
     res.json(result);
   });
   router.get("/session-status", auth, (req, res) => {

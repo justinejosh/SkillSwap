@@ -273,7 +273,8 @@ test("exact flexible migration preserves historical agreements, schedules, ackno
     const actualField=/^\s*actualCompletedAt\s+DateTime\?\r?\n/gm;
     assert.equal([...releaseSchema.matchAll(actualField)].length,1);
     const intermediate=join(m.directory,"pre-actual-release.prisma");
-    const beforeModeration=releaseSchema.replace(/^model (AdminAudit|ReportEvidence) \{[\s\S]*?^\}/gm, "").replace(/^\s*evidence\s+ReportEvidence\?\r?\n/gm, "");
+    const beforeSuspensions=releaseSchema.replace(/^(?:model|enum) (StudentSuspension|SuspensionAudit|SuspensionReason|SuspensionStatus|SuspensionAuditAction) \{[\s\S]*?^\}/gm, "").replace(/^\s*(activeSuspensionId|activeSuspension|suspensionHistory|suspensionsIssued|suspensionAuditActions)\s.*\r?$/gm, "");
+    const beforeModeration=beforeSuspensions.replace(/^model (AdminAudit|ReportEvidence) \{[\s\S]*?^\}/gm, "").replace(/^\s*evidence\s+ReportEvidence\?\r?\n/gm, "");
     writeFileSync(intermediate,beforeModeration.replace(actualField,""));
     assert.equal(infrastructure.schemaDiff(target,intermediate),0);
     await old.$disconnect();
@@ -292,9 +293,10 @@ test("exact flexible migration preserves historical agreements, schedules, ackno
     assert.equal(infrastructure.schemaDiff(target,preModeration),0);
     await old.$disconnect();
     infrastructure.cli(target,["db","execute","--file","prisma/release/migrations/20261123000000_moderation_and_report_evidence/migration.sql","--schema","prisma/release/schema.prisma"]);
+    infrastructure.cli(target,["db","execute","--file","prisma/release/migrations/20261126000000_temporary_student_suspensions/migration.sql","--schema","prisma/release/schema.prisma"]);
     assert.equal(infrastructure.schemaDiff(target,"prisma/release/schema.prisma"),0);
     assert.equal(await old.adminAudit.count(),0);assert.equal(await old.reportEvidence.count(),0);
-    const preserved=await snapshot();preserved.SessionConfirmation=preserved.SessionConfirmation.map(({actualCompletedAt,...row}:any)=>row);preserved.SwapSession=preserved.SwapSession.map(({endsAt,...row}:any)=>row);assert.deepEqual(preserved,before);
+    const preserved=await snapshot();preserved.User=preserved.User.map(({activeSuspensionId,...row}:any)=>row);preserved.SessionConfirmation=preserved.SessionConfirmation.map(({actualCompletedAt,...row}:any)=>row);preserved.SwapSession=preserved.SwapSession.map(({endsAt,...row}:any)=>row);assert.deepEqual(preserved,before);
     const active=await old.swap.findUniqueOrThrow({where:{id:"historical-active"}});
     const schedule=await old.swapSession.findUniqueOrThrow({where:{id:"historical-session-a"}});
     const next={...schedule,sessionNumber:2}; // Pure timing check; no historical row is edited.

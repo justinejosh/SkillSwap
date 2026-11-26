@@ -4,6 +4,7 @@ import jwt, { JwtPayload } from "jsonwebtoken";
 import { AppConfig, studentEmailAllowed, pilotSessionAccountAllowed } from "../lib/config";
 import { HttpError } from "../lib/http";
 import { lastInteraction, sessionDeadlines, timeoutsEnabled, SESSION_POLICY } from "../services/sessionPolicy";
+import { reconcileSuspensionById } from "../services/studentSuspensions";
 
 declare global {
   namespace Express {
@@ -68,12 +69,17 @@ export function authentication(
             email: true,
             role: true,
             isSuspended: true,
+            activeSuspensionId: true,
             tokenVersion: true,
             emailVerifiedAt: true,
           },
         },
       },
     });
+    if (session?.user.activeSuspensionId) {
+      await reconcileSuspensionById(db, session.user.id);
+      throw new HttpError(401, "Sign in again to check your account access.");
+    }
     if (!session || session.user.tokenVersion !== claims.tokenVersion)
       throw new HttpError(401, "Session has been revoked.");
     if (timeoutsEnabled(config) && claims.sessionPolicy === SESSION_POLICY && claims.sessionRole !== session.user.role) {

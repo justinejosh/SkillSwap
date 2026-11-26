@@ -14,6 +14,7 @@ async function fixture() {
   const state:any={role:"USER",skillCalls:0,userSelect:null,userWhere:null,writes:0,skills:presetSkills.map((p,i)=>({id:`skill-${i}`,name:p.name,category:p.category,_count:{offeringLinks:i===0?0:2,wantedBy:i===0?3:0}})),outcomes:[outcome("COMPLETED",now),outcome("CANCELLED",now),outcome("COMPLETED",now,false),outcome("CANCELLED",prior)]};
   const db:any={
     authSession:{findFirst:async()=>({id:"s",user:{id:"a",email:"syntheticlag@fixture.test",role:state.role,isSuspended:false,emailVerifiedAt:now,tokenVersion:0}})},
+    studentSuspension:{findMany:async()=>[]},
     user:{count:async()=>3,findMany:async(args:any)=>{state.userSelect=args.select;state.userWhere=args.where;return args.select.createdAt&&Object.keys(args.select).length===2?[{id:"a",createdAt:now},{id:"b",createdAt:now}]:[{id:"a",name:"Synthetic",email:"syntheticlag@fixture.test",role:"USER",isSuspended:false,createdAt:now}];}},
     swap:{findMany:async()=>state.outcomes},skill:{findMany:async()=>{state.skillCalls++;return state.skills;}},review:{count:async()=>2},
     assessmentBank:{findMany:async()=>[{id:"bank",skill:{name:"Synthetic skill"},versions:[{id:"v",items:[{options:[{text:"Private answer",isCorrect:true}]}]}]}]},

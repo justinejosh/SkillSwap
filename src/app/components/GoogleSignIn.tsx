@@ -1,3 +1,5 @@
+import { suspensionNotice, type SuspensionNotice } from "@/app/lib/suspensionNotice";
+import { ApiError } from "@/app/lib/api";
 import LegalNoticeDialog, { type LegalDocument } from "@/app/components/LegalNoticeDialog";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { useNavigate } from "react-router";
@@ -78,11 +80,13 @@ async function proofHash(secret: string) {
 export default function GoogleSignIn({
   linking = false,
   onLinked,
+  onSuspended,
   onOnboardingChange,
   signup = false,
 }: {
   linking?: boolean;
   onLinked?: () => void;
+  onSuspended?: (notice: SuspensionNotice) => void;
   onOnboardingChange?: (active: boolean) => void;
   signup?: boolean;
 }) {
@@ -228,7 +232,8 @@ export default function GoogleSignIn({
             })
             .catch((e) => {
               if (generation === current.current) {
-                setError(e.message);
+                const notice = e instanceof ApiError && e.status === 403 ? suspensionNotice(e.details) : null;
+                if (notice && onSuspended) onSuspended(notice); else setError(e.message);
                 setReady(false);
               }
             })

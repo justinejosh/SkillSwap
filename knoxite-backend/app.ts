@@ -162,7 +162,7 @@ export function createApp(
   app.use("/api/swap-requests", swaps.requests);
   app.use("/api/reputation", swaps.reputation);
   app.use("/api/assessments", assessmentsRouter(db));
-  app.use("/api/admin", adminRouter(db, evidence));
+  app.use("/api/admin", adminRouter(db, evidence, config));
   app.use("/api/chat", chatRouter(db));
   app.use("/api/analytics", analyticsRouter(db));
   app.use("/api/forum", forumRouter(db));

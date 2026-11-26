@@ -15,6 +15,7 @@ test("isolated MySQL API, assessment and exchange regression suite", async (t) =
   assert.match(new URL(databaseUrl).pathname, /_test$/);
   const db = new PrismaClient({ datasources: { db: { url: databaseUrl } } });
   const config = loadConfig({
+    SUSPENSION_CREATION_ENABLED: "true",
     JWT_SECRET: "synthetic-test-secret-".repeat(3),
     INSTITUTION_EMAIL_DOMAINS: "fixture.example",
     CAMPUS_EMAIL_SUFFIX: "lag",
@@ -1114,10 +1115,11 @@ test("isolated MySQL API, assessment and exchange regression suite", async (t) =
           ).status,
           200,
         );
-        assert.equal(
-          (await call("DELETE", `/admin/users/${c.id}`, tad)).status,
-          200,
-        );
+        assert.equal((await call("DELETE", `/admin/users/${c.id}`, tad)).status, 422);
+        const suspensionInput = { reason: "SPAM_MISUSE", durationDays: 1, studentExplanation: "Synthetic administrator-reviewed restriction." };
+        const preview = await call("POST", `/admin/users/${c.id}/suspensions/preview`, tad, suspensionInput);
+        assert.equal(preview.status, 200);
+        assert.equal((await call("POST", `/admin/users/${c.id}/suspensions`, tad, { ...suspensionInput, confirmationToken: preview.data.confirmationToken })).status, 201);
         assert.ok(await db.user.findUnique({ where: { id: c.id } }));
         assert.equal((await call("GET", "/profile", tc)).status, 401);
         assert.equal(

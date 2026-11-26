@@ -1,3 +1,5 @@
+import { AccountSuspensionNotice } from "@/app/components/AccountSuspensionNotice";
+import { suspensionNotice, type SuspensionNotice } from "@/app/lib/suspensionNotice";
 import { saveSession } from "@/app/lib/session";
 import { api } from "@/app/lib/api";
 import GoogleSignIn from "@/app/components/GoogleSignIn";
@@ -17,6 +19,7 @@ import { API_BASE_URL } from "@/config";
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const [suspension, setSuspension] = useState<SuspensionNotice | null>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -81,6 +84,8 @@ export default function LoginPage() {
       const data = await response.json();
 
       if (!response.ok) {
+        const notice = response.status === 403 ? suspensionNotice(data.details) : null;
+        if (notice) { setPassword(""); setSuspension(notice); return; }
         if (response.status === 429) {
           const seconds = Number(data.details?.retryAfterSeconds ?? response.headers.get("Retry-After"));
           if (Number.isFinite(seconds) && seconds > 0) {
@@ -102,6 +107,7 @@ export default function LoginPage() {
     }
   };
 
+  if (suspension) return <AccountSuspensionNotice notice={suspension} onBack={()=>{setSuspension(null);setError("");}}/>;
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-blue-50 via-white to-blue-100 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900 p-4">
       <div className="w-full max-w-md">
@@ -115,7 +121,7 @@ export default function LoginPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <GoogleSignIn onOnboardingChange={setGoogleOnboarding} />
+            <GoogleSignIn onSuspended={notice=>{setPassword("");setSuspension(notice);}} onOnboardingChange={setGoogleOnboarding} />
             {!googleOnboarding && (
               <form
                 ref={signInForm}

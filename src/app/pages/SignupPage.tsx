@@ -1,3 +1,5 @@
+import { AccountSuspensionNotice } from "@/app/components/AccountSuspensionNotice";
+import { type SuspensionNotice } from "@/app/lib/suspensionNotice";
 import { api } from "@/app/lib/api";
 import LegalNoticeDialog, { type LegalDocument } from "@/app/components/LegalNoticeDialog";
 import GoogleSignIn from "@/app/components/GoogleSignIn";
@@ -19,6 +21,7 @@ import { Loader2, Eye, EyeOff, UserPlus } from "lucide-react";
 import { API_BASE_URL } from "@/config";
 
 export default function SignupPage() {
+  const [suspension, setSuspension] = useState<SuspensionNotice | null>(null);
   const navigate = useNavigate();
   const [programId, setProgramId] = useState("");
   const [yearLevelId, setYearLevelId] = useState("");
@@ -146,6 +149,7 @@ export default function SignupPage() {
 
   if (createdMessage) return <main className="min-h-dvh knoxite-surface flex items-center justify-center p-4 text-slate-900 dark:text-slate-100"><Card className="w-full max-w-md rounded-3xl"><CardHeader><CardTitle>Account created</CardTitle></CardHeader><CardContent className="space-y-5"><p role="status" className="text-sm leading-relaxed">{createdMessage}</p><p className="text-sm text-slate-600 dark:text-slate-300">Email ownership must be verified before you can sign in. If you need another link, request it on the sign-in page.</p><Button className="h-12 w-full rounded-xl bg-blue-600 text-white hover:bg-blue-700" onClick={()=>navigate("/login")}>Continue to Sign In</Button></CardContent></Card></main>;
 
+  if (suspension) return <AccountSuspensionNotice notice={suspension} onBack={()=>{setSuspension(null);navigate("/login");}}/>;
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-blue-100 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900 p-6 relative">
       <div className="w-full max-w-md sm:max-w-xl">
@@ -165,7 +169,7 @@ export default function SignupPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="sm:px-8 sm:pb-8">
-            <GoogleSignIn signup onOnboardingChange={setGoogleOnboarding} />
+            <GoogleSignIn onSuspended={notice=>{setPassword("");setConfirmPassword("");setSuspension(notice);}} signup onOnboardingChange={setGoogleOnboarding} />
             {!googleOnboarding && (
               <form noValidate onSubmit={handleSubmit} className="min-w-0 w-full space-y-4 rounded-2xl dark:bg-slate-950 dark:p-4">
                 {optionsLoading && (

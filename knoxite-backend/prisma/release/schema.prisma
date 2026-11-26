@@ -273,6 +273,11 @@ model User {
   location        String?
   role            Role      @default(USER)
   isSuspended     Boolean   @default(false)
+  activeSuspensionId String? @unique
+  activeSuspension StudentSuspension? @relation("CurrentStudentSuspension", fields: [activeSuspensionId], references: [id], onDelete: Restrict)
+  suspensionHistory StudentSuspension[] @relation("StudentSuspensionSubject")
+  suspensionsIssued StudentSuspension[] @relation("StudentSuspensionIssuer")
+  suspensionAuditActions SuspensionAudit[] @relation("SuspensionAuditActor")
   emailVerifiedAt DateTime?
   tokenVersion    Int       @default(0)
 
@@ -565,4 +570,63 @@ model ReportEvidence {
   createdAt   DateTime    @default(now())
 
   @@index([state, createdAt])
+}
+
+// Temporary restrictions are separate from legacy User.isSuspended flags.
+enum SuspensionReason {
+  HARASSMENT
+  REPEATED_VIOLATIONS
+  FRAUDULENT_EXCHANGE
+  SPAM_MISUSE
+  ELIGIBILITY_VIOLATION
+  OTHER
+}
+
+enum SuspensionStatus {
+  ACTIVE
+  EXPIRED
+}
+
+enum SuspensionAuditAction {
+  SUSPENDED
+  EXPIRED
+  EXPIRED_RESTRICTION_RETAINED
+}
+
+model StudentSuspension {
+  id                   String @id @default(uuid())
+  userId               String
+  administratorId      String
+  reason               SuspensionReason
+  reasonExplanation    String? @db.VarChar(500)
+  studentExplanation   String @db.VarChar(2000)
+  privateNotes         String? @db.VarChar(2000)
+  durationDays         Int
+  startsAt             DateTime
+  expiresAt            DateTime
+  status               SuspensionStatus @default(ACTIVE)
+  enforcedTokenVersion Int
+  expiredAt            DateTime?
+  reactivatedAt        DateTime?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  user                 User @relation("StudentSuspensionSubject", fields: [userId], references: [id], onDelete: Restrict)
+  administrator        User @relation("StudentSuspensionIssuer", fields: [administratorId], references: [id], onDelete: Restrict)
+  activeFor            User? @relation("CurrentStudentSuspension")
+  events               SuspensionAudit[]
+
+  @@index([userId, createdAt, id])
+  @@index([status, expiresAt])
+}
+
+model SuspensionAudit {
+  id                   String @id @default(uuid())
+  suspensionId         String
+  action               SuspensionAuditAction
+  actorAdministratorId String?
+  createdAt            DateTime @default(now())
+  suspension           StudentSuspension @relation(fields: [suspensionId], references: [id], onDelete: Restrict)
+  actorAdministrator   User? @relation("SuspensionAuditActor", fields: [actorAdministratorId], references: [id], onDelete: Restrict)
+
+  @@unique([suspensionId, action])
 }

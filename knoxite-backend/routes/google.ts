@@ -14,7 +14,7 @@ import {
   eligibleGoogleIdentity,
   GoogleVerifier,
 } from "../services/googleIdentity";
-import { issueSession } from "../services/authSessions";
+import { issueSession, verifiedIdentityLogin } from "../services/authSessions";
 import { validateAcademicSelection } from "../services/academics";
 import { throttle } from "./auth";
 
@@ -230,7 +230,7 @@ export function googleRouter(
             403,
             "The linked institutional identity changed. Contact the administrator.",
           );
-        const session = await issueSession(
+        const session = await verifiedIdentityLogin(
           tx,
           config,
           user,
@@ -274,6 +274,7 @@ export function googleRouter(
         name: identity.name,
       };
     });
+    if ("suspension" in result) { res.status(403).json({ error: "Your account access is suspended.", details: { code: "ACCOUNT_SUSPENDED", suspension: result.suspension } }); return; }
     res.json(result);
   });
   router.post("/google/onboard", async (req, res) => {

@@ -3,8 +3,9 @@ import jwt from "jsonwebtoken";
 import { AppConfig, studentEmailAllowed, pilotSessionAccountAllowed } from "../lib/config";
 import { HttpError } from "../lib/http";
 import { SESSION_POLICY, sessionLimits, timeoutsEnabled } from "./sessionPolicy";
+import { reconcileStudentSuspension, studentSuspensionNotice } from "./studentSuspensions";
 
-export function assertAccountAllowed(
+export function assertIdentityAllowed(
   user: Pick<User, "role" | "email" | "isSuspended" | "emailVerifiedAt"> & { id?: string },
   config: AppConfig,
 ) {
@@ -15,7 +16,10 @@ export function assertAccountAllowed(
       403,
       "This student account does not meet the configured Santa Rosa institutional email rule.",
     );
-  if (user.isSuspended) throw new HttpError(403, "This account is suspended.");
+}
+export function assertAccountAllowed(user: Pick<User, "role" | "email" | "isSuspended" | "emailVerifiedAt"> & { id?: string; activeSuspensionId?: string | null }, config: AppConfig) {
+  assertIdentityAllowed(user, config);
+  if (user.isSuspended || user.activeSuspensionId) throw new HttpError(403, "This account is suspended.");
   if (config.verificationRequired && !user.emailVerifiedAt)
     throw new HttpError(
       403,
@@ -30,6 +34,7 @@ export async function issueSession(
   user: User,
   userAgent: string,
 ) {
+  user = await reconcileStudentSuspension(tx, user);
   assertAccountAllowed(user, config);
   const policy = timeoutsEnabled(config);
   // JWT NumericDate uses whole seconds. Persist the identical origin/deadline.
@@ -67,4 +72,13 @@ export async function issueSession(
       avatarUrl: user.avatarUrl,
     },
   };
+}
+
+// Only use after password verification or signed, linked Google identity proof.
+// Returning a notice instead of throwing lets authoritative expiration commit.
+export async function verifiedIdentityLogin(tx: Prisma.TransactionClient, config: AppConfig, user: User, userAgent: string) {
+  user = await reconcileStudentSuspension(tx, user);
+  assertIdentityAllowed(user, config);
+  if (user.isSuspended || user.activeSuspensionId) return { suspension: await studentSuspensionNotice(tx, user) };
+  return issueSession(tx, config, user, userAgent);
 }

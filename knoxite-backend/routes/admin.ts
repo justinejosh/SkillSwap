@@ -1,4 +1,6 @@
+import { AppConfig } from "../lib/config";
 import { overviewReviewWhere } from "../services/reviewReporting";
+import { previewStudentSuspension, suspendStudent, reconcileDueSuspensions, reconcileSuspensionById } from "../services/studentSuspensions";
 import { ReportEvidenceService } from "../services/reportEvidence";
 import express from "express";
 import { Prisma, PrismaClient } from "@prisma/client";
@@ -15,7 +17,7 @@ import {
 } from "../services/departmentDraft";
 import { integrityRouter } from "./integrity";
 import { INTEGRITY_REVIEW_REASON } from "../services/exchangeIntegrity";
-export function adminRouter(db: PrismaClient, evidence?: ReportEvidenceService) {
+export function adminRouter(db: PrismaClient, evidence?: ReportEvidenceService, config?: AppConfig) {
   const router = express.Router();
   router.use(requireAdmin);
   router.get("/peer-evaluations", async (req, res) => {
@@ -44,6 +46,7 @@ export function adminRouter(db: PrismaClient, evidence?: ReportEvidenceService) 
     res.json({ page, pageSize, total, validation, reviews: reviews.map(review => ({ ...review, countedInOverview: review.isValidated && review.swap.integrityVerified && review.swap.status === "COMPLETED" })) });
   });
   router.get("/users", async (req, res) => {
+    await reconcileDueSuspensions(db);
     const page = integer(Number(req.query.page ?? 1), "Page", 1, 100000);
     const pageSize = integer(Number(req.query.pageSize ?? 20), "Page size", 1, 50);
     const search = text(req.query.search ?? "", "Search", 100, true);
@@ -53,8 +56,27 @@ export function adminRouter(db: PrismaClient, evidence?: ReportEvidenceService) 
     const where = { ...(search ? { OR: [{ name: { contains: search } }, { email: { contains: search } }] } : {}),
       ...(role ? { role: role as "USER" | "ADMIN" } : {}), ...(status ? { isSuspended: status === "SUSPENDED" } : {}) };
     const [total, users] = await Promise.all([db.user.count({ where }), db.user.findMany({ where, skip: (page - 1) * pageSize, take: pageSize,
-      orderBy: [{ createdAt: "desc" }, { id: "asc" }], select: { id: true, name: true, email: true, role: true, isSuspended: true, createdAt: true } })]);
-    res.json({ users, total, page, pageSize });
+      orderBy: [{ createdAt: "desc" }, { id: "asc" }], select: { id: true, name: true, email: true, role: true, isSuspended: true, createdAt: true, activeSuspensionId: true, activeSuspension: { select: { expiresAt: true } } } })]);
+    res.json({ users, total, page, pageSize, suspensionCreationEnabled: config?.suspensionCreationEnabled === true });
+  });
+  const suspensionConfig = () => { if (!config) throw new HttpError(503, "Suspension configuration is unavailable."); return config; };
+  const authority = (req: express.Request) => ({ id: actor(req), tokenVersion: req.sessionTokenVersion!, sessionId: req.sessionId! });
+  router.post("/users/:id/suspensions/preview", async (req, res) => { res.json(await previewStudentSuspension(db, suspensionConfig(), authority(req), String(req.params.id), req.body)); });
+  const suspend: express.RequestHandler = async (req, res) => { res.status(201).json(await suspendStudent(db, suspensionConfig(), authority(req), String(req.params.id), req.body)); };
+  router.post("/users/:id/suspensions", suspend);
+  // Preserve the old route's authorization, but never its reason-free bypass.
+  router.delete("/users/:id", suspend);
+  router.get("/users/:id/suspensions", async (req, res) => {
+    const user = await reconcileSuspensionById(db, String(req.params.id));
+    if (!user) throw new HttpError(404, "Account not found.");
+    if (user.role !== "USER") throw new HttpError(422, "Suspension history is for student accounts.");
+    const page = integer(Number(req.query.page ?? 1), "Page", 1, 100000), pageSize = 10;
+    const where = { userId: user.id };
+    const [total, suspensions] = await Promise.all([db.studentSuspension.count({ where }), db.studentSuspension.findMany({ where, take: pageSize, skip: (page - 1) * pageSize, orderBy: [{ createdAt: "desc" }, { id: "desc" }], select: {
+      id: true, reason: true, reasonExplanation: true, studentExplanation: true, privateNotes: true, durationDays: true, startsAt: true, expiresAt: true, status: true, expiredAt: true, reactivatedAt: true, createdAt: true,
+      administrator: { select: { name: true } }, events: { orderBy: { createdAt: "asc" }, select: { action: true, createdAt: true, actorAdministrator: { select: { name: true } } } },
+    } })]);
+    res.json({ student: { name: user.name, isSuspended: user.isSuspended, legacyRestriction: user.isSuspended && !user.activeSuspensionId }, page, pageSize, total, suspensions });
   });
   router.post("/skill-catalog/initialize", async (req, res) => {
     onlyKeys(req.body, []);
@@ -210,6 +232,7 @@ export function adminRouter(db: PrismaClient, evidence?: ReportEvidenceService) 
     });
   });
   router.get("/dashboard-data", async (_req, res) => {
+    await reconcileDueSuspensions(db);
     const [
       totalUsers,
       activeSwaps,
@@ -241,32 +264,6 @@ export function adminRouter(db: PrismaClient, evidence?: ReportEvidenceService) 
     res.json({
       stats: { totalUsers, activeSwaps, completedSwaps, reportedIssues },
       recentUsers,
-    });
-  });
-  router.delete("/users/:id", async (req, res) => {
-    const id = String(req.params.id);
-    const user = await db.user.findUnique({
-      where: { id },
-      select: { role: true },
-    });
-    if (!user) throw new HttpError(404, "User not found.");
-    if (user.role === "ADMIN")
-      throw new HttpError(
-        403,
-        "Administrator accounts cannot be suspended here.",
-      );
-    await db.$transaction(async (tx) => {
-      await tx.user.update({
-        where: { id },
-        data: { isSuspended: true, tokenVersion: { increment: 1 } },
-      });
-      await tx.authSession.updateMany({
-        where: { userId: id, revokedAt: null },
-        data: { revokedAt: new Date() },
-      });
-    });
-    res.json({
-      message: "Account suspended. All historical records are retained.",
     });
   });
   router.post("/academic-options", async (req, res) => {
