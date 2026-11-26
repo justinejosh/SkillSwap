@@ -1,15 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { spawnSync } from "node:child_process";
-import { resolve } from "node:path";
 import { PrismaClient } from "@prisma/client";
 import { requireOwnedFixtureDatabase } from "./fixtureDatabase";
-import { legacyCliFixture } from "./legacyCliFixture";
+import { legacyCliFixture, legacyUpgradeTimeoutMs } from "./legacyCliFixture";
 test("migration rehearsal preserves historical data and blocks unsafe legacy rows", async (t) => {
   const rootUrl = requireOwnedFixtureDatabase(true);
   const historical = legacyCliFixture();
-  const backendRoot = historical.root;
   assert.match(new URL(rootUrl).pathname, /_test$/);
   const root = new PrismaClient({ datasources: { db: { url: rootUrl } } });
   const created: string[] = [];
@@ -22,14 +19,13 @@ test("migration rehearsal preserves historical data and blocks unsafe legacy row
     url.pathname = `/${name}`;
     const env = {
       ...process.env,
-    LOCALAPPDATA: historical.localAppData,
+      LOCALAPPDATA: historical.localAppData,
       DATABASE_URL: url.toString(),
       KNOXITE_LOCAL_DATABASE_ACK: "local-synthetic-or-sanitized",
     };
-    const initial = spawnSync(
-      process.execPath,
+    const initial = historical.run(
+      "prisma",
       [
-        require.resolve("prisma/build/index.js"),
         "db",
         "execute",
         "--file",
@@ -37,9 +33,11 @@ test("migration rehearsal preserves historical data and blocks unsafe legacy row
         "--schema",
         "prisma/schema.prisma",
       ],
-      { cwd: backendRoot, env, encoding: "utf8" },
+      env,
     );
-    assert.equal(initial.status, 0, initial.stderr);
+    assert.equal(initial.errorCode, null, initial.diagnostic);
+    assert.equal(initial.signal, null, initial.diagnostic);
+    assert.equal(initial.status, 0, initial.diagnostic);
     const db = new PrismaClient({
       datasources: { db: { url: url.toString() } },
     });
@@ -63,12 +61,11 @@ test("migration rehearsal preserves historical data and blocks unsafe legacy row
         try {
           const before =
             await db.$queryRaw`SELECT id,name,email,passwordHash FROM User ORDER BY id`;
-          const upgrade = spawnSync(
-            process.execPath,
-            [resolve(backendRoot, "dist/scripts/migrate-local.js"), "upgrade"],
-            { cwd: backendRoot, env, encoding: "utf8", timeout: 60000 },
-          );
-          assert.equal(upgrade.status, 0, upgrade.stderr + upgrade.stdout);
+          const upgrade = historical.run("migrate-local", ["upgrade"], env, legacyUpgradeTimeoutMs);
+          console.log("Historical upgrade subprocess:", upgrade.diagnostic);
+          assert.equal(upgrade.errorCode, null, upgrade.diagnostic);
+          assert.equal(upgrade.signal, null, upgrade.diagnostic);
+          assert.equal(upgrade.status, 0, upgrade.diagnostic);
           assert.deepEqual(
             await db.$queryRaw`SELECT id,name,email,passwordHash FROM User ORDER BY id`,
             before,
@@ -114,12 +111,10 @@ test("migration rehearsal preserves historical data and blocks unsafe legacy row
             where: { id: first.id },
             data: { tier: "AMATEUR" },
           });
-          const backfill = spawnSync(
-            process.execPath,
-            [resolve(backendRoot, "dist/scripts/backfill.js")],
-            { cwd: backendRoot, env, encoding: "utf8" },
-          );
-          assert.equal(backfill.status, 0, backfill.stderr);
+          const backfill = historical.run("backfill", [], env);
+          assert.equal(backfill.errorCode, null, backfill.diagnostic);
+          assert.equal(backfill.signal, null, backfill.diagnostic);
+          assert.equal(backfill.status, 0, backfill.diagnostic);
           assert.equal(
             (
               await db.userOfferedSkill.findUniqueOrThrow({
@@ -149,12 +144,10 @@ test("migration rehearsal preserves historical data and blocks unsafe legacy row
       async () => {
         const { db, env } = await fixture(true);
         try {
-          const upgrade = spawnSync(
-            process.execPath,
-            [resolve(backendRoot, "dist/scripts/migrate-local.js"), "upgrade"],
-            { cwd: backendRoot, env, encoding: "utf8", timeout: 60000 },
-          );
-          assert.notEqual(upgrade.status, 0);
+          const upgrade = historical.run("migrate-local", ["upgrade"], env);
+          assert.equal(upgrade.errorCode, null, upgrade.diagnostic);
+          assert.equal(upgrade.signal, null, upgrade.diagnostic);
+          assert.equal(upgrade.status, 1, upgrade.diagnostic);
           assert.match(upgrade.stderr, /Duplicate reviews found/);
           const newTables = await db.$queryRaw<
             Array<{ count: bigint }>

@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 import bcrypt from "bcrypt";
-import { PrismaClient } from "@prisma/client";
+import { Prisma, PrismaClient } from "@prisma/client";
 import { requireOwnedFixtureDatabase } from "./fixtureDatabase";
 import { legacyCliFixture } from "./legacyCliFixture";
 import {
@@ -14,6 +14,15 @@ import {
 import { once } from "node:events";
 import { createApp } from "../../app";
 import { loadConfig } from "../../lib/config";
+
+// This fixture intentionally never receives today's release columns. Select
+// only the complete historical User scalars, including in post-upgrade reads.
+const historicalUserSelect = {
+  id: true, name: true, email: true, passwordHash: true, bio: true,
+  gender: true, avatarUrl: true, location: true, role: true,
+  isSuspended: true, emailVerifiedAt: true, tokenVersion: true,
+  programId: true, yearLevelId: true, createdAt: true,
+} satisfies Prisma.UserSelect;
 
 test("Google migration preserves all populated legacy rows and enforces case-sensitive identities", async () => {
   const rootUrl = requireOwnedFixtureDatabase(true);
@@ -33,6 +42,20 @@ test("Google migration preserves all populated legacy rows and enforces case-sen
     KNOXITE_LOCAL_DATABASE_ACK: "local-synthetic-or-sanitized",
   };
   const db = new PrismaClient({ datasources: { db: { url: url.toString() } } });
+  async function assertHistoricalReleaseBoundaries() {
+    const columns = await db.$queryRaw<Array<{ count: bigint }>>`
+      SELECT COUNT(*) AS count FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA=DATABASE() AND (
+        (TABLE_NAME='User' AND COLUMN_NAME='activeSuspensionId') OR
+        (TABLE_NAME='AuthSession' AND COLUMN_NAME='lastInteractiveAt') OR
+        (TABLE_NAME='SwapSession' AND COLUMN_NAME='endsAt') OR
+        (TABLE_NAME='SessionConfirmation' AND COLUMN_NAME='actualCompletedAt'))`;
+    assert.equal(Number(columns[0].count), 0, "Later release fields must not leak into the historical fixture");
+    const duration = await db.$queryRaw<Array<{ IS_NULLABLE: string; COLUMN_DEFAULT: string | null }>>`
+      SELECT IS_NULLABLE,COLUMN_DEFAULT FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='Swap' AND COLUMN_NAME='duration'`;
+    assert.deepEqual(duration, [{ IS_NULLABLE: "NO", COLUMN_DEFAULT: "1" }]);
+  }
   try {
     const baseline = spawnSync(
       process.execPath,
@@ -48,6 +71,7 @@ test("Google migration preserves all populated legacy rows and enforces case-sen
       { cwd: backendRoot, env, encoding: "utf8", timeout: 60000 },
     );
     assert.equal(baseline.status, 0, baseline.stderr);
+    await assertHistoricalReleaseBoundaries();
     const hash = await bcrypt.hash("synthetic-preserved-password", 4);
     const a = await db.user.create({
       data: {
@@ -57,6 +81,7 @@ test("Google migration preserves all populated legacy rows and enforces case-sen
         passwordHash: hash,
         emailVerifiedAt: new Date(),
       },
+      select: historicalUserSelect,
     });
     const b = await db.user.create({
       data: {
@@ -64,6 +89,7 @@ test("Google migration preserves all populated legacy rows and enforces case-sen
         email: "synthetic-blag@fixture.example",
         passwordHash: hash,
       },
+      select: historicalUserSelect,
     });
     const one = await db.skill.create({
       data: {
@@ -102,7 +128,11 @@ test("Google migration preserves all populated legacy rows and enforces case-sen
         requestId: request.id,
         status: "COMPLETED",
         sessions: 1,
+        // The historical schema requires this value and defaults it to 1;
+        // today's nullable-duration client no longer supplies that default.
+        duration: 1,
       },
+      select: { id: true },
     });
     await db.review.createMany({
       data: [
@@ -118,37 +148,13 @@ test("Google migration preserves all populated legacy rows and enforces case-sen
         content: "Synthetic preserved conversation",
       },
     });
-    // Prove password auth remains usable against the unmigrated prior schema.
-    const config = loadConfig({
-      JWT_SECRET: "synthetic-old-schema-key-".repeat(3),
-      INSTITUTION_EMAIL_DOMAINS: "fixture.example",
+    assert.equal(await bcrypt.compare("synthetic-preserved-password", a.passwordHash!), true);
+    // Retain populated legacy session-history coverage without running today's
+    // suspension-aware middleware against an incompatible historical schema.
+    await db.authSession.create({
+      data: { userId: a.id, userAgent: "Synthetic preserved historical session", expiresAt: new Date(Date.now() + 86400_000) },
+      select: { id: true },
     });
-    const server = createApp(db, config, async () => {}).listen(0, "127.0.0.1");
-    await once(server, "listening");
-    const base = `http://127.0.0.1:${(server.address() as { port: number }).port}/api/auth`;
-    try {
-      assert.deepEqual(await (await fetch(`${base}/providers`)).json(), {
-        google: { enabled: false },
-      });
-      const login = await fetch(`${base}/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: a.email,
-          password: "synthetic-preserved-password",
-        }),
-      });
-      assert.equal(login.status, 200);
-      const token = ((await login.json()) as any).token;
-      const methods = await fetch(`${base}/methods`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      assert.equal(methods.status, 200);
-      assert.equal(((await methods.json()) as any).hasPassword, true);
-    } finally {
-      server.close();
-      await once(server, "close");
-    }
     const before = await captureLegacyData(db);
     const history = spawnSync(
       process.execPath,
@@ -187,11 +193,55 @@ test("Google migration preserves all populated legacy rows and enforces case-sen
       { cwd: backendRoot, env, encoding: "utf8", timeout: 60000 },
     );
     assert.equal(upgrade.status, 0, upgrade.stdout + upgrade.stderr);
+    await assertHistoricalReleaseBoundaries();
     assertLegacyDataPreserved(before, await captureLegacyData(db, before));
-    assert.deepEqual(
-      await db.user.findUniqueOrThrow({ where: { id: a.id } }),
-      a,
-    );
+    const preservedUser = await db.user.findUniqueOrThrow({ where: { id: a.id }, select: historicalUserSelect });
+    assert.deepEqual(preservedUser, a);
+    assert.equal(preservedUser.passwordHash, hash);
+
+    // Current auth intentionally requires the current release schema. Exercise
+    // its real login/methods endpoints with the untouched historical credentials
+    // copied into the runner's separate, fully migrated disposable database.
+    // Do not add release columns to the historical Google-upgrade target.
+    await root.user.create({ data: preservedUser, select: { id: true } });
+    const config = loadConfig({
+      JWT_SECRET: "synthetic-old-schema-key-".repeat(3),
+      INSTITUTION_EMAIL_DOMAINS: "fixture.example",
+    });
+    const server = createApp(root, config, async () => {}).listen(0, "127.0.0.1");
+    await once(server, "listening");
+    const base = `http://127.0.0.1:${(server.address() as { port: number }).port}/api/auth`;
+    try {
+      assert.deepEqual(await (await fetch(`${base}/providers`)).json(), {
+        google: { enabled: false },
+      });
+      const rejected = await fetch(`${base}/login`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: a.email, password: "wrong-synthetic-password" }),
+      });
+      assert.equal(rejected.status, 401);
+      const login = await fetch(`${base}/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: a.email,
+          password: "synthetic-preserved-password",
+        }),
+      });
+      assert.equal(login.status, 200);
+      const authenticated = (await login.json()) as any;
+      assert.equal(authenticated.user.id, a.id);
+      assert.equal(authenticated.user.email, a.email);
+      const token = authenticated.token;
+      const methods = await fetch(`${base}/methods`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      assert.equal(methods.status, 200);
+      assert.equal(((await methods.json()) as any).hasPassword, true);
+    } finally {
+      server.close();
+      await once(server, "close");
+    }
     assert.equal(
       await db.externalIdentity.count(),
       0,

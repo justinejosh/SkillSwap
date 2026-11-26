@@ -3,6 +3,31 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, 
 import { tmpdir } from "node:os";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { backendRoot } from "../../scripts/preflight";
+import { spawnSync, SpawnSyncReturns } from "node:child_process";
+
+// The complete historical upgrade runs nine sequential Prisma CLI processes,
+// including all four history resolutions and the final schema diff. Measured
+// Windows startup costs exhausted the former 60s whole-workflow budget.
+export const legacyUpgradeTimeoutMs = 120_000;
+type CliResult = Pick<SpawnSyncReturns<string>, "status" | "signal" | "error" | "stdout" | "stderr">;
+export function legacyCliResult(result: CliResult, env: NodeJS.ProcessEnv, elapsedMs: number) {
+  const secrets = Object.entries(env).filter(([key, value]) => value && /PASSWORD|PASSWD|(?:^|_)PWD(?:_|$)|SECRET|TOKEN|(?:API|ACCESS)_KEY|DATABASE_URL/i.test(key)).map(([, value]) => value!);
+  try {
+    const url = new URL(env.DATABASE_URL || "");
+    secrets.push(url.password, decodeURIComponent(url.password));
+  } catch { /* Missing/malformed URLs must not break failure diagnostics. */ }
+  function clean(value: string | null) {
+    let output = value || "";
+    for (const secret of secrets.filter(Boolean).sort((a,b)=>b.length-a.length)) output = output.split(secret).join("[REDACTED]");
+    return output.replace(/mysql:\/\/[^\s"'<>]+/gi, "[REDACTED_DATABASE_URL]")
+      .replace(/\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g, "[REDACTED_TOKEN]")
+      .replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, "").slice(-4000);
+  }
+  const errorCode = result.error ? (result.error as NodeJS.ErrnoException).code || "UNKNOWN" : null;
+  const summary = { status: result.status, signal: result.signal, errorCode, elapsedMs };
+  const stdout = clean(result.stdout), stderr = clean(result.stderr);
+  return { ...summary, stdout, stderr, diagnostic: `${JSON.stringify(summary)}\n${stderr}\n${stdout}` };
+}
 
 // Historical CLI regressions need their historical target, not today's release
 // contract. Copy only compiled dependencies/public schema assets; never dotenv,
@@ -52,8 +77,25 @@ export function legacyCliFixture() {
   writeFileSync(join(root, "prisma/schema.prisma"), schema);
   const localAppData = join(root, "operator");
   mkdirSync(localAppData);
+  // Observe only this test CLI's nested calls, without changing arguments,
+  // results, migration checks or deadlines. Log fixed operation labels only.
+  const trace = join(root, "dist/scripts/trace-prisma.cjs");
+  writeFileSync(trace, `const cp=require('node:child_process'),path=require('node:path'),original=cp.spawnSync;
+cp.spawnSync=function(file,args,options){
+ const command=args.slice(1,3).join(' '),detail=['--file','--to-schema-datamodel','--applied'].map(flag=>{const i=args.indexOf(flag);return i<0?'':flag+'='+path.basename(args[i+1]);}).filter(Boolean).join(' '),start=Date.now();
+ console.error(JSON.stringify({event:'prisma-start',command,detail}));
+ const result=original(file,args,options);
+ console.error(JSON.stringify({event:'prisma-finish',command,detail,elapsedMs:Date.now()-start,status:result.status,signal:result.signal,code:result.error?.code||null}));return result;
+};`);
   return {
     root, localAppData,
+    run(entry: "prisma" | "migrate-local" | "backfill", args: string[], env: NodeJS.ProcessEnv, timeout = 60_000) {
+      assert.ok(Number.isInteger(timeout) && timeout > 0 && timeout <= legacyUpgradeTimeoutMs, "Historical CLI deadline must be finite and at most 120 seconds");
+      const command = entry === "prisma" ? [require.resolve("prisma/build/index.js")] : ["--require", trace, join(root, "dist/scripts", entry + ".js")];
+      const start = Date.now();
+      const result = spawnSync(process.execPath, [...command, ...args], { cwd: root, env, encoding: "utf8", timeout, maxBuffer: 1_000_000, windowsHide: true });
+      return legacyCliResult(result, env, Date.now() - start);
+    },
     dispose() {
       assert.equal(dirname(root), resolve(tmpdir()));
       assert.match(basename(root), /^knoxite-legacy-cli-[\w-]+$/);
