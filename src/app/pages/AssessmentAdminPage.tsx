@@ -302,7 +302,7 @@ export default function AssessmentAdminPage() {
                 <td><strong>{p.label}</strong></td>
                 <td>{p.department?.name||"Not assigned"}</td>
                 <td>{descendingAcademicYears(p.yearLevels).map((y:any)=>y.name).join(", ")||"Not configured"}</td>
-                <td><AdminStatus status={p.mappingValidatedAt?"Validation recorded":p.department?"Provisional":"Not recorded"}/>{!p.mappingValidatedAt&&<p className="admin-record-caption">Excluded from WRMR</p>}</td>
+                <td><AdminStatus plain indicator={p.mappingValidatedAt?"check":"dot"} status={p.mappingValidatedAt?"Validation recorded":p.department?"Provisional":"Not recorded"}/>{!p.mappingValidatedAt&&<p className="admin-record-caption">Excluded from WRMR</p>}</td>
                 <td><Button type="button" variant="outline" size="sm" aria-label={`Stored mapping evidence for ${p.label}`} aria-expanded={selectedProgramId===p.id} onClick={()=>setSelectedProgramId(selectedProgramId===p.id?null:p.id)}>View details</Button></td>
               </tr>)}</tbody>
             </table>

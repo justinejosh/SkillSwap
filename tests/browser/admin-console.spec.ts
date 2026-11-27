@@ -226,7 +226,7 @@ test("account management distinguishes admins, limits result pages and confirms 
   const state=await fixture(page);await page.goto("/admin-dashboard?section=students");await expect(page.getByRole("table").locator("tbody tr")).toHaveCount(20);const admin=page.getByRole("row").filter({hasText:"Synthetic Account 0"});await expect(admin.getByRole("button",{name:"Suspend account",exact:true})).toBeDisabled();await page.getByRole("button",{name:"Next",exact:true}).click();await expect(page.getByRole("table").locator("tbody tr")).toHaveCount(5);await page.getByLabel("Search accounts",{exact:true}).fill("Synthetic Account 1");await expect(page.getByText("Page 1 of 1",{exact:false})).toBeVisible();await page.getByRole("row").filter({hasText:"Synthetic Account 1"}).first().getByRole("button",{name:"Suspend account",exact:true}).click();await expect(page.getByRole("alertdialog")).toContainText("revoke existing sessions");await page.getByRole("button",{name:"Cancel",exact:true}).click();expect(state.mutations).toHaveLength(0);
 });
 test("forum inspection and reports preserve explicit moderation actions and case notes",async({page})=>{
-  const state=await fixture(page);await page.goto("/admin-dashboard?section=forum");await page.getByRole("button",{name:"Inspect thread",exact:true}).click();await expect(page.getByRole("region",{name:"Thread inspection",exact:true})).toContainText("Synthetic reply");await page.getByRole("button",{name:"Delete thread",exact:true}).click();await page.getByRole("button",{name:"Cancel",exact:true}).click();expect(state.mutations).toHaveLength(0);await page.goto("/admin/assessments?section=reports");await page.getByLabel("Resolution notes for Synthetic Reported Student",{exact:true}).fill("Synthetic reviewed disposition");await page.getByRole("button",{name:"Dismiss",exact:true}).click();await page.getByRole("button",{name:"Confirm",exact:true}).click();await expect(page.getByText("Resolution: Synthetic reviewed disposition",{exact:true})).toBeVisible();expect(state.mutations.map((m:any)=>m.path)).toEqual(["/api/admin/reports/report"]);
+  const state=await fixture(page);await page.goto("/admin-dashboard?section=forum");await page.getByRole("button",{name:"Inspect",exact:true}).click();await expect(page.getByRole("region",{name:"Thread inspection",exact:true})).toContainText("Synthetic reply");await page.getByRole("button",{name:"Delete thread",exact:true}).click();await page.getByRole("button",{name:"Cancel",exact:true}).click();expect(state.mutations).toHaveLength(0);await page.goto("/admin/assessments?section=reports");await page.getByLabel("Resolution notes for Synthetic Reported Student",{exact:true}).fill("Synthetic reviewed disposition");await page.getByRole("button",{name:"Dismiss",exact:true}).click();await page.getByRole("button",{name:"Confirm",exact:true}).click();await expect(page.getByText("Resolution: Synthetic reviewed disposition",{exact:true})).toBeVisible();expect(state.mutations.map((m:any)=>m.path)).toEqual(["/api/admin/reports/report"]);
 });
 test("leaderboard audit shows approved metrics and honest empty states without invented points",async({page})=>{
   const state=await fixture(page);await page.goto("/admin-dashboard?section=leaderboard");await expect(page.getByRole("table")).toContainText("4.5/5");await page.getByRole("tab",{name:"Most Active",exact:true}).click();await expect(page.getByRole("table")).toContainText("80.0%");await expect(page.getByRole("columnheader",{name:"Raw completed exchanges",exact:true})).toBeVisible();state.mentors=[];state.activity=[];await page.getByRole("button",{name:"Refresh data",exact:true}).click();await expect(page.getByRole("status")).toContainText("two distinct completed partners");expect(state.mutations).toHaveLength(0);
@@ -384,7 +384,7 @@ test("assessment skill selector preserves JSON content and keeps raw IDs and adv
 
 test("admin can inspect and remove one reply with confirmation and recoverable errors",async({page})=>{
   const state=await fixture(page);state.replies.push({id:"keep",content:"Keep this unrelated reply",author:{id:"other",name:"Another Student"},createdAt:"2026-11-01T00:00Z"});state.posts[0]._count.comments=2;
-  await page.goto("/admin-dashboard?section=forum");await page.getByRole("button",{name:"Inspect thread",exact:true}).click();const inspector=page.getByRole("region",{name:"Thread inspection",exact:true});
+  await page.goto("/admin-dashboard?section=forum");await page.getByRole("button",{name:"Inspect",exact:true}).click();const inspector=page.getByRole("region",{name:"Thread inspection",exact:true});
   await expect(inspector.getByRole("region",{name:"Original thread",exact:true})).toContainText("Synthetic Author");
   const remove=page.getByRole("button",{name:"Delete reply by Synthetic Replier",exact:true});await remove.click();await page.getByRole("button",{name:"Keep Reply",exact:true}).click();expect(state.mutations).toHaveLength(0);
   state.failure="/api/forum/posts/post/comments/reply";await remove.click();await page.getByLabel("Moderation reason",{exact:true}).selectOption("SPAM");await page.getByRole("alertdialog").getByRole("button",{name:"Delete Reply",exact:true}).click();await expect(page.getByRole("alertdialog").getByRole("alert")).toContainText("Synthetic endpoint unavailable");
@@ -392,3 +392,62 @@ test("admin can inspect and remove one reply with confirmation and recoverable e
   await expect(inspector.getByText("Synthetic reply",{exact:true})).toHaveCount(0);await expect(inspector.getByText("Keep this unrelated reply",{exact:true})).toBeVisible();await expect(inspector.getByText("Full synthetic discussion",{exact:true})).toBeVisible();
   await expect(page.getByRole("table").locator("tbody tr")).toContainText("1");expect(state.posts).toHaveLength(1);expect(state.replies).toHaveLength(1);expect(state.mutations.map((m:any)=>m.path)).toEqual(["/api/forum/posts/post/comments/reply"]);
 });
+
+
+for (const theme of ["light", "dark"]) {
+  test(`${theme} minimalist admin surfaces preserve data, full IDs and actions`, async ({page},info)=>{
+    test.setTimeout(60000);
+    const state=await fixture(page,{theme});
+    const uuid="12345678-1234-4abc-8abc-123456789abc";
+    state.evaluations[0]={...state.evaluations[0],rating:5,swap:{...state.evaluations[0].swap,id:uuid}};
+    state.evaluations.push({...state.evaluations[0],id:"unvalidated",isValidated:false,countedInOverview:false});
+    state.users[3]={...state.users[3],isSuspended:true,activeSuspensionId:"synthetic-restriction"};
+    state.programs[1].mappingValidatedAt=null;state.programs[2].mappingValidatedAt=null;state.programs[2].department=null;
+    const originalViewport=page.viewportSize()!;
+    await page.goto("/admin-dashboard");
+    const header=page.locator(".admin-header"),actions=header.locator(".admin-header-actions");
+    await expect(actions.getByRole("button")).toHaveCount(2);
+    await expect(header.getByText("Administrator",{exact:true})).toHaveCount(0);
+    await expect(header.locator(".admin-account,.lucide-shield-check")).toHaveCount(0);
+    await expect(page.locator(".admin-metric-value")).toHaveText(["2","0","4","8"]);
+    for(const width of [320,768,1280]){
+      await page.setViewportSize({width,height:900});
+      const metrics=await page.locator(".admin-metric").evaluateAll(nodes=>nodes.map(el=>({border:getComputedStyle(el).borderTopWidth,borderColor:getComputedStyle(el).borderTopColor,background:getComputedStyle(el).backgroundColor,icon:getComputedStyle(el.querySelector(".admin-metric-icon")!).color,iconBackground:getComputedStyle(el.querySelector(".admin-metric-icon")!).backgroundColor})));
+      expect(metrics).toHaveLength(4);for(const metric of metrics)expect(metric).toEqual(metrics[0]);expect(metrics[0].border).toBe("1px");
+      expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+    }
+    await page.setViewportSize(originalViewport);
+    await page.screenshot({path:info.outputPath(`minimal-overview-${theme}.png`),fullPage:true});
+    const toggle=page.getByRole("button",{name:"Administrator navigation",exact:true});if(await toggle.isVisible())await toggle.click();
+    const active=page.locator(".admin-nav-link[aria-current=page]");await expect(active).toHaveText("Overview");await expect(active).toHaveCSS("box-shadow","none");await expect(active).toHaveCSS("border-left-width","0px");
+    await expect(active).toHaveCSS("background-color",theme==="light"?"rgb(234, 241, 255)":"rgb(26, 48, 80)");
+    await expect(active).toHaveCSS("color",theme==="light"?"rgb(36, 88, 211)":"rgb(191, 219, 254)");
+    await expect(page.locator(".admin-nav-dot")).toHaveCount(0);
+    await active.focus();await page.keyboard.press("Shift+Tab");await page.keyboard.press("Tab");await expect(active).toBeFocused();await expect(active).toHaveCSS("outline-style","solid");await page.keyboard.press("Tab");
+    const inactive=page.getByRole("navigation",{name:"Admin navigation",exact:true}).getByRole("link",{name:"Analytics & Trends",exact:true});await expect(inactive).toBeFocused();await inactive.hover();await expect(inactive).toHaveCSS("background-color",theme==="light"?"rgb(244, 247, 252)":"rgb(21, 34, 57)");
+    await page.goto("/admin-dashboard?section=analytics");
+    const legend=page.locator(".admin-legend");await expect(legend.locator("span")).toHaveText(["■ Supply — active teaching links","■ Demand — wanted links"]);
+    for(const item of await legend.locator("span").all()){await expect(item).toHaveCSS("border-top-width","0px");await expect(item).toHaveCSS("background-color","rgba(0, 0, 0, 0)");await expect(item).toHaveCSS("border-radius","0px");}
+    await page.goto("/admin-dashboard?section=evaluations");
+    const table=page.getByRole("table",{name:"Peer evaluations",exact:true}),row=table.locator("tbody tr").filter({hasText:"Synthetic Reviewer 0"}).first();
+    const id=row.getByRole("button",{name:"View full exchange ID 12345678",exact:true});await expect(id).toHaveText("Exchange 12345678");await expect(row).not.toContainText(uuid);
+    await expect(row.getByLabel("5 out of 5 stars",{exact:true}).locator("svg")).toHaveCount(1);
+    const validated=row.locator(".admin-status-plain");await expect(validated).toHaveText("Validated");await expect(validated.locator("svg")).toHaveCount(1);
+    await expect(validated).toHaveCSS("border-top-width","0px");await expect(validated).toHaveCSS("background-color","rgba(0, 0, 0, 0)");await expect(row.getByText("completed",{exact:true})).toHaveClass(/text-xs/);
+    await readableContrast(page,".admin-status-plain",".admin-panel");
+    await id.scrollIntoViewIfNeeded();await id.focus();await page.keyboard.press("Enter");const popup=page.getByRole("dialog",{name:"Full exchange ID",exact:true});await expect(popup).toContainText(uuid);await expect(popup).toHaveCSS("background-color",theme==="light"?"rgb(255, 255, 255)":"rgb(17, 30, 50)");
+    const bounds=await popup.boundingBox();expect(bounds!.x).toBeGreaterThanOrEqual(0);expect(bounds!.x+bounds!.width).toBeLessThanOrEqual(originalViewport.width);
+    await page.screenshot({path:info.outputPath(`full-exchange-id-${theme}.png`)});
+    await page.keyboard.press("Escape");await expect(popup).toHaveCount(0);await expect(id).toBeFocused();expect(state.evaluations[0].swap.id).toBe(uuid);
+    await page.getByLabel("Validation status",{exact:true}).selectOption("UNVALIDATED");await expect(table.locator("tbody tr")).toHaveCount(1);await expect(table.locator(".admin-status-plain")).toHaveText("Not validated");await expect(table.locator(".admin-status-plain svg")).toHaveCount(0);
+    await page.goto("/admin-dashboard?section=students");const accounts=page.getByRole("table",{name:"Registered account directory",exact:true});
+    for(const [index,status,disabled]of [[1,"Active",false],[2,"Legacy suspension",true],[3,"Temporary suspension",true]] as const){const account=accounts.locator("tbody tr").filter({hasText:`synthetic-account-${index}-long-address@fixture.test`});const label=account.locator(".admin-status-plain");await expect(label).toHaveText(status);await expect(label.locator("span[aria-hidden=true]")).toHaveCount(1);await expect(label).toHaveCSS("border-top-width","0px");await expect(label).toHaveCSS("background-color","rgba(0, 0, 0, 0)");const suspend=account.getByRole("button",{name:"Suspend account",exact:true});if(disabled)await expect(suspend).toBeDisabled();else await expect(suspend).toBeEnabled();await expect(account.getByRole("button",{name:/Suspension history/})).toBeEnabled();}
+    await readableContrast(page,".admin-status-plain",".admin-panel");
+    await page.goto("/admin/assessments?section=academic");const programs=page.getByRole("table",{name:"Academic program directory",exact:true});
+    await expect(programs.locator("tbody tr")).toHaveCount(13);
+    for(const [index,status]of [[0,"Validation recorded"],[1,"Provisional"],[2,"Not recorded"]]as const){const program=programs.locator("tbody tr").nth(index);const label=program.locator(".admin-status-plain");await expect(label).toHaveText(status);await expect(label).toHaveCSS("border-top-width","0px");await expect(label).toHaveCSS("background-color","rgba(0, 0, 0, 0)");await expect(label.locator("svg")).toHaveCount(index===0?1:0);await expect(program.getByRole("button",{name:/Stored mapping evidence/})).toHaveCSS("border-top-width","1px");}
+    await programs.locator("tbody tr").first().getByRole("button",{name:/Stored mapping evidence/}).click();await expect(page.getByRole("region",{name:"Program mapping details",exact:true})).toContainText("Synthetic mapping evidence; not an institutional approval.");
+    await page.goto("/admin-dashboard?section=forum");const inspect=page.getByRole("button",{name:"Inspect",exact:true});await expect(inspect).toHaveCSS("border-top-width","0px");await expect(inspect).toHaveCSS("box-shadow","none");await inspect.focus();await page.keyboard.press("Enter");await expect(page.getByRole("region",{name:"Thread inspection",exact:true})).toContainText("Synthetic reply");
+    expect(state.mutations).toHaveLength(0);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  });
+}

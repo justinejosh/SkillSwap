@@ -4,6 +4,7 @@ import { api } from "@/app/lib/api";
 import { LoadingContent } from "../PageSkeleton";
 import { DateTimeText } from "../DateTimeText";
 import { Button } from "../ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { AdminPager, AdminStatus } from "./AdminUI";
 
 interface Evaluation {
@@ -42,10 +43,10 @@ export function PeerEvaluations({ refreshKey }: { refreshKey: number }) {
       <p role="status" className="text-sm text-slate-600 dark:text-slate-300">Showing {data.reviews.length} of {data.total} matching evaluations.</p>
       {!data.reviews.length ? <p>No peer evaluations match this view.</p> : <div className="admin-scroll" tabIndex={0} aria-label="Scrollable peer evaluations"><table className="admin-table"><caption className="sr-only">Peer evaluations</caption><thead><tr><th>Reviewer</th><th>Reviewed student</th><th>Rating</th><th>Feedback</th><th>Skill exchange</th><th>Submitted</th><th>Validation</th></tr></thead><tbody>{data.reviews.map(review => <tr key={review.id}>
         <td className="min-w-32"><span className="break-words font-medium">{review.reviewer.name}</span></td><td className="min-w-32"><span className="break-words font-medium">{review.reviewee.name}</span></td>
-        <td>{Number.isInteger(review.rating) && review.rating >= 1 && review.rating <= 5 ? <span className="inline-flex items-center gap-1.5 whitespace-nowrap" aria-label={`${review.rating} out of 5 stars`}><Star className="size-4 fill-amber-500 text-amber-700 dark:text-amber-300" aria-hidden="true" />{review.rating} / 5</span> : <span>Stored rating {review.rating} (outside 1–5)</span>}</td>
+        <td className="admin-evaluation-cell">{Number.isInteger(review.rating) && review.rating >= 1 && review.rating <= 5 ? <span className="inline-flex items-center gap-1.5 whitespace-nowrap" aria-label={`${review.rating} out of 5 stars`}><Star className="size-4 fill-amber-500 text-amber-700 dark:text-amber-300" aria-hidden="true" />{review.rating} / 5</span> : <span>Stored rating {review.rating} (outside 1–5)</span>}</td>
         <td><p className="min-w-44 max-w-sm whitespace-pre-wrap [overflow-wrap:anywhere]">{review.comment?.trim() ? review.comment : "No written feedback."}</p></td>
-        <td className="min-w-44"><p className="break-words">{review.swap.offeredSkill.name} ⇄ {review.swap.wantedSkill.name}</p><p className="mt-2 max-w-xs break-all text-xs text-slate-600 dark:text-slate-300">Exchange {review.swap.id}</p><p className="mt-1 text-xs capitalize text-slate-600 dark:text-slate-300">{review.swap.status.replaceAll("_", " ").toLowerCase()}</p></td>
-        <td><DateTimeText value={review.createdAt} /></td><td><AdminStatus status={review.isValidated ? "Validated" : "Not validated"} />{!review.countedInOverview && <p className="mt-2 text-xs text-slate-600 dark:text-slate-300">Excluded from Overview</p>}</td>
+        <td className="admin-evaluation-cell min-w-44"><p className="break-words">{review.swap.offeredSkill.name} ⇄ {review.swap.wantedSkill.name}</p><Popover><PopoverTrigger asChild><button type="button" className="admin-minimal-action mt-1 text-left text-xs text-slate-600 underline-offset-2 hover:underline dark:text-slate-300" aria-label={`View full exchange ID ${review.swap.id.slice(0, 8)}`}>Exchange {review.swap.id.slice(0, 8)}</button></PopoverTrigger><PopoverContent aria-label="Full exchange ID" className="admin-id-popover w-72 max-w-[calc(100vw-2rem)] text-sm data-[state=open]:animate-none data-[state=closed]:animate-none"><p className="font-medium">Full exchange ID</p><p className="mt-1 select-text break-all font-mono text-xs">{review.swap.id}</p></PopoverContent></Popover><p className="mt-1 text-xs capitalize text-slate-600 dark:text-slate-300">{review.swap.status.replaceAll("_", " ").toLowerCase()}</p></td>
+        <td><DateTimeText value={review.createdAt} /></td><td className="admin-evaluation-cell"><AdminStatus plain indicator={review.isValidated ? "check" : "dot"} status={review.isValidated ? "Validated" : "Not validated"} />{!review.countedInOverview && <p className="mt-2 text-xs text-slate-600 dark:text-slate-300">Excluded from Overview</p>}</td>
       </tr>)}</tbody></table></div>}
       <AdminPager page={page} total={data.total} pageSize={20} onPage={setPage} />
     </>}
