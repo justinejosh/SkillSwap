@@ -473,15 +473,20 @@ test("email signup legal reader preserves data and requires independent consent"
     await expect(page.getByLabel("Full Name", { exact: true })).toHaveValue("Synthetic Preserved Student");
   }
   await page.getByRole("checkbox").check();
-  await page.getByRole("button", { name: "Privacy Policy", exact: true }).click();
-
-  await expect(page.getByRole("dialog")).toBeVisible();
+  const privacy = page.getByRole("button", { name: "Privacy Policy", exact: true });
+  await privacy.click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toBeVisible();
+  // Visibility can precede Radix's focus setup and Escape listener registration.
+  await expect(dialog.getByLabel("Policy content")).toBeFocused();
 
   await page.keyboard.press("Escape");
 
-  await expect(page.getByRole("dialog")).toBeHidden();
+  await expect(dialog).toBeHidden();
+  await expect(privacy).toBeFocused();
 
   await expect(page.getByRole("checkbox")).toBeChecked();
+  await expect(page.getByLabel("Full Name", { exact: true })).toHaveValue("Synthetic Preserved Student");
   expect(f.calls.some(c => c.path.endsWith("/register"))).toBe(false);
   expect(refWarnings).toEqual([]);
 });

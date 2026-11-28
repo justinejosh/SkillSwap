@@ -58,7 +58,7 @@ test("invalid and oversized selections block submission until explicitly removed
 });
 test("administrator reason is required, audited, and viewable after the reply is gone", async ({ page }, info) => {
   if(info.project.name==="mobile")await page.setViewportSize({width:320,height:640});
-  const state = await fixture(page, "ADMIN"); await page.goto("/admin-dashboard?section=forum"); await page.getByRole("button", { name: "Inspect thread", exact: true }).click(); await page.getByRole("button", { name: "Delete reply by Synthetic Author", exact: true }).click(); const dialog = page.getByRole("alertdialog"), remove = dialog.getByRole("button", { name: "Delete Reply", exact: true }); await expect(remove).toBeDisabled();
+  const state = await fixture(page, "ADMIN"); await page.goto("/admin-dashboard?section=forum"); await page.getByRole("button", { name: "Inspect", exact: true }).click(); await page.getByRole("button", { name: "Delete reply by Synthetic Author", exact: true }).click(); const dialog = page.getByRole("alertdialog"), remove = dialog.getByRole("button", { name: "Delete Reply", exact: true }); await expect(remove).toBeDisabled();
   await page.getByLabel("Moderation reason", { exact: true }).selectOption("OTHER"); await expect(remove).toBeDisabled(); await page.getByLabel("Short explanation", { exact: true }).fill("Synthetic review reason only");
   for (const dark of [false, true]) { await page.evaluate(value => document.documentElement.classList.toggle("dark", value), dark); const expected = await themeColors(page,dark); await expect(dialog).toHaveCSS("background-color",expected.background); await expect(dialog).toHaveCSS("color",expected.color); }
   await dialog.screenshot({path:info.outputPath("moderation-dark.png")});
